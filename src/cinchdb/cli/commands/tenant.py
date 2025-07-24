@@ -10,7 +10,7 @@ from cinchdb.config import Config
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.tenant import TenantManager
 
-app = typer.Typer(help="Tenant management commands")
+app = typer.Typer(help="Tenant management commands", no_args_is_help=True)
 console = Console()
 
 

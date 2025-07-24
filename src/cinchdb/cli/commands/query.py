@@ -11,7 +11,7 @@ from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.cli.utils import get_config_with_data
 
-app = typer.Typer(help="Execute SQL queries")
+app = typer.Typer(help="Execute SQL queries", no_args_is_help=True)
 console = Console()
 
 

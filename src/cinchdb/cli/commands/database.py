@@ -10,7 +10,7 @@ from cinchdb.core.path_utils import list_databases
 from cinchdb.models import Database
 from cinchdb.cli.utils import get_config_with_data, set_active_database, set_active_branch
 
-app = typer.Typer(help="Database management commands")
+app = typer.Typer(help="Database management commands", no_args_is_help=True)
 console = Console()
 
 

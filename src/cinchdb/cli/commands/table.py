@@ -11,20 +11,18 @@ from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
 from cinchdb.cli.utils import get_config_with_data
 
-app = typer.Typer(help="Table management commands")
+app = typer.Typer(help="Table management commands", no_args_is_help=True)
 console = Console()
 
 
 @app.command(name="list")
-def list_tables(
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name")
-):
+def list_tables():
     """List all tables in the current branch."""
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
     
-    table_mgr = TableManager(config.project_dir, db_name, branch_name, tenant)
+    table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
     tables = table_mgr.list_tables()
     
     if not tables:
@@ -50,7 +48,6 @@ def list_tables(
 def create(
     name: str = typer.Argument(..., help="Name of the table"),
     columns: List[str] = typer.Argument(..., help="Column definitions (format: name:type[:nullable])"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Create a new table.
@@ -87,11 +84,11 @@ def create(
         parsed_columns.append(Column(name=col_name, type=col_type, nullable=nullable))
     
     try:
-        table_mgr = TableManager(config.project_dir, db_name, branch_name, tenant)
+        table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
         table = table_mgr.create_table(name, parsed_columns)
         console.print(f"[green]✅ Created table '{name}' with {len(parsed_columns)} columns[/green]")
         
-        if apply and tenant == "main":
+        if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
@@ -106,7 +103,6 @@ def create(
 @app.command()
 def delete(
     name: str = typer.Argument(..., help="Name of the table to delete"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
@@ -123,11 +119,11 @@ def delete(
             raise typer.Exit(0)
     
     try:
-        table_mgr = TableManager(config.project_dir, db_name, branch_name, tenant)
+        table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
         table_mgr.delete_table(name)
         console.print(f"[green]✅ Deleted table '{name}'[/green]")
         
-        if apply and tenant == "main":
+        if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
@@ -143,7 +139,6 @@ def delete(
 def copy(
     source: str = typer.Argument(..., help="Source table name"),
     target: str = typer.Argument(..., help="Target table name"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     data: bool = typer.Option(True, "--data/--no-data", help="Copy data along with structure"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
@@ -153,11 +148,11 @@ def copy(
     branch_name = config_data.active_branch
     
     try:
-        table_mgr = TableManager(config.project_dir, db_name, branch_name, tenant)
+        table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
         table = table_mgr.copy_table(source, target, copy_data=data)
         console.print(f"[green]✅ Copied table '{source}' to '{target}'[/green]")
         
-        if apply and tenant == "main":
+        if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
@@ -171,8 +166,7 @@ def copy(
 
 @app.command()
 def info(
-    name: str = typer.Argument(..., help="Table name"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name")
+    name: str = typer.Argument(..., help="Table name")
 ):
     """Show detailed information about a table."""
     config, config_data = get_config_with_data()
@@ -180,7 +174,7 @@ def info(
     branch_name = config_data.active_branch
     
     try:
-        table_mgr = TableManager(config.project_dir, db_name, branch_name, tenant)
+        table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
         table = table_mgr.get_table(name)
         
         # Display info

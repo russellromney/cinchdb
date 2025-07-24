@@ -9,20 +9,18 @@ from cinchdb.managers.view import ViewModel
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.cli.utils import get_config_with_data
 
-app = typer.Typer(help="View management commands")
+app = typer.Typer(help="View management commands", no_args_is_help=True)
 console = Console()
 
 
 @app.command(name="list")
-def list_views(
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name")
-):
+def list_views():
     """List all views in the current branch."""
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
     
-    view_mgr = ViewModel(config.project_dir, db_name, branch_name, tenant)
+    view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
     views = view_mgr.list_views()
     
     if not views:
@@ -46,7 +44,6 @@ def list_views(
 def create(
     name: str = typer.Argument(..., help="Name of the view"),
     sql: str = typer.Argument(..., help="SQL query for the view"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Create a new view.
@@ -60,11 +57,11 @@ def create(
     branch_name = config_data.active_branch
     
     try:
-        view_mgr = ViewModel(config.project_dir, db_name, branch_name, tenant)
+        view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
         view = view_mgr.create_view(name, sql)
         console.print(f"[green]✅ Created view '{name}'[/green]")
         
-        if apply and tenant == "main":
+        if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
@@ -80,7 +77,6 @@ def create(
 def update(
     name: str = typer.Argument(..., help="Name of the view to update"),
     sql: str = typer.Argument(..., help="New SQL query for the view"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Update an existing view's SQL."""
@@ -89,11 +85,11 @@ def update(
     branch_name = config_data.active_branch
     
     try:
-        view_mgr = ViewModel(config.project_dir, db_name, branch_name, tenant)
+        view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
         view_mgr.update_view(name, sql)
         console.print(f"[green]✅ Updated view '{name}'[/green]")
         
-        if apply and tenant == "main":
+        if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
@@ -108,7 +104,6 @@ def update(
 @app.command()
 def delete(
     name: str = typer.Argument(..., help="Name of the view to delete"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
@@ -125,11 +120,11 @@ def delete(
             raise typer.Exit(0)
     
     try:
-        view_mgr = ViewModel(config.project_dir, db_name, branch_name, tenant)
+        view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
         view_mgr.delete_view(name)
         console.print(f"[green]✅ Deleted view '{name}'[/green]")
         
-        if apply and tenant == "main":
+        if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
@@ -143,8 +138,7 @@ def delete(
 
 @app.command()
 def info(
-    name: str = typer.Argument(..., help="View name"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name")
+    name: str = typer.Argument(..., help="View name")
 ):
     """Show detailed information about a view."""
     config, config_data = get_config_with_data()
@@ -152,7 +146,7 @@ def info(
     branch_name = config_data.active_branch
     
     try:
-        view_mgr = ViewModel(config.project_dir, db_name, branch_name, tenant)
+        view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
         view = view_mgr.get_view(name)
         
         # Display info

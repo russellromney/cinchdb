@@ -11,6 +11,7 @@ app = typer.Typer(
     name="cinch",
     help="CinchDB - A Git-like SQLite database management system",
     add_completion=False,
+    no_args_is_help=True,
 )
 
 # Add command groups

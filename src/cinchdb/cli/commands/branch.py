@@ -10,7 +10,7 @@ from cinchdb.config import Config
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.branch import BranchManager
 
-app = typer.Typer(help="Branch management commands")
+app = typer.Typer(help="Branch management commands", no_args_is_help=True)
 console = Console()
 
 

@@ -10,14 +10,13 @@ from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
 from cinchdb.cli.utils import get_config_with_data
 
-app = typer.Typer(help="Column management commands")
+app = typer.Typer(help="Column management commands", no_args_is_help=True)
 console = Console()
 
 
 @app.command(name="list")
 def list_columns(
-    table: str = typer.Argument(..., help="Table name"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name")
+    table: str = typer.Argument(..., help="Table name")
 ):
     """List all columns in a table."""
     config, config_data = get_config_with_data()
@@ -25,7 +24,7 @@ def list_columns(
     branch_name = config_data.active_branch
     
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
         columns = column_mgr.list_columns(table)
         
         # Create a table
@@ -56,7 +55,6 @@ def add(
     type: str = typer.Argument(..., help="Column type (TEXT, INTEGER, REAL, BLOB, NUMERIC)"),
     nullable: bool = typer.Option(True, "--nullable/--not-null", help="Allow NULL values"),
     default: Optional[str] = typer.Option(None, "--default", "-d", help="Default value"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Add a new column to a table."""
@@ -72,13 +70,13 @@ def add(
         raise typer.Exit(1)
     
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
         column = Column(name=name, type=type, nullable=nullable, default=default)
         column_mgr.add_column(table, column)
         
         console.print(f"[green]✅ Added column '{name}' to table '{table}'[/green]")
         
-        if apply and tenant == "main":
+        if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
@@ -94,7 +92,6 @@ def add(
 def drop(
     table: str = typer.Argument(..., help="Table name"),
     name: str = typer.Argument(..., help="Column name to drop"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
@@ -111,12 +108,12 @@ def drop(
             raise typer.Exit(0)
     
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
         column_mgr.drop_column(table, name)
         
         console.print(f"[green]✅ Dropped column '{name}' from table '{table}'[/green]")
         
-        if apply and tenant == "main":
+        if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
@@ -133,7 +130,6 @@ def rename(
     table: str = typer.Argument(..., help="Table name"),
     old_name: str = typer.Argument(..., help="Current column name"),
     new_name: str = typer.Argument(..., help="New column name"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Rename a column in a table."""
@@ -142,12 +138,12 @@ def rename(
     branch_name = config_data.active_branch
     
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
         column_mgr.rename_column(table, old_name, new_name)
         
         console.print(f"[green]✅ Renamed column '{old_name}' to '{new_name}' in table '{table}'[/green]")
         
-        if apply and tenant == "main":
+        if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
@@ -162,8 +158,7 @@ def rename(
 @app.command()
 def info(
     table: str = typer.Argument(..., help="Table name"),
-    name: str = typer.Argument(..., help="Column name"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name")
+    name: str = typer.Argument(..., help="Column name")
 ):
     """Show detailed information about a column."""
     config, config_data = get_config_with_data()
@@ -171,7 +166,7 @@ def info(
     branch_name = config_data.active_branch
     
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
         column = column_mgr.get_column_info(table, name)
         
         # Display info

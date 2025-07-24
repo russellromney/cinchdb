@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
+from cinchdb.core.maintenance import check_maintenance_mode
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.query import QueryManager
 
@@ -101,7 +102,11 @@ class DataManager:
             
         Raises:
             ValueError: If record with same ID already exists
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         table_name = self._get_table_name(type(instance))
         
         # Prepare data for insertion
@@ -145,7 +150,13 @@ class DataManager:
             
         Returns:
             Saved model instance with updated timestamps
+            
+        Raises:
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         data = instance.model_dump()
         
         # Generate ID if not provided
@@ -173,7 +184,11 @@ class DataManager:
             
         Raises:
             ValueError: If record doesn't exist
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         table_name = self._get_table_name(type(instance))
         data = instance.model_dump()
         
@@ -218,7 +233,11 @@ class DataManager:
             
         Raises:
             ValueError: If no filters provided or table doesn't exist
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         if not filters:
             raise ValueError("Delete requires at least one filter to prevent accidental deletion of all records")
         
@@ -248,6 +267,9 @@ class DataManager:
             
         Returns:
             True if record was deleted, False if not found
+            
+        Raises:
+            MaintenanceError: If branch is in maintenance mode
         """
         deleted_count = self.delete(model_class, id=record_id)
         return deleted_count > 0
@@ -260,7 +282,13 @@ class DataManager:
             
         Returns:
             List of created model instances with populated IDs and timestamps
+            
+        Raises:
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         if not instances:
             return []
         

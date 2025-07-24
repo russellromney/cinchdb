@@ -6,6 +6,7 @@ from typing import List
 from cinchdb.models import View, Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
+from cinchdb.core.maintenance import check_maintenance_mode
 from cinchdb.managers.change_tracker import ChangeTracker
 
 
@@ -69,7 +70,11 @@ class ViewModel:
             
         Raises:
             ValueError: If view already exists
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         # Check if view already exists
         if self._view_exists(view_name):
             raise ValueError(f"View '{view_name}' already exists")
@@ -115,7 +120,11 @@ class ViewModel:
             
         Raises:
             ValueError: If view doesn't exist
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         # Check if view exists
         if not self._view_exists(view_name):
             raise ValueError(f"View '{view_name}' does not exist")
@@ -158,7 +167,11 @@ class ViewModel:
             
         Raises:
             ValueError: If view doesn't exist
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         # Check if view exists
         if not self._view_exists(view_name):
             raise ValueError(f"View '{view_name}' does not exist")

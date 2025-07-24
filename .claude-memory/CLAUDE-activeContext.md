@@ -298,6 +298,29 @@ Phase 6 (API Development) completed:
   - Collects statements for all change types including multi-step operations
   - Added comprehensive test coverage (3 new tests)
 
+- **Snapshot-Based Rollback for Change Application** ✅
+  - Implemented atomic change application with rollback capability
+  - Creates database snapshots before applying changes to tenants
+  - Restores all tenants if any fail (maintains consistency)
+  - Handles WAL and SHM files properly
+  - Accepts brief "maintenance mode" downtime for consistency
+  - Added comprehensive test coverage (6 new tests)
+  - ChangeError exception for better error handling
+
+- **Write Blocking During Maintenance Mode** ✅
+  - Implemented hard write blocking while schema changes are being applied
+  - Added `check_maintenance_mode()` to all write operations across managers:
+    - TableManager: create_table, delete_table, copy_table
+    - ColumnManager: add_column, drop_column, rename_column
+    - ViewModel: create_view, update_view, delete_view
+    - DataManager: create, save, update, delete, bulk_create
+    - TenantManager: create_tenant, delete_tenant, copy_tenant
+  - File-based maintenance mode (.maintenance_mode) for cross-process coordination
+  - MaintenanceError exception raised when writes attempted during maintenance
+  - Read operations remain available during maintenance
+  - Added comprehensive test coverage (19 tests, all passing)
+  - Maintenance mode automatically cleared after change application (success or failure)
+
 ### Unified Interface Features
 - **Simple API**: `db = cinch.connect("mydb")` then `db.query("SELECT * FROM users")`
 - **Convenience methods**: `db.create_table()`, `db.insert()`, `db.update()`, `db.delete()`

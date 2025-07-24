@@ -11,6 +11,7 @@ from cinchdb.core.path_utils import (
     list_tenants,
 )
 from cinchdb.core.connection import DatabaseConnection
+from cinchdb.core.maintenance import check_maintenance_mode
 
 
 class TenantManager:
@@ -61,7 +62,11 @@ class TenantManager:
             
         Raises:
             ValueError: If tenant already exists
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         # Validate tenant doesn't exist
         if tenant_name in list_tenants(self.project_root, self.database, self.branch):
             raise ValueError(f"Tenant '{tenant_name}' already exists")
@@ -105,7 +110,11 @@ class TenantManager:
             
         Raises:
             ValueError: If tenant doesn't exist or is main tenant
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         # Can't delete main tenant
         if tenant_name == "main":
             raise ValueError("Cannot delete the main tenant")
@@ -139,7 +148,11 @@ class TenantManager:
             
         Raises:
             ValueError: If source doesn't exist or target already exists
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         # Validate source exists
         if source_tenant not in list_tenants(self.project_root, self.database, self.branch):
             raise ValueError(f"Source tenant '{source_tenant}' does not exist")

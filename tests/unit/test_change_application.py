@@ -4,14 +4,15 @@ import pytest
 import tempfile
 import shutil
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 from cinchdb.config import Config
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.managers.change_tracker import ChangeTracker
-from cinchdb.managers.change_applier import ChangeApplier
+from cinchdb.managers.change_applier import ChangeApplier, ChangeError
 from cinchdb.models import Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.path_utils import get_tenant_db_path
+from cinchdb.core.path_utils import get_tenant_db_path, get_branch_path
 
 
 class TestChangeApplier:
@@ -340,3 +341,360 @@ class TestChangeApplier:
         # Verify all are applied
         changes = managers["tracker"].get_changes()
         assert all(c.applied for c in changes)
+
+
+class TestChangeApplierRollback:
+    """Test snapshot-based rollback functionality."""
+    
+    @pytest.fixture
+    def temp_project(self):
+        """Create a temporary project with config."""
+        temp = tempfile.mkdtemp()
+        project_dir = Path(temp)
+        
+        # Initialize project
+        config = Config(project_dir)
+        config.init_project()
+        
+        yield project_dir
+        shutil.rmtree(temp)
+    
+    @pytest.fixture
+    def setup_with_tenants(self, temp_project):
+        """Set up project with multiple tenants and basic tables."""
+        branch_mgr = BranchManager(temp_project, "main")
+        tenant_mgr = TenantManager(temp_project, "main", "main")
+        change_tracker = ChangeTracker(temp_project, "main", "main")
+        change_applier = ChangeApplier(temp_project, "main", "main")
+        
+        # Create multiple tenants
+        tenant_mgr.create_tenant("tenant1")
+        tenant_mgr.create_tenant("tenant2")
+        tenant_mgr.create_tenant("tenant3")
+        
+        # Create a base table in all tenants
+        base_change = Change(
+            type=ChangeType.CREATE_TABLE,
+            entity_type="table",
+            entity_name="base_table",
+            branch="main",
+            sql="CREATE TABLE base_table (id TEXT PRIMARY KEY, data TEXT)"
+        )
+        added = change_tracker.add_change(base_change)
+        change_applier.apply_change(added.id)
+        
+        # Insert test data in each tenant
+        tenants = tenant_mgr.list_tenants()
+        for tenant in tenants:
+            db_path = get_tenant_db_path(temp_project, "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                conn.execute(
+                    "INSERT INTO base_table (id, data) VALUES (?, ?)",
+                    (f"test-{tenant.name}", f"data-{tenant.name}")
+                )
+                conn.commit()
+        
+        return {
+            "project_dir": temp_project,
+            "branch_mgr": branch_mgr,
+            "tenant_mgr": tenant_mgr,
+            "change_tracker": change_tracker,
+            "change_applier": change_applier,
+            "tenants": tenants
+        }
+    
+    def test_successful_application_cleans_up_snapshots(self, setup_with_tenants):
+        """Test that successful change application cleans up snapshots."""
+        setup = setup_with_tenants
+        
+        # Create a change
+        change = Change(
+            type=ChangeType.CREATE_TABLE,
+            entity_type="table",
+            entity_name="new_table",
+            branch="main",
+            sql="CREATE TABLE new_table (id TEXT PRIMARY KEY, value INTEGER)"
+        )
+        added = setup["change_tracker"].add_change(change)
+        
+        # Apply the change
+        setup["change_applier"].apply_change(added.id)
+        
+        # Verify table exists in all tenants
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='new_table'"
+                )
+                assert cursor.fetchone() is not None
+        
+        # Verify snapshot directory was cleaned up
+        branch_path = get_branch_path(setup["project_dir"], "main", "main")
+        backup_dir = branch_path / ".change_backups" / added.id
+        assert not backup_dir.exists()
+    
+    def test_rollback_on_first_tenant_failure(self, setup_with_tenants):
+        """Test rollback when first tenant fails."""
+        setup = setup_with_tenants
+        
+        # Create a change that will fail on first tenant
+        change = Change(
+            type=ChangeType.CREATE_TABLE,
+            entity_type="table",
+            entity_name="fail_table",
+            branch="main",
+            sql="CREATE TABLE fail_table (id TEXT PRIMARY KEY)"
+        )
+        added = setup["change_tracker"].add_change(change)
+        
+        # Mock to make first tenant fail
+        original_apply = setup["change_applier"]._apply_change_to_tenant
+        call_count = 0
+        
+        def mock_apply(change, tenant_name):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:  # First tenant
+                raise Exception("Simulated failure on first tenant")
+            return original_apply(change, tenant_name)
+        
+        with patch.object(setup["change_applier"], "_apply_change_to_tenant", side_effect=mock_apply):
+            # Should raise ChangeError
+            with pytest.raises(ChangeError) as exc_info:
+                setup["change_applier"].apply_change(added.id)
+            
+            assert "Simulated failure on first tenant" in str(exc_info.value)
+        
+        # Verify table doesn't exist in any tenant
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='fail_table'"
+                )
+                assert cursor.fetchone() is None
+        
+        # Verify change not marked as applied
+        changes = setup["change_tracker"].get_changes()
+        test_change = next(c for c in changes if c.id == added.id)
+        assert not test_change.applied
+        
+        # Verify original data still intact
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                cursor = conn.execute("SELECT * FROM base_table WHERE id = ?", (f"test-{tenant.name}",))
+                row = cursor.fetchone()
+                assert row is not None
+                assert row["data"] == f"data-{tenant.name}"
+    
+    def test_rollback_on_middle_tenant_failure(self, setup_with_tenants):
+        """Test rollback when middle tenant fails after some succeed."""
+        setup = setup_with_tenants
+        
+        # Create a change
+        change = Change(
+            type=ChangeType.CREATE_TABLE,
+            entity_type="table",
+            entity_name="partial_table",
+            branch="main",
+            sql="CREATE TABLE partial_table (id TEXT PRIMARY KEY, status TEXT)"
+        )
+        added = setup["change_tracker"].add_change(change)
+        
+        # Mock to make second tenant fail
+        original_apply = setup["change_applier"]._apply_change_to_tenant
+        call_count = 0
+        
+        def mock_apply(change, tenant_name):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:  # Second tenant
+                raise Exception("Simulated failure on second tenant")
+            return original_apply(change, tenant_name)
+        
+        with patch.object(setup["change_applier"], "_apply_change_to_tenant", side_effect=mock_apply):
+            # Should raise ChangeError
+            with pytest.raises(ChangeError):
+                setup["change_applier"].apply_change(added.id)
+        
+        # Verify table doesn't exist in ANY tenant (all rolled back)
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='partial_table'"
+                )
+                assert cursor.fetchone() is None
+    
+    def test_snapshot_creation_and_restoration(self, setup_with_tenants):
+        """Test snapshot creation and restoration functionality."""
+        setup = setup_with_tenants
+        applier = setup["change_applier"]
+        
+        # Create backup directory
+        backup_dir = applier._get_backup_dir("test-backup")
+        
+        # Create snapshots
+        applier._create_snapshots(setup["tenants"], backup_dir)
+        
+        # Verify snapshots exist
+        for tenant in setup["tenants"]:
+            backup_path = backup_dir / f"{tenant.name}.db"
+            assert backup_path.exists()
+        
+        # Modify data in tenants
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                conn.execute("DELETE FROM base_table")
+                conn.execute("CREATE TABLE extra_table (id INTEGER)")
+                conn.commit()
+        
+        # Restore from snapshots
+        applier._restore_all_snapshots(setup["tenants"], backup_dir)
+        
+        # Verify data is restored
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                # Original data should be back
+                cursor = conn.execute("SELECT * FROM base_table WHERE id = ?", (f"test-{tenant.name}",))
+                row = cursor.fetchone()
+                assert row is not None
+                assert row["data"] == f"data-{tenant.name}"
+                
+                # Extra table should not exist
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='extra_table'"
+                )
+                assert cursor.fetchone() is None
+        
+        # Cleanup
+        applier._cleanup_snapshots(backup_dir)
+        assert not backup_dir.exists()
+    
+    def test_rollback_preserves_existing_data(self, setup_with_tenants):
+        """Test that rollback preserves all existing data and state."""
+        setup = setup_with_tenants
+        
+        # Add more data to base table
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                for i in range(5):
+                    conn.execute(
+                        "INSERT INTO base_table (id, data) VALUES (?, ?)",
+                        (f"extra-{tenant.name}-{i}", f"value-{i}")
+                    )
+                conn.commit()
+        
+        # Create a failing change
+        change = Change(
+            type=ChangeType.CREATE_TABLE,
+            entity_type="table",
+            entity_name="bad_table",
+            branch="main",
+            sql="CREATE TABLE bad_table SYNTAX ERROR HERE"  # Definitely bad SQL
+        )
+        added = setup["change_tracker"].add_change(change)
+        
+        # Apply should fail
+        with pytest.raises(ChangeError):
+            setup["change_applier"].apply_change(added.id)
+        
+        # Verify all original data is intact
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                cursor = conn.execute("SELECT COUNT(*) as count FROM base_table")
+                count = cursor.fetchone()["count"]
+                assert count == 6  # 1 original + 5 extra
+                
+                # Verify specific records
+                cursor = conn.execute("SELECT * FROM base_table ORDER BY id")
+                rows = cursor.fetchall()
+                assert len(rows) == 6
+    
+    def test_rollback_with_wal_files(self, setup_with_tenants):
+        """Test that rollback properly handles WAL and SHM files."""
+        setup = setup_with_tenants
+        
+        # Ensure WAL files exist by doing operations
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                conn.execute("INSERT INTO base_table (id, data) VALUES ('wal-test', 'wal-data')")
+                conn.commit()  # Commit to ensure data is persisted
+        
+        # Create a failing change
+        change = Change(
+            type=ChangeType.CREATE_TABLE,
+            entity_type="table",
+            entity_name="wal_test_table",
+            branch="main",
+            sql="CREATE TABLE wal_test_table (id TEXT PRIMARY KEY)"
+        )
+        added = setup["change_tracker"].add_change(change)
+        
+        # Make it fail on second tenant
+        original_apply = setup["change_applier"]._apply_change_to_tenant
+        call_count = 0
+        
+        def mock_apply(change, tenant_name):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise Exception("Simulated WAL test failure")
+            return original_apply(change, tenant_name)
+        
+        with patch.object(setup["change_applier"], "_apply_change_to_tenant", side_effect=mock_apply):
+            with pytest.raises(ChangeError):
+                setup["change_applier"].apply_change(added.id)
+        
+        # Verify data integrity after rollback
+        for tenant in setup["tenants"]:
+            db_path = get_tenant_db_path(setup["project_dir"], "main", "main", tenant.name)
+            with DatabaseConnection(db_path) as conn:
+                # WAL test data should still be there
+                cursor = conn.execute("SELECT * FROM base_table WHERE id = 'wal-test'")
+                row = cursor.fetchone()
+                assert row is not None
+                assert row["data"] == "wal-data"
+                
+                # New table should not exist
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='wal_test_table'"
+                )
+                assert cursor.fetchone() is None
+    
+    def test_rollback_cleans_up_snapshots(self, setup_with_tenants):
+        """Test that snapshots are cleaned up after rollback."""
+        setup = setup_with_tenants
+        
+        # Create a change that will fail
+        change = Change(
+            type=ChangeType.CREATE_TABLE,
+            entity_type="table",
+            entity_name="cleanup_test",
+            branch="main",
+            sql="CREATE TABLE syntax error here"  # Invalid SQL
+        )
+        added = setup["change_tracker"].add_change(change)
+        
+        # Get the expected backup directory path
+        branch_path = get_branch_path(setup["project_dir"], "main", "main")
+        backup_dir = branch_path / ".change_backups" / added.id
+        
+        # Apply should fail
+        with pytest.raises(ChangeError):
+            setup["change_applier"].apply_change(added.id)
+        
+        # Verify snapshot directory was cleaned up after rollback
+        assert not backup_dir.exists(), "Backup directory should be cleaned up after rollback"
+        
+        # Verify change not marked as applied
+        changes = setup["change_tracker"].get_changes()
+        test_change = next(c for c in changes if c.id == added.id)
+        assert not test_change.applied

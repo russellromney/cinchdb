@@ -373,8 +373,20 @@ make test
 # Run only Python tests
 make test-python
 
-# Run with coverage
+# Run only Python unit tests
+make test-python-unit
+
+# Run only Python integration tests
+make test-python-integreation
+
+# Run all tests with coverage
 uv run pytest tests/ --cov=src --cov-report=html
+
+# Run unit tests with coverage
+uv run pytest tests/unit/ --cov=src --cov-report=html
+
+# Run only integration tests with coverage
+uv run pytest tests/integration/ --cov=src --cov-report=html
 
 # Run specific test file
 uv run pytest tests/unit/test_codegen_manager.py -v
@@ -565,3 +577,149 @@ if result.get("sql_statements"):
             console.print(f"  Step: {stmt['step']}")
         console.print(f"  SQL: [yellow]{stmt['sql']}[/yellow]")
 ```
+
+## Snapshot-Based Rollback Pattern
+
+### Change Application with Atomic Rollback
+```python
+def apply_change(self, change_id: str) -> None:
+    """Apply change atomically with snapshot-based rollback."""
+    change = self._get_change_by_id(change_id)
+    backup_dir = self._get_backup_dir(change.id)
+    tenants = self.tenant_manager.list_tenants()
+    
+    try:
+        # Phase 1: Create snapshots
+        logger.info("Creating database snapshots...")
+        self._create_snapshots(tenants, backup_dir)
+        
+        # Phase 2: Enter maintenance mode and apply
+        logger.info("Entering maintenance mode for schema update...")
+        for tenant in tenants:
+            self._apply_change_to_tenant(change, tenant.name)
+            
+        # Phase 3: Mark as applied and cleanup
+        self.change_tracker.mark_change_applied(change_id)
+        self._cleanup_snapshots(backup_dir)
+        
+    except Exception as e:
+        # Rollback all tenants
+        logger.info("Rolling back all tenants to snapshot...")
+        self._restore_all_snapshots(tenants, backup_dir)
+        self._cleanup_snapshots(backup_dir)
+        raise ChangeError(f"Failed to apply change: {e}")
+```
+
+### Snapshot Management
+```python
+def _create_tenant_snapshot(self, tenant_name: str, backup_dir: Path) -> None:
+    """Create snapshot including WAL and SHM files."""
+    db_path = get_tenant_db_path(...)
+    
+    # Copy main database file
+    shutil.copy2(db_path, backup_dir / f"{tenant_name}.db")
+    
+    # Copy WAL file if exists
+    wal_path = Path(str(db_path) + "-wal")
+    if wal_path.exists():
+        shutil.copy2(wal_path, backup_dir / f"{tenant_name}.db-wal")
+        
+    # Copy SHM file if exists
+    shm_path = Path(str(db_path) + "-shm")
+    if shm_path.exists():
+        shutil.copy2(shm_path, backup_dir / f"{tenant_name}.db-shm")
+```
+
+### Key Principles
+- **All or Nothing**: Either all tenants succeed or all are rolled back
+- **Maintenance Mode**: Accept brief downtime for consistency
+- **Snapshot Location**: Use `.change_backups/{change_id}` in branch directory
+- **WAL Handling**: Always backup/restore WAL and SHM files together
+- **Cleanup**: Always clean up snapshots, even on failure
+
+### Testing Rollback
+```python
+# Test different failure scenarios
+def test_rollback_on_middle_tenant_failure(self):
+    """Mock failure on specific tenant to test rollback."""
+    with patch.object(applier, "_apply_change_to_tenant", side_effect=mock_apply):
+        with pytest.raises(ChangeError):
+            applier.apply_change(change_id)
+    
+    # Verify all tenants rolled back
+    for tenant in tenants:
+        verify_original_state(tenant)
+```
+
+## Snapshot-Based Rollback Pattern
+```python
+try:
+    # Phase 1: Create snapshots
+    self._create_snapshots(tenants, backup_dir)
+    
+    # Phase 2: Enter maintenance mode
+    self._enter_maintenance_mode()
+    
+    try:
+        # Apply changes to all tenants
+        for tenant in tenants:
+            self._apply_change_to_tenant(change, tenant.name)
+        
+        # Phase 3: Mark as applied
+        self.change_tracker.mark_change_applied(change_id)
+        
+        # Exit maintenance mode
+        self._exit_maintenance_mode()
+        
+        # Cleanup snapshots
+        self._cleanup_snapshots(backup_dir)
+        
+    except Exception as e:
+        # Always exit maintenance mode on error
+        self._exit_maintenance_mode()
+        raise
+        
+except Exception as e:
+    # Rollback all tenants
+    self._restore_all_snapshots(tenants, backup_dir)
+    self._cleanup_snapshots(backup_dir)
+    raise ChangeError(f"Failed to apply change: {e}")
+```
+
+## Maintenance Mode Pattern
+```python
+# In managers that modify data:
+def create_table(self, table_name: str, columns: List[Column]) -> Table:
+    """Create a new table.
+    
+    Raises:
+        MaintenanceError: If branch is in maintenance mode
+    """
+    # Check maintenance mode
+    check_maintenance_mode(self.project_root, self.database, self.branch)
+    
+    # ... rest of implementation
+```
+
+## File-Based Maintenance Lock
+```python
+# Enter maintenance mode
+maintenance_file = branch_path / ".maintenance_mode"
+with open(maintenance_file, "w") as f:
+    json.dump({
+        "active": True,
+        "reason": "Schema update in progress",
+        "started_at": datetime.now().isoformat()
+    }, f)
+
+# Exit maintenance mode
+if maintenance_file.exists():
+    maintenance_file.unlink()
+```
+
+## Maintenance Mode Write Blocking
+- **Purpose**: Prevent data corruption during schema changes
+- **Scope**: All write operations in DataManager, TableManager, ColumnManager, ViewModel, TenantManager
+- **Implementation**: File-based lock for cross-process coordination
+- **Read Access**: Always allowed during maintenance
+- **Auto-cleanup**: Maintenance mode cleared on success or failure

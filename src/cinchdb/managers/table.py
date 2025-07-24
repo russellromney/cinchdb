@@ -6,6 +6,7 @@ from typing import List
 from cinchdb.models import Table, Column, Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
+from cinchdb.core.maintenance import check_maintenance_mode
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.tenant import TenantManager
 
@@ -70,7 +71,11 @@ class TableManager:
             
         Raises:
             ValueError: If table already exists or uses protected column names
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         # Validate table doesn't exist
         if self._table_exists(table_name):
             raise ValueError(f"Table '{table_name}' already exists")
@@ -191,7 +196,11 @@ class TableManager:
             
         Raises:
             ValueError: If table doesn't exist
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         if not self._table_exists(table_name):
             raise ValueError(f"Table '{table_name}' does not exist")
         
@@ -226,7 +235,11 @@ class TableManager:
             
         Raises:
             ValueError: If source doesn't exist or target already exists
+            MaintenanceError: If branch is in maintenance mode
         """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
         if not self._table_exists(source_table):
             raise ValueError(f"Source table '{source_table}' does not exist")
         

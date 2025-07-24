@@ -157,7 +157,7 @@ def main():
             print(f"   Deleted user Carol: {was_deleted}")
             
             # Final counts
-            print(f"\n📊 Final counts:")
+            print("\n📊 Final counts:")
             print(f"   Remaining users: {Users.count()}")
             print(f"   Remaining posts: {Posts.count()}")
             

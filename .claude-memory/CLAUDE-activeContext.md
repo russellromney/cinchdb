@@ -271,11 +271,35 @@ Phase 6 (API Development) completed:
 - **Generated models include type-annotated CRUD operations (select, save, create, update, delete)**
 - **QueryManager for direct SQL execution with optional type validation and SELECT-only restriction for typed queries**
 
+### Latest Updates (2025-07-24)
+- **NEW: Unified Database Interface** ✅
+  - Created `CinchDatabase` class that handles both local and remote connections
+  - Single class design instead of separate local/remote classes
+  - Factory functions: `cinch.connect()` for local, `cinch.connect_api()` for remote
+  - Lazy loading of managers for performance
+  - Context manager support for automatic cleanup
+  - Full backward compatibility with existing manager pattern
+  - Comprehensive unit tests (16 tests, all passing)
+  - Created `examples/unified_interface_demo.py` showing usage patterns
+
+### Unified Interface Features
+- **Simple API**: `db = cinch.connect("mydb")` then `db.query("SELECT * FROM users")`
+- **Convenience methods**: `db.create_table()`, `db.insert()`, `db.update()`, `db.delete()`
+- **Manager access**: `db.tables`, `db.columns`, `db.views` etc. (local only)
+- **Connection switching**: `db.switch_branch()`, `db.switch_tenant()`
+- **Remote support**: Same interface works with `connect_api()`
+- **Type safety**: Full type hints and IDE support
+
 ### Next Development Phases (Future)
 - **Phase 7**: Frontend development (NextJS app)
 - **Phase 8**: TypeScript SDK (enhanced by codegen)
 - **Phase 9**: Documentation site
 - **Phase 10**: Production deployment tools
+- **Future Enhancements**:
+  - Async support for remote connections
+  - Connection pooling for remote API
+  - Retry logic for API calls
+  - Additional convenience methods
 
 ## Key Technical Decisions
 - WAL mode with autocheckpoint disabled for better concurrency
@@ -284,3 +308,4 @@ Phase 6 (API Development) completed:
 - Strict separation between table models and metadata models
 - Branch creation copies all tenants (as per design)
 - Tenant creation copies schema but not data from main tenant
+- **NEW**: Unified interface uses single class for both local/remote connections

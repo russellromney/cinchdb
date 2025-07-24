@@ -394,3 +394,107 @@ make format-python        # Format code consistently
 - Use ruff for consistent code formatting and linting
 - Maintain comprehensive test coverage for all new features
 - TypeScript SDK can have placeholder status with `--passWithNoTests`
+
+## Unified Database Interface Patterns
+
+### Connection Factory Pattern
+```python
+# Local connection
+db = cinchdb.connect(
+    database="mydb",
+    branch="main",
+    tenant="main",
+    project_dir=Path("/path/to/project")  # Optional
+)
+
+# Remote connection
+db = cinchdb.connect_api(
+    api_url="https://api.example.com",
+    api_key="your-api-key",
+    database="mydb",
+    branch="main",
+    tenant="main"
+)
+```
+
+### Single Class Design
+```python
+class CinchDatabase:
+    def __init__(self, database, branch="main", tenant="main", 
+                 project_dir=None, api_url=None, api_key=None):
+        """Single class handles both local and remote connections."""
+        if project_dir is not None:
+            self.is_local = True
+            # Local connection setup
+        elif api_url is not None and api_key is not None:
+            self.is_local = False
+            # Remote connection setup
+        else:
+            raise ValueError("Must provide connection parameters")
+```
+
+### Lazy Loading Pattern
+```python
+@property
+def tables(self) -> TableManager:
+    """Lazy load managers only when accessed."""
+    if not self.is_local:
+        raise RuntimeError("Direct manager access not available for remote")
+    if self._table_manager is None:
+        from cinchdb.managers.table import TableManager
+        self._table_manager = TableManager(...)
+    return self._table_manager
+```
+
+### Unified Method Pattern
+```python
+def query(self, sql: str, params: Optional[List[Any]] = None):
+    """Same interface for local and remote."""
+    if self.is_local:
+        # Use local QueryManager
+        return self._query_manager.execute(sql, params)
+    else:
+        # Make API request
+        return self._make_request("POST", "/query", json={"sql": sql, "params": params})
+```
+
+### Context Manager Support
+```python
+# Automatic cleanup for remote connections
+with cinchdb.connect_api(url, key, "mydb") as db:
+    results = db.query("SELECT * FROM users")
+    # Session automatically closed on exit
+```
+
+### Testing Remote Connections
+```python
+# Mock the session property instead of requests module
+with patch.object(CinchDatabase, 'session', new_callable=PropertyMock) as mock_session_prop:
+    mock_session = Mock()
+    mock_session_prop.return_value = mock_session
+    
+    # Test remote operations
+    db = CinchDatabase(database="test", api_url="...", api_key="...")
+    db.query("SELECT * FROM users")
+```
+
+### Usage Patterns
+```python
+# Simple operations
+db = cinchdb.connect("mydb")
+db.create_table("users", columns)
+results = db.query("SELECT * FROM users")
+user = db.insert("users", {"name": "Alice"})
+db.update("users", user["id"], {"name": "Alice Smith"})
+db.delete("users", user["id"])
+
+# Advanced operations (local only)
+if db.is_local:
+    db.tables.copy_table("users", "users_backup")
+    db.columns.rename_column("users", "email", "email_address")
+    db.branches.merge("feature", "main")
+
+# Switching contexts
+dev_db = db.switch_branch("dev")
+customer_db = db.switch_tenant("customer1")
+```

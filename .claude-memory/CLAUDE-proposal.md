@@ -1,3 +1,3 @@
-# CLAUDE-proposal.md
+# Proposals and Ideas
 
-This file is cleared after each proposal implementation.
+(Currently empty - add proposals as needed)

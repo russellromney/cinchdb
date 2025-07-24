@@ -282,6 +282,22 @@ Phase 6 (API Development) completed:
   - Comprehensive unit tests (16 tests, all passing)
   - Created `examples/unified_interface_demo.py` showing usage patterns
 
+- **CLI Help Display Fix** ✅
+  - All CLI subcommands now show help text when required arguments missing
+  - Added `validate_required_arg` utility function
+  - Consistent error display across all commands
+  
+- **Metadata Cleanup** ✅
+  - Removed redundant tables/views fields from branch metadata
+  - SQLite introspection provides single source of truth for schema
+  - Updated tests to match new metadata structure
+
+- **Dry-run Flag for Merge Commands** ✅
+  - Added `--dry-run` flag to `cinch branch merge` and `cinch branch merge-into-main`
+  - Shows exact SQL statements that would be executed without applying them
+  - Collects statements for all change types including multi-step operations
+  - Added comprehensive test coverage (3 new tests)
+
 ### Unified Interface Features
 - **Simple API**: `db = cinch.connect("mydb")` then `db.query("SELECT * FROM users")`
 - **Convenience methods**: `db.create_table()`, `db.insert()`, `db.update()`, `db.delete()`

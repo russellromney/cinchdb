@@ -200,7 +200,8 @@ def merge(
     source: Optional[str] = typer.Argument(None, help="Source branch to merge from"),
     target: Optional[str] = typer.Option(None, "--target", "-t", help="Target branch (default: current)"),
     force: bool = typer.Option(False, "--force", "-f", help="Force merge even with conflicts"),
-    preview: bool = typer.Option(False, "--preview", "-p", help="Show merge preview without executing")
+    preview: bool = typer.Option(False, "--preview", "-p", help="Show merge preview without executing"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show SQL statements that would be executed without applying them")
 ):
     """Merge changes from source branch into target branch."""
     source = validate_required_arg(source, "source", ctx)
@@ -241,6 +242,26 @@ def merge(
             
             return
         
+        # Handle dry-run
+        if dry_run:
+            result = merge_mgr.merge_branches(source, target_branch, force=force, dry_run=True)
+            
+            console.print(f"\n[bold]Dry Run: {source} → {target_branch}[/bold]")
+            console.print(f"Merge Type: {result.get('merge_type', 'unknown')}")
+            console.print(f"Changes to merge: {result.get('changes_to_merge', 0)}")
+            
+            if result.get("sql_statements"):
+                console.print("\n[bold]SQL statements that would be executed:[/bold]")
+                for stmt in result["sql_statements"]:
+                    console.print(f"\n[cyan]Change {stmt['change_id']} ({stmt['change_type']}): {stmt['entity_name']}[/cyan]")
+                    if "step" in stmt:
+                        console.print(f"  Step: {stmt['step']}")
+                    console.print(f"  SQL: [yellow]{stmt['sql']}[/yellow]")
+            else:
+                console.print("\n[yellow]No SQL statements to execute[/yellow]")
+            
+            return
+        
         # Perform actual merge
         result = merge_mgr.merge_branches(source, target_branch, force=force)
         
@@ -263,7 +284,8 @@ def merge(
 def merge_into_main(
     ctx: typer.Context,
     source: Optional[str] = typer.Argument(None, help="Source branch to merge into main"),
-    preview: bool = typer.Option(False, "--preview", "-p", help="Show merge preview without executing")
+    preview: bool = typer.Option(False, "--preview", "-p", help="Show merge preview without executing"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show SQL statements that would be executed without applying them")
 ):
     """Merge a branch into main branch (the primary way to get changes into main)."""
     source = validate_required_arg(source, "source", ctx)
@@ -297,6 +319,26 @@ def merge_into_main(
                     console.print(f"  {entity_type}: {len(changes)} changes")
                     for change in changes:
                         console.print(f"    • {change['operation']} {change['entity_name']}")
+            
+            return
+        
+        # Handle dry-run
+        if dry_run:
+            result = merge_mgr.merge_into_main(source, dry_run=True)
+            
+            console.print(f"\n[bold]Dry Run: {source} → main[/bold]")
+            console.print(f"Merge Type: {result.get('merge_type', 'unknown')}")
+            console.print(f"Changes to merge: {result.get('changes_to_merge', 0)}")
+            
+            if result.get("sql_statements"):
+                console.print("\n[bold]SQL statements that would be executed:[/bold]")
+                for stmt in result["sql_statements"]:
+                    console.print(f"\n[cyan]Change {stmt['change_id']} ({stmt['change_type']}): {stmt['entity_name']}[/cyan]")
+                    if "step" in stmt:
+                        console.print(f"  Step: {stmt['step']}")
+                    console.print(f"  SQL: [yellow]{stmt['sql']}[/yellow]")
+            else:
+                console.print("\n[yellow]No SQL statements to execute[/yellow]")
             
             return
         

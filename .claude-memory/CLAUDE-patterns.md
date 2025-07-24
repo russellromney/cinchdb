@@ -498,3 +498,70 @@ if db.is_local:
 dev_db = db.switch_branch("dev")
 customer_db = db.switch_tenant("customer1")
 ```
+
+## CLI Argument Validation Pattern
+
+### Required Arguments with Help Display
+```python
+def validate_required_arg(value: Optional[str], arg_name: str, ctx: typer.Context) -> str:
+    """Validate required argument and show help if missing."""
+    if value is None:
+        console.print(ctx.get_help())
+        console.print(f"\n[red]❌ Error: Missing argument '{arg_name.upper()}'.[/red]")
+        raise typer.Exit(1)
+    return value
+
+# Usage in commands
+@app.command()
+def merge(
+    ctx: typer.Context,
+    source: Optional[str] = typer.Argument(None, help="Source branch to merge from")
+):
+    source = validate_required_arg(source, "source", ctx)
+```
+
+## Dry-run Pattern
+
+### Manager Implementation
+```python
+def merge_branches(self, source: str, target: str, force: bool = False, dry_run: bool = False):
+    """Support dry-run mode to preview operations."""
+    if dry_run:
+        sql_statements = self._collect_sql_statements(changes, target)
+        return {
+            "success": True,
+            "dry_run": True,
+            "sql_statements": sql_statements
+        }
+    # Normal execution
+```
+
+### SQL Statement Collection
+```python
+def _collect_sql_statements(self, changes: List[Change], target_branch: str) -> List[Dict[str, Any]]:
+    """Collect SQL statements without tenant information."""
+    sql_statements = []
+    for change in changes:
+        # Handle different change types
+        if change.type == ChangeType.UPDATE_VIEW:
+            # Multi-step operations
+            sql_statements.append({
+                "change_id": change.id,
+                "change_type": change.type.value if hasattr(change.type, 'value') else change.type,
+                "entity_name": change.entity_name,
+                "step": "drop_existing",
+                "sql": f"DROP VIEW IF EXISTS {change.entity_name}"
+            })
+            # Add CREATE step...
+```
+
+### CLI Display Pattern
+```python
+if result.get("sql_statements"):
+    console.print("\n[bold]SQL statements that would be executed:[/bold]")
+    for stmt in result["sql_statements"]:
+        console.print(f"\n[cyan]Change {stmt['change_id']} ({stmt['change_type']}): {stmt['entity_name']}[/cyan]")
+        if "step" in stmt:
+            console.print(f"  Step: {stmt['step']}")
+        console.print(f"  SQL: [yellow]{stmt['sql']}[/yellow]")
+```

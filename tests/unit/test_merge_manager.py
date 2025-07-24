@@ -326,3 +326,135 @@ class TestMergeManager:
         
         assert not preview["can_merge"]
         assert "No changes to merge" in preview["reason"]
+    
+    def test_merge_branches_dry_run(self, temp_project):
+        """Test dry-run merge returns SQL statements without applying."""
+        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr.create_branch("main", "feature")
+        branch_mgr.create_branch("main", "target")
+        
+        # Add changes to feature branch
+        tracker = ChangeTracker(temp_project, "main", "feature")
+        
+        # Add a table
+        change1 = Change(
+            type=ChangeType.CREATE_TABLE,
+            entity_type="table",
+            entity_name="users",
+            branch="feature",
+            sql="CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT)"
+        )
+        tracker.add_change(change1)
+        
+        # Add a column
+        change2 = Change(
+            type=ChangeType.ADD_COLUMN,
+            entity_type="column",
+            entity_name="email",
+            branch="feature",
+            sql="ALTER TABLE users ADD COLUMN email TEXT",
+            details={"table": "users"}
+        )
+        tracker.add_change(change2)
+        
+        merge_mgr = MergeManager(temp_project, "main")
+        result = merge_mgr.merge_branches("feature", "target", dry_run=True)
+        
+        assert result["success"]
+        assert result["dry_run"] is True
+        assert "Dry run" in result["message"]
+        assert result["changes_to_merge"] == 2
+        assert "sql_statements" in result
+        assert len(result["sql_statements"]) == 2
+        
+        # Check SQL statement structure
+        stmt1 = result["sql_statements"][0]
+        assert stmt1["change_id"] == change1.id
+        assert stmt1["change_type"] == "create_table"
+        assert stmt1["entity_name"] == "users"
+        assert stmt1["sql"] == "CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT)"
+        
+        stmt2 = result["sql_statements"][1]
+        assert stmt2["change_id"] == change2.id
+        assert stmt2["change_type"] == "add_column"
+        assert stmt2["entity_name"] == "email"
+        assert stmt2["sql"] == "ALTER TABLE users ADD COLUMN email TEXT"
+        
+        # Verify no changes were actually applied to target
+        target_tracker = ChangeTracker(temp_project, "main", "target")
+        target_changes = target_tracker.get_changes()
+        assert len(target_changes) == 0
+    
+    def test_merge_into_main_dry_run(self, temp_project):
+        """Test dry-run merge into main returns SQL statements without applying."""
+        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr.create_branch("main", "feature")
+        
+        # Add a view change to feature
+        tracker = ChangeTracker(temp_project, "main", "feature")
+        change = Change(
+            type=ChangeType.UPDATE_VIEW,
+            entity_type="view",
+            entity_name="user_stats",
+            branch="feature",
+            sql="CREATE VIEW user_stats AS SELECT COUNT(*) as total FROM users"
+        )
+        tracker.add_change(change)
+        
+        merge_mgr = MergeManager(temp_project, "main")
+        result = merge_mgr.merge_into_main("feature", dry_run=True)
+        
+        assert result["success"]
+        assert result["dry_run"] is True
+        assert "sql_statements" in result
+        
+        # View updates produce two statements: DROP and CREATE
+        assert len(result["sql_statements"]) == 2
+        
+        stmt1 = result["sql_statements"][0]
+        assert stmt1["step"] == "drop_existing"
+        assert stmt1["sql"] == "DROP VIEW IF EXISTS user_stats"
+        
+        stmt2 = result["sql_statements"][1]
+        assert stmt2["step"] == "create_view"
+        assert stmt2["sql"] == "CREATE VIEW user_stats AS SELECT COUNT(*) as total FROM users"
+        
+        # Verify no changes were applied to main
+        main_tracker = ChangeTracker(temp_project, "main", "main")
+        main_changes = main_tracker.get_changes()
+        assert len(main_changes) == 0
+    
+    def test_merge_branches_dry_run_complex_changes(self, temp_project):
+        """Test dry-run with complex changes including table copy."""
+        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr.create_branch("main", "feature")
+        branch_mgr.create_branch("main", "target")
+        
+        # Add complex change with copy SQL
+        tracker = ChangeTracker(temp_project, "main", "feature")
+        change = Change(
+            type=ChangeType.CREATE_TABLE,
+            entity_type="table",
+            entity_name="users_backup",
+            branch="feature",
+            sql="CREATE TABLE users_backup (id TEXT PRIMARY KEY, name TEXT)",
+            details={
+                "copy_sql": "INSERT INTO users_backup SELECT * FROM users"
+            }
+        )
+        tracker.add_change(change)
+        
+        merge_mgr = MergeManager(temp_project, "main")
+        result = merge_mgr.merge_branches("feature", "target", dry_run=True)
+        
+        assert result["success"]
+        assert len(result["sql_statements"]) == 2
+        
+        # Table copy produces two statements
+        stmt1 = result["sql_statements"][0]
+        assert stmt1["step"] == "create_table"
+        assert "CREATE TABLE users_backup" in stmt1["sql"]
+        
+        stmt2 = result["sql_statements"][1]
+        assert stmt2["step"] == "copy_data"
+        assert "INSERT INTO users_backup" in stmt2["sql"]

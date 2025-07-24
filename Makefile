@@ -1,4 +1,4 @@
-.PHONY: help install install-all dev test coverage lint format typecheck clean \
+.PHONY: help install install-dev install-all dev test coverage lint format typecheck clean \
         build-python build-ts build-frontend build-docs \
         dev-api dev-frontend dev-docs \
         test-python test-ts test-integration \
@@ -10,7 +10,8 @@ help:
 	@echo ""
 	@echo "Installation:"
 	@echo "  make install          - Install Python dependencies only"
-	@echo "  make install-all      - Install all dependencies (Python, TypeScript, Frontend, Docs)"
+	@echo "  make install-dev      - Install CinchDB CLI in editable mode"
+	@echo "  make install-all      - Install everything (dependencies + CLI + TypeScript + Frontend + Docs)"
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev              - Run development mode (API + Frontend)"
@@ -44,7 +45,10 @@ help:
 install:
 	uv sync
 
-install-all: install
+install-dev:
+	uv pip install -e .
+
+install-all: install install-dev
 	cd sdk/typescript && npm install
 	cd frontend && npm install
 	cd docs && npm install

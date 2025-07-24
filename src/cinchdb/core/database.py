@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from cinchdb.managers.tenant import TenantManager
 
 
-class CinchDatabase:
+class CinchDB:
     """Unified interface for CinchDB operations.
     
     Provides a simple, user-friendly interface for both local and remote
@@ -24,10 +24,10 @@ class CinchDatabase:
     
     Examples:
         # Local connection
-        db = CinchDatabase(project_dir="/path/to/project", database="mydb", branch="dev")
+        db = CinchDB(project_dir="/path/to/project", database="mydb", branch="dev")
         
         # Remote connection
-        db = CinchDatabase(
+        db = CinchDB(
             api_url="https://api.example.com",
             api_key="your-api-key", 
             database="mydb",
@@ -323,24 +323,24 @@ class CinchDatabase:
                 f"/tables/{table}/data/{id}"
             )
     
-    def switch_branch(self, branch: str) -> "CinchDatabase":
+    def switch_branch(self, branch: str) -> "CinchDB":
         """Switch to a different branch.
         
         Args:
             branch: Branch name to switch to
             
         Returns:
-            New CinchDatabase instance for the branch
+            New CinchDB instance for the branch
         """
         if self.is_local:
-            return CinchDatabase(
+            return CinchDB(
                 database=self.database,
                 branch=branch,
                 tenant=self.tenant,
                 project_dir=self.project_dir
             )
         else:
-            return CinchDatabase(
+            return CinchDB(
                 database=self.database,
                 branch=branch,
                 tenant=self.tenant,
@@ -348,24 +348,24 @@ class CinchDatabase:
                 api_key=self.api_key
             )
     
-    def switch_tenant(self, tenant: str) -> "CinchDatabase":
+    def switch_tenant(self, tenant: str) -> "CinchDB":
         """Switch to a different tenant.
         
         Args:
             tenant: Tenant name to switch to
             
         Returns:
-            New CinchDatabase instance for the tenant
+            New CinchDB instance for the tenant
         """
         if self.is_local:
-            return CinchDatabase(
+            return CinchDB(
                 database=self.database,
                 branch=self.branch,
                 tenant=tenant,
                 project_dir=self.project_dir
             )
         else:
-            return CinchDatabase(
+            return CinchDB(
                 database=self.database,
                 branch=self.branch,
                 tenant=tenant,
@@ -394,7 +394,7 @@ def connect(
     branch: str = "main", 
     tenant: str = "main", 
     project_dir: Optional[Path] = None
-) -> CinchDatabase:
+) -> CinchDB:
     """Connect to a local CinchDB database.
     
     Args:
@@ -404,7 +404,7 @@ def connect(
         project_dir: Path to project directory (optional, will search for .cinchdb)
         
     Returns:
-        CinchDatabase connection instance
+        CinchDB connection instance
         
     Examples:
         # Connect using current directory
@@ -422,7 +422,7 @@ def connect(
             raise ValueError("No .cinchdb directory found. Run 'cinchdb init' first.")
         project_dir = config.project_dir
     
-    return CinchDatabase(
+    return CinchDB(
         database=database,
         branch=branch,
         tenant=tenant,
@@ -436,7 +436,7 @@ def connect_api(
     database: str, 
     branch: str = "main", 
     tenant: str = "main"
-) -> CinchDatabase:
+) -> CinchDB:
     """Connect to a remote CinchDB API.
     
     Args:
@@ -447,7 +447,7 @@ def connect_api(
         tenant: Tenant name (default: main)
         
     Returns:
-        CinchDatabase connection instance for remote API
+        CinchDB connection instance for remote API
         
     Examples:
         # Connect to remote API
@@ -460,7 +460,7 @@ def connect_api(
         with connect_api("https://api.example.com", "key", "mydb") as db:
             results = db.query("SELECT * FROM users")
     """
-    return CinchDatabase(
+    return CinchDB(
         database=database,
         branch=branch,
         tenant=tenant,

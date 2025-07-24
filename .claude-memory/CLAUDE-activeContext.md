@@ -273,7 +273,7 @@ Phase 6 (API Development) completed:
 
 ### Latest Updates (2025-07-24)
 - **NEW: Unified Database Interface** ✅
-  - Created `CinchDatabase` class that handles both local and remote connections
+  - Created `CinchDB` class that handles both local and remote connections
   - Single class design instead of separate local/remote classes
   - Factory functions: `cinch.connect()` for local, `cinch.connect_api()` for remote
   - Lazy loading of managers for performance

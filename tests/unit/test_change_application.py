@@ -4,7 +4,7 @@ import pytest
 import tempfile
 import shutil
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from cinchdb.config import Config
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.tenant import TenantManager

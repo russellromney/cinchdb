@@ -122,7 +122,7 @@ class ChangeApplier:
                 
                 logger.info(f"Schema update complete. Applied change {change_id} to {len(tenants)} tenants")
                 
-            except Exception as e:
+            except Exception:
                 # Always exit maintenance mode on error
                 self._exit_maintenance_mode()
                 raise
@@ -371,7 +371,7 @@ class ChangeApplier:
         import time
         import os
         if os.getenv("CINCHDB_SKIP_MAINTENANCE_DELAY") != "1":
-            time.sleep(0.5)  # Half a second should be enough
+            time.sleep(0.25)  # A quarter second should be enough
     
     def _exit_maintenance_mode(self) -> None:
         """Exit maintenance mode to allow writes again."""

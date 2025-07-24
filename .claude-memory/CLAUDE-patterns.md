@@ -431,7 +431,7 @@ db = cinchdb.connect_api(
 
 ### Single Class Design
 ```python
-class CinchDatabase:
+class CinchDB:
     def __init__(self, database, branch="main", tenant="main", 
                  project_dir=None, api_url=None, api_key=None):
         """Single class handles both local and remote connections."""
@@ -481,12 +481,12 @@ with cinchdb.connect_api(url, key, "mydb") as db:
 ### Testing Remote Connections
 ```python
 # Mock the session property instead of requests module
-with patch.object(CinchDatabase, 'session', new_callable=PropertyMock) as mock_session_prop:
+with patch.object(CinchDB, 'session', new_callable=PropertyMock) as mock_session_prop:
     mock_session = Mock()
     mock_session_prop.return_value = mock_session
     
     # Test remote operations
-    db = CinchDatabase(database="test", api_url="...", api_key="...")
+    db = CinchDB(database="test", api_url="...", api_key="...")
     db.query("SELECT * FROM users")
 ```
 

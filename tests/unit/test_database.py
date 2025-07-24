@@ -1,18 +1,18 @@
-"""Tests for the unified CinchDatabase interface."""
+"""Tests for the unified CinchDB interface."""
 
 import pytest
 from unittest.mock import Mock, patch, PropertyMock
 
-from cinchdb.core.database import CinchDatabase, connect, connect_api
+from cinchdb.core.database import CinchDB, connect, connect_api
 from cinchdb.models import Column
 
 
-class TestCinchDatabase:
-    """Test the CinchDatabase class."""
+class TestCinchDB:
+    """Test the CinchDB class."""
     
     def test_local_connection_init(self, tmp_path):
         """Test initializing a local connection."""
-        db = CinchDatabase(
+        db = CinchDB(
             database="test_db",
             branch="main",
             tenant="main",
@@ -29,7 +29,7 @@ class TestCinchDatabase:
     
     def test_remote_connection_init(self):
         """Test initializing a remote connection."""
-        db = CinchDatabase(
+        db = CinchDB(
             database="test_db",
             branch="dev",
             tenant="customer1",
@@ -48,11 +48,11 @@ class TestCinchDatabase:
     def test_init_requires_connection_params(self):
         """Test that init requires either local or remote params."""
         with pytest.raises(ValueError, match="Must provide either project_dir"):
-            CinchDatabase(database="test_db")
+            CinchDB(database="test_db")
     
     def test_local_managers_lazy_load(self, tmp_path):
         """Test that local managers are lazy loaded."""
-        db = CinchDatabase(
+        db = CinchDB(
             database="test_db",
             project_dir=tmp_path
         )
@@ -74,7 +74,7 @@ class TestCinchDatabase:
     
     def test_remote_managers_raise_error(self):
         """Test that accessing managers on remote connection raises error."""
-        db = CinchDatabase(
+        db = CinchDB(
             database="test_db",
             api_url="https://api.example.com",
             api_key="test-key"
@@ -88,7 +88,7 @@ class TestCinchDatabase:
     
     def test_local_query(self, tmp_path):
         """Test query execution on local connection."""
-        db = CinchDatabase(
+        db = CinchDB(
             database="test_db",
             project_dir=tmp_path
         )
@@ -114,10 +114,10 @@ class TestCinchDatabase:
         mock_session.request.return_value = mock_response
         
         # Patch the session property to return our mock
-        with patch.object(CinchDatabase, 'session', new_callable=PropertyMock) as mock_session_prop:
+        with patch.object(CinchDB, 'session', new_callable=PropertyMock) as mock_session_prop:
             mock_session_prop.return_value = mock_session
             
-            db = CinchDatabase(
+            db = CinchDB(
                 database="test_db",
                 api_url="https://api.example.com",
                 api_key="test-key"
@@ -135,7 +135,7 @@ class TestCinchDatabase:
     
     def test_local_create_table(self, tmp_path):
         """Test table creation on local connection."""
-        db = CinchDatabase(
+        db = CinchDB(
             database="test_db",
             project_dir=tmp_path
         )
@@ -163,10 +163,10 @@ class TestCinchDatabase:
         mock_session.request.return_value = mock_response
         
         # Patch the session property to return our mock
-        with patch.object(CinchDatabase, 'session', new_callable=PropertyMock) as mock_session_prop:
+        with patch.object(CinchDB, 'session', new_callable=PropertyMock) as mock_session_prop:
             mock_session_prop.return_value = mock_session
             
-            db = CinchDatabase(
+            db = CinchDB(
                 database="test_db",
                 api_url="https://api.example.com",
                 api_key="test-key"
@@ -194,7 +194,7 @@ class TestCinchDatabase:
     
     def test_switch_branch_local(self, tmp_path):
         """Test switching branches on local connection."""
-        db = CinchDatabase(
+        db = CinchDB(
             database="test_db",
             branch="main",
             project_dir=tmp_path
@@ -210,7 +210,7 @@ class TestCinchDatabase:
     
     def test_switch_branch_remote(self):
         """Test switching branches on remote connection."""
-        db = CinchDatabase(
+        db = CinchDB(
             database="test_db",
             branch="main",
             api_url="https://api.example.com",
@@ -231,10 +231,10 @@ class TestCinchDatabase:
         # Create a mock session
         mock_session = Mock()
         
-        with patch.object(CinchDatabase, 'session', new_callable=PropertyMock) as mock_session_prop:
+        with patch.object(CinchDB, 'session', new_callable=PropertyMock) as mock_session_prop:
             mock_session_prop.return_value = mock_session
             
-            with CinchDatabase(
+            with CinchDB(
                 database="test_db",
                 api_url="https://api.example.com",
                 api_key="test-key"

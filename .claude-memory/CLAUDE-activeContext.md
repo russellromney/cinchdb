@@ -227,11 +227,11 @@ Phase 6 (API Development) completed:
 
 ### Status Summary ✅
 - **Core Functionality**: Complete (Phases 1-6 + Enhanced Codegen + QueryManager implemented)
-- **Test Suite**: All 227 tests passing (added 30 data operation tests + 27 query tests)
+- **Test Suite**: All 217 tests passing (added SELECT-only validation tests)
 - **CLI**: Fully functional with all commands working
 - **API**: Complete with authentication and all endpoints  
 - **Codegen**: Enhanced Python model generation with type-annotated CRUD operations ✅
-- **Query Manager**: Type-safe SQL execution with model validation ✅
+- **Query Manager**: Type-safe SQL execution with SELECT-only restriction on all query methods ✅
 - **Code Quality**: All linting issues fixed, clean codebase
 - **Documentation**: Memory bank system maintained and current
 
@@ -247,7 +247,8 @@ Phase 6 (API Development) completed:
 - **Advanced Querying**: Support for operators like age__gte, name__like, age__in
 - **Comprehensive Demo**: Created sdk_operations_demo.py showing all features
 - **QueryManager Implementation**: Type-safe SQL query execution with Pydantic model validation
-- **Model.query() Method**: Added SELECT-only query method to generated models with type safety
+- **Removed Model.query()**: Cleaned up architecture by removing query() from generated models
+- **SELECT-Only Query Methods**: execute() and execute_one() now only accept SELECT queries
 - **SQL Injection Protection**: Parameterized queries throughout the system
 
 ### Available Features
@@ -267,9 +268,8 @@ Phase 6 (API Development) completed:
 - Automatic handling of id, created_at, updated_at fields
 - Configurable output with --tables/--views flags
 - Force overwrite protection
-- **NEW**: Generated models now include type-annotated CRUD operations (select, save, create, update, delete)
-- **NEW**: Type-safe query() method on generated models for SELECT queries with result validation
-- **NEW**: QueryManager for direct SQL execution with optional type validation
+- **Generated models include type-annotated CRUD operations (select, save, create, update, delete)**
+- **QueryManager for direct SQL execution with optional type validation and SELECT-only restriction for typed queries**
 
 ### Next Development Phases (Future)
 - **Phase 7**: Frontend development (NextJS app)

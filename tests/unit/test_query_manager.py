@@ -141,6 +141,17 @@ class TestQueryManager:
         
         assert results == []
     
+    def test_execute_non_select_query(self, query_manager):
+        """Test that execute rejects non-SELECT queries."""
+        with pytest.raises(ValueError, match="execute\\(\\) can only be used with SELECT queries"):
+            query_manager.execute("UPDATE users SET active = 0")
+        
+        with pytest.raises(ValueError, match="execute\\(\\) can only be used with SELECT queries"):
+            query_manager.execute("INSERT INTO users (name) VALUES ('test')")
+        
+        with pytest.raises(ValueError, match="execute\\(\\) can only be used with SELECT queries"):
+            query_manager.execute("DELETE FROM users WHERE id = '1'")
+    
     def test_execute_typed_non_select_query(self, query_manager):
         """Test that execute_typed rejects non-SELECT queries."""
         with pytest.raises(ValueError, match="execute_typed can only be used with SELECT queries"):
@@ -161,6 +172,11 @@ class TestQueryManager:
         # Test no results
         no_result = query_manager.execute_one("SELECT * FROM users WHERE email = 'nonexistent@example.com'")
         assert no_result is None
+    
+    def test_execute_one_non_select_query(self, query_manager):
+        """Test that execute_one rejects non-SELECT queries."""
+        with pytest.raises(ValueError, match="execute\\(\\) can only be used with SELECT queries"):
+            query_manager.execute_one("UPDATE users SET active = 0")
     
     def test_execute_one_typed(self, query_manager):
         """Test executing a typed query that returns a single result."""

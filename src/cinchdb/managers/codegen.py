@@ -266,27 +266,7 @@ class CodegenManager:
             '        """Delete this record."""',
             "        if not self.id:",
             '            raise ValueError("Cannot delete record without ID")',
-            "        return self._get_data_manager().delete_by_id(type(self), self.id)",
-            "",
-            "    @classmethod",
-            f"    def query(cls, sql: str, params: Optional[Union[tuple, dict]] = None) -> List['{class_name}']:",
-            '        """Execute a SELECT query and return typed results.',
-            '        ',
-            '        Args:',
-            '            sql: SQL SELECT query to execute',
-            '            params: Optional query parameters',
-            '            ',
-            '        Returns:',
-            '            List of model instances',
-            '            ',
-            '        Raises:',
-            '            ValueError: If query is not a SELECT query',
-            '            ValidationError: If result validation fails',
-            '        """',
-            "        # Ensure query is a SELECT query",
-            "        if not sql.strip().upper().startswith('SELECT'):",
-            "            raise ValueError('Model.query() can only execute SELECT queries. Use DataManager for other operations.')",
-            "        return cls._get_data_manager().query_manager.execute_typed(sql, cls, params)"
+            "        return self._get_data_manager().delete_by_id(type(self), self.id)"
         ])
         
         return "\n".join(content)

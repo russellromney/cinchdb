@@ -41,25 +41,20 @@ class QueryManager:
             params: Optional query parameters (tuple for positional, dict for named)
             
         Returns:
-            List of dictionaries representing rows (empty list for non-SELECT queries)
+            List of dictionaries representing rows
             
         Raises:
+            ValueError: If query is not a SELECT query
             Exception: If query execution fails
         """
+        # Ensure this is a SELECT query
+        if not sql.strip().upper().startswith('SELECT'):
+            raise ValueError("execute() can only be used with SELECT queries. Use execute_non_query() for INSERT/UPDATE/DELETE operations.")
+        
         with DatabaseConnection(self.db_path) as conn:
             cursor = conn.execute(sql, params)
-            
-            # Check if this is a SELECT query
-            is_select = sql.strip().upper().startswith('SELECT')
-            
-            if is_select:
-                # For SELECT queries, return rows as dicts
-                rows = cursor.fetchall()
-                return [dict(row) for row in rows]
-            else:
-                # For non-SELECT queries, commit and return empty list
-                conn.commit()
-                return []
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
     
     def execute_typed(
         self, 

@@ -182,7 +182,7 @@ class TestCinchDB:
             mock_session.request.assert_called_once_with(
                 "POST",
                 "https://api.example.com/tables",
-                params={"database": "test_db", "branch": "main", "tenant": "main"},
+                params={"database": "test_db", "branch": "main"},
                 json={
                     "name": "users",
                     "columns": [

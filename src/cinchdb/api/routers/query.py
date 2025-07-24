@@ -4,7 +4,6 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query as QueryParam
 from pydantic import BaseModel
 
-from cinchdb.config import Config
 from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.api.auth import AuthContext, require_read_permission, require_write_permission
@@ -30,9 +29,9 @@ class QueryResult(BaseModel):
 @router.post("/execute")
 async def execute_query(
     request: QueryRequest,
-    database: Optional[str] = QueryParam(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = QueryParam(None, description="Branch name (defaults to active)"),
-    tenant: str = QueryParam("main", description="Tenant name"),
+    database: str = QueryParam(..., description="Database name"),
+    branch: str = QueryParam(..., description="Branch name"),
+    tenant: str = QueryParam(..., description="Tenant name"),
     auth: AuthContext = Depends(require_read_permission)
 ) -> QueryResult:
     """Execute a SQL query.
@@ -40,11 +39,8 @@ async def execute_query(
     SELECT queries require read permission.
     INSERT/UPDATE/DELETE queries require write permission.
     """
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check if this is a write operation
     sql_upper = request.sql.strip().upper()
@@ -108,9 +104,9 @@ async def execute_query(
 @router.get("/tables/{table}/data")
 async def get_table_data(
     table: str,
-    database: Optional[str] = QueryParam(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = QueryParam(None, description="Branch name (defaults to active)"),
-    tenant: str = QueryParam("main", description="Tenant name"),
+    database: str = QueryParam(..., description="Database name"),
+    branch: str = QueryParam(..., description="Branch name"),
+    tenant: str = QueryParam(..., description="Tenant name"),
     limit: int = QueryParam(100, description="Maximum rows to return"),
     offset: int = QueryParam(0, description="Number of rows to skip"),
     auth: AuthContext = Depends(require_read_permission)
@@ -128,9 +124,9 @@ async def get_table_data(
 @router.get("/tables/{table}/count")
 async def get_table_count(
     table: str,
-    database: Optional[str] = QueryParam(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = QueryParam(None, description="Branch name (defaults to active)"),
-    tenant: str = QueryParam("main", description="Tenant name"),
+    database: str = QueryParam(..., description="Database name"),
+    branch: str = QueryParam(..., description="Branch name"),
+    tenant: str = QueryParam(..., description="Tenant name"),
     auth: AuthContext = Depends(require_read_permission)
 ) -> Dict[str, int]:
     """Get the row count for a table."""

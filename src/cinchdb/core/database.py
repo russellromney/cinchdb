@@ -122,6 +122,30 @@ class CinchDB:
             })
         return self._session
     
+    def _endpoint_needs_tenant(self, endpoint: str) -> bool:
+        """Check if an API endpoint needs tenant parameter.
+        
+        Args:
+            endpoint: API endpoint path
+            
+        Returns:
+            True if endpoint needs tenant parameter
+        """
+        # Query operations need tenant
+        if endpoint.startswith('/query'):
+            return True
+            
+        # Data CRUD operations need tenant (tables/{table}/data)
+        if '/data' in endpoint:
+            return True
+            
+        # Tenant management operations need tenant
+        if endpoint.startswith('/tenants'):
+            return True
+            
+        # Schema operations don't need tenant
+        return False
+    
     def _make_request(self, method: str, endpoint: str, **kwargs) -> Any:
         """Make an API request for remote connections.
         
@@ -145,9 +169,13 @@ class CinchDB:
         params = kwargs.get('params', {})
         params.update({
             'database': self.database,
-            'branch': self.branch,
-            'tenant': self.tenant
+            'branch': self.branch
         })
+        
+        # Only add tenant for data operations (query, data CRUD, tenant management)
+        if self._endpoint_needs_tenant(endpoint):
+            params['tenant'] = self.tenant
+            
         kwargs['params'] = params
         
         response = self.session.request(method, url, **kwargs)
@@ -277,11 +305,11 @@ class CinchDB:
         if self.is_local:
             return self.data.create(table, data)
         else:
-            # Remote insert
+            # Remote insert - use new data CRUD endpoint
             result = self._make_request(
                 "POST",
                 f"/tables/{table}/data",
-                json=data
+                json={"data": data}
             )
             return result
     
@@ -299,11 +327,11 @@ class CinchDB:
         if self.is_local:
             return self.data.update(table, id, data)
         else:
-            # Remote update
+            # Remote update - use new data CRUD endpoint
             result = self._make_request(
                 "PUT",
                 f"/tables/{table}/data/{id}",
-                json=data
+                json={"data": data}
             )
             return result
     

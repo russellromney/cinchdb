@@ -4,7 +4,6 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from cinchdb.config import Config
 from cinchdb.managers.column import ColumnManager
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
@@ -41,23 +40,19 @@ class RenameColumnRequest(BaseModel):
 @router.get("/{table}/columns", response_model=List[ColumnInfo])
 async def list_columns(
     table: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_read_permission)
 ):
     """List all columns in a table."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_read_permission(auth, branch_name)
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
         columns = column_mgr.list_columns(table)
         
         result = []
@@ -81,18 +76,14 @@ async def list_columns(
 async def add_column(
     table: str,
     request: AddColumnRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     apply: bool = Query(True, description="Apply changes to all tenants"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Add a new column to a table."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
@@ -105,7 +96,7 @@ async def add_column(
         )
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
         column = Column(
             name=request.name,
             type=request.type.upper(),
@@ -115,7 +106,7 @@ async def add_column(
         column_mgr.add_column(table, column)
         
         # Apply to all tenants if requested
-        if apply and tenant == "main":
+        if apply:
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
             applier.apply_all_unapplied()
         
@@ -129,28 +120,24 @@ async def add_column(
 async def drop_column(
     table: str,
     column: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     apply: bool = Query(True, description="Apply changes to all tenants"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Drop a column from a table."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
         column_mgr.drop_column(table, column)
         
         # Apply to all tenants if requested
-        if apply and tenant == "main":
+        if apply:
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
             applier.apply_all_unapplied()
         
@@ -164,28 +151,24 @@ async def drop_column(
 async def rename_column(
     table: str,
     request: RenameColumnRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     apply: bool = Query(True, description="Apply changes to all tenants"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Rename a column in a table."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
         column_mgr.rename_column(table, request.old_name, request.new_name)
         
         # Apply to all tenants if requested
-        if apply and tenant == "main":
+        if apply:
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
             applier.apply_all_unapplied()
         
@@ -199,23 +182,19 @@ async def rename_column(
 async def get_column_info(
     table: str,
     column: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_read_permission)
 ) -> ColumnInfo:
     """Get information about a specific column."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_read_permission(auth, branch_name)
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, tenant)
+        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
         col = column_mgr.get_column_info(table, column)
         
         return ColumnInfo(

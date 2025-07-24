@@ -1,12 +1,14 @@
 """Branches router for CinchDB API."""
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from datetime import datetime
 
 from cinchdb.config import Config
 from cinchdb.managers.branch import BranchManager
+from cinchdb.managers.merge_manager import MergeManager, MergeError
+from cinchdb.managers.change_comparator import ChangeComparator
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
 
 
@@ -28,16 +30,43 @@ class CreateBranchRequest(BaseModel):
     source: str = "main"
 
 
+class MergeBranchRequest(BaseModel):
+    """Request to merge branches."""
+    source: str
+    target: str
+    force: bool = False
+
+
+class BranchComparisonResult(BaseModel):
+    """Result of branch comparison."""
+    source_branch: str
+    target_branch: str
+    source_only_changes: int
+    target_only_changes: int
+    common_ancestor: Optional[str]
+    can_fast_forward: bool
+
+
+class MergeCheckResult(BaseModel):
+    """Result of merge feasibility check."""
+    can_merge: bool
+    reason: Optional[str] = None
+    merge_type: Optional[str] = None
+    changes_to_merge: Optional[int] = None
+    target_changes: Optional[int] = None
+    conflicts: Optional[List[Dict[str, Any]]] = None
+
+
 @router.get("/", response_model=List[BranchInfo])
 async def list_branches(
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
+    database: str = Query(..., description="Database name"),
     auth: AuthContext = Depends(require_read_permission)
 ):
     """List all branches in a database."""
     config = Config(auth.project_dir)
     config_data = config.load()
     
-    db_name = database or config_data.active_database
+    db_name = database
     
     try:
         branch_mgr = BranchManager(auth.project_dir, db_name)
@@ -54,7 +83,7 @@ async def list_branches(
                 name=branch.name,
                 parent=branch.parent,
                 created_at=branch.created_at,
-                is_active=branch.name == config_data.active_branch,
+                is_active=branch.name == config_data.active_branch and db_name == config_data.active_database,
                 tenant_count=tenant_count
             ))
         
@@ -67,14 +96,11 @@ async def list_branches(
 @router.post("/")
 async def create_branch(
     request: CreateBranchRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
+    database: str = Query(..., description="Database name"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Create a new branch."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
+    db_name = database
     
     # Check branch permissions
     if auth.api_key.branches and request.source not in auth.api_key.branches:
@@ -109,7 +135,7 @@ async def create_branch(
 @router.delete("/{name}")
 async def delete_branch(
     name: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
+    database: str = Query(..., description="Database name"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Delete a branch."""
@@ -119,7 +145,7 @@ async def delete_branch(
     config = Config(auth.project_dir)
     config_data = config.load()
     
-    db_name = database or config_data.active_database
+    db_name = database
     
     # Check branch permissions
     if auth.api_key.branches and name not in auth.api_key.branches:
@@ -146,14 +172,11 @@ async def delete_branch(
 @router.put("/switch/{name}")
 async def switch_branch(
     name: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
+    database: str = Query(..., description="Database name"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Switch to a different branch."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
+    db_name = database
     
     # Check branch permissions
     if auth.api_key.branches and name not in auth.api_key.branches:
@@ -174,3 +197,127 @@ async def switch_branch(
         
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{source}/compare/{target}", response_model=BranchComparisonResult)
+async def compare_branches(
+    source: str,
+    target: str,
+    database: str = Query(..., description="Database name"),
+    auth: AuthContext = Depends(require_read_permission)
+):
+    """Compare two branches to see their differences."""
+    db_name = database
+    
+    # Check branch permissions
+    await require_read_permission(auth, source)
+    await require_read_permission(auth, target)
+    
+    try:
+        comparator = ChangeComparator(auth.project_dir, db_name)
+        
+        # Get divergent changes
+        source_only, target_only = comparator.get_divergent_changes(source, target)
+        
+        # Find common ancestor
+        common_ancestor = comparator.find_common_ancestor(source, target)
+        
+        # Check if fast-forward merge is possible
+        can_fast_forward = comparator.can_fast_forward_merge(source, target)
+        
+        return BranchComparisonResult(
+            source_branch=source,
+            target_branch=target,
+            source_only_changes=len(source_only),
+            target_only_changes=len(target_only),
+            common_ancestor=common_ancestor,
+            can_fast_forward=can_fast_forward
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{source}/can-merge/{target}", response_model=MergeCheckResult)
+async def check_merge_feasibility(
+    source: str,
+    target: str,
+    database: str = Query(..., description="Database name"),
+    auth: AuthContext = Depends(require_read_permission)
+):
+    """Check if source branch can be merged into target branch."""
+    db_name = database
+    
+    # Check branch permissions
+    await require_read_permission(auth, source)
+    await require_read_permission(auth, target)
+    
+    try:
+        merge_mgr = MergeManager(auth.project_dir, db_name)
+        result = merge_mgr.can_merge(source, target)
+        
+        return MergeCheckResult(**result)
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{source}/merge/{target}")
+async def merge_branches(
+    source: str,
+    target: str,
+    database: str = Query(..., description="Database name"),
+    force: bool = Query(False, description="Force merge even with conflicts"),
+    dry_run: bool = Query(False, description="Preview merge without executing"),
+    auth: AuthContext = Depends(require_write_permission)
+):
+    """Merge source branch into target branch."""
+    db_name = database
+    
+    # Check branch permissions for both branches
+    await require_write_permission(auth, source)
+    await require_write_permission(auth, target)
+    
+    try:
+        merge_mgr = MergeManager(auth.project_dir, db_name)
+        
+        if target == "main":
+            # Use the merge_into_main method for main branch protection
+            result = merge_mgr.merge_into_main(source, force=force, dry_run=dry_run)
+        else:
+            # Use internal merge method for non-main branches
+            result = merge_mgr._merge_branches_internal(source, target, force=force, dry_run=dry_run)
+        
+        return result
+        
+    except MergeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{source}/merge-into-main")
+async def merge_into_main_branch(
+    source: str,
+    database: str = Query(..., description="Database name"),
+    force: bool = Query(False, description="Force merge even with conflicts"),
+    dry_run: bool = Query(False, description="Preview merge without executing"),
+    auth: AuthContext = Depends(require_write_permission)
+):
+    """Merge source branch into the main branch with additional protections."""
+    db_name = database
+    
+    # Check branch permissions
+    await require_write_permission(auth, source)
+    await require_write_permission(auth, "main")
+    
+    try:
+        merge_mgr = MergeManager(auth.project_dir, db_name)
+        result = merge_mgr.merge_into_main(source, force=force, dry_run=dry_run)
+        
+        return result
+        
+    except MergeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

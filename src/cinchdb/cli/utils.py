@@ -32,6 +32,31 @@ def get_config_with_data():
     return config, config_data
 
 
+def get_config_dict():
+    """Get config data as dictionary, including API configuration if present.
+    
+    Returns:
+        dict: Configuration data
+    """
+    config, config_data = get_config_with_data()
+    
+    # Convert config_data to dict-like structure for handlers
+    config_dict = {
+        "active_database": getattr(config_data, "active_database", None),
+        "active_branch": getattr(config_data, "active_branch", "main"),
+        "project_root": config.project_dir
+    }
+    
+    # Add API configuration if present in raw config
+    if hasattr(config_data, "api") and config_data.api:
+        config_dict["api"] = {
+            "url": getattr(config_data.api, "url", None),
+            "key": getattr(config_data.api, "key", None)
+        }
+    
+    return config_dict
+
+
 def set_active_database(config: Config, database: str):
     """Set the active database in config."""
     config_data = config.load()

@@ -14,7 +14,9 @@ from cinchdb.api.routers import (
     tables,
     columns,
     views,
-    query
+    query,
+    data,
+    codegen
 )
 
 
@@ -58,6 +60,8 @@ app.include_router(tables.router, prefix="/api/v1/tables", tags=["tables"])
 app.include_router(columns.router, prefix="/api/v1/columns", tags=["columns"])
 app.include_router(views.router, prefix="/api/v1/views", tags=["views"])
 app.include_router(query.router, prefix="/api/v1/query", tags=["query"])
+app.include_router(data.router, prefix="/api/v1/tables", tags=["data"])
+app.include_router(codegen.router, prefix="/api/v1/codegen", tags=["codegen"])
 
 
 @app.get("/")

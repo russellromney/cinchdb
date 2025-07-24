@@ -321,6 +321,21 @@ Phase 6 (API Development) completed:
   - Added comprehensive test coverage (19 tests, all passing)
   - Maintenance mode automatically cleared after change application (success or failure)
 
+- **API Router Parameters Made Required** ✅
+  - Updated all API router files to make database and branch parameters required (not optional):
+    - `/Users/russellromney/Documents/Github/cinchdb/src/cinchdb/api/routers/branches.py`
+    - `/Users/russellromney/Documents/Github/cinchdb/src/cinchdb/api/routers/codegen.py` 
+    - `/Users/russellromney/Documents/Github/cinchdb/src/cinchdb/api/routers/columns.py`
+    - `/Users/russellromney/Documents/Github/cinchdb/src/cinchdb/api/routers/data.py`
+    - `/Users/russellromney/Documents/Github/cinchdb/src/cinchdb/api/routers/tenants.py`
+    - `/Users/russellromney/Documents/Github/cinchdb/src/cinchdb/api/routers/views.py`
+  - Changed parameter pattern from `Optional[str] = Query(None, description="...")` to `str = Query(..., description="...")`
+  - For data.py router (all query operations), made tenant parameter also required
+  - Removed fallback logic (`database or config_data.active_database`)
+  - Cleaned up unused Config imports and variables
+  - All 283 tests still passing after changes
+  - Linting issues resolved (15 auto-fixes applied)
+
 ### Unified Interface Features
 - **Simple API**: `db = cinch.connect("mydb")` then `db.query("SELECT * FROM users")`
 - **Convenience methods**: `db.create_table()`, `db.insert()`, `db.update()`, `db.delete()`

@@ -4,10 +4,13 @@ base command:
 
 okay. read claude claude.md and the design and implementation files, check over the files in .claude-memory, and carefully consider claude.md as you move forward. make sure to focus on testing, and use the temp file for noodling if you need (refer to claude.md for how to clean this up). your role is a senior engineer at a startup, but don't pre-optimize. consider how things already work and if your implementations match the designs. if told to do something silly, please just let me know and stop before implementing the task. your task is: 
 
-do all writes, structure changes, tenant additions, reads, and other operations now need to check for maintenance mode? do you think that's okay for an alpha? give me feedback on this
+does it make sense to unify the codegen models behind a single access point? like instead of User you do "models = CinchModels(connect(...))" then "models.User(...)". don't write any code, but consider if this is a good idea, then suggest some feedback and implementation options in a proposal
 
-in the current change tracking and merge logic, changes only have "migrate up"-type commands, and if one tenant fails but the others succeed, the rest will struggle to roll back. I think that maybe changes should have both migration commands stored in the table: "up" and "down", so for adding a table we should store the "create table ..." statement as well as the "drop table ...". do you think this is a good idea? think about the goals of the project and the current state. do not change code, but respond with your feedback and an idea of how this could work 
+the API should be using a CinchDB instance rather than using XXManager for every call
 
-create a plan in the propsal memory doc to update the API with the recent changes. think about what is necessary to exist in the api vs what is not necessary. consider how codegen models might use the api for .save(), .update(), etc. do not write any code
+we need to be able to use the api for all relevant operations from the core package and the CLI.
+
+the CLI current cannot insert or update data. should it be able to? please provide feedback without touching any code
 
 make a Makefile command to just run python unit tests vs python integration tests, and keep the current "make test" command that runs everyrhintg, so that we don't have to run integration tests for every small change.
+

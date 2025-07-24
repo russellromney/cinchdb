@@ -1,10 +1,9 @@
 """Tenants router for CinchDB API."""
 
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from cinchdb.config import Config
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
 
@@ -38,16 +37,13 @@ class CopyTenantRequest(BaseModel):
 
 @router.get("/", response_model=List[TenantInfo])
 async def list_tenants(
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_read_permission)
 ):
     """List all tenants in a branch."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_read_permission(auth, branch_name)
@@ -78,16 +74,13 @@ async def list_tenants(
 @router.post("/")
 async def create_tenant(
     request: CreateTenantRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Create a new tenant."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
@@ -105,19 +98,16 @@ async def create_tenant(
 @router.delete("/{name}")
 async def delete_tenant(
     name: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Delete a tenant."""
     if name == "main":
         raise HTTPException(status_code=400, detail="Cannot delete the main tenant")
     
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
@@ -136,19 +126,16 @@ async def delete_tenant(
 async def rename_tenant(
     name: str,
     request: RenameTenantRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Rename a tenant."""
     if name == "main":
         raise HTTPException(status_code=400, detail="Cannot rename the main tenant")
     
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
@@ -166,16 +153,13 @@ async def rename_tenant(
 @router.post("/copy")
 async def copy_tenant(
     request: CopyTenantRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Copy a tenant to a new tenant."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)

@@ -4,7 +4,6 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from cinchdb.config import Config
 from cinchdb.managers.view import ViewModel
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
@@ -36,23 +35,19 @@ class UpdateViewRequest(BaseModel):
 
 @router.get("/", response_model=List[ViewInfo])
 async def list_views(
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_read_permission)
 ):
     """List all views in a branch."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_read_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, tenant)
+        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
         views = view_mgr.list_views()
         
         result = []
@@ -73,28 +68,24 @@ async def list_views(
 @router.post("/")
 async def create_view(
     request: CreateViewRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     apply: bool = Query(True, description="Apply changes to all tenants"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Create a new view."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, tenant)
+        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
         view_mgr.create_view(request.name, request.sql, request.description)
         
         # Apply to all tenants if requested
-        if apply and tenant == "main":
+        if apply:
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
             applier.apply_all_unapplied()
         
@@ -108,28 +99,24 @@ async def create_view(
 async def update_view(
     name: str,
     request: UpdateViewRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     apply: bool = Query(True, description="Apply changes to all tenants"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Update an existing view."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, tenant)
+        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
         view_mgr.update_view(name, request.sql, request.description)
         
         # Apply to all tenants if requested
-        if apply and tenant == "main":
+        if apply:
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
             applier.apply_all_unapplied()
         
@@ -142,28 +129,24 @@ async def update_view(
 @router.delete("/{name}")
 async def delete_view(
     name: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     apply: bool = Query(True, description="Apply changes to all tenants"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Delete a view."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, tenant)
+        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
         view_mgr.delete_view(name)
         
         # Apply to all tenants if requested
-        if apply and tenant == "main":
+        if apply:
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
             applier.apply_all_unapplied()
         
@@ -176,23 +159,19 @@ async def delete_view(
 @router.get("/{name}")
 async def get_view_info(
     name: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_read_permission)
 ) -> ViewInfo:
     """Get information about a specific view."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_read_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, tenant)
+        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
         view = view_mgr.get_view(name)
         
         return ViewInfo(

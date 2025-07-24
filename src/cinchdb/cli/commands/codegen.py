@@ -6,8 +6,8 @@ from rich.console import Console
 from rich.table import Table as RichTable
 from typing import Optional
 
-from ..utils import get_config_with_data, validate_required_arg
-from ...managers import CodegenManager
+from ..utils import get_config_with_data, get_config_dict, validate_required_arg
+from ..handlers import CodegenHandler
 
 console = Console()
 
@@ -30,24 +30,21 @@ def languages():
     """List available code generation languages."""
     try:
         config, config_data = get_config_with_data()
+        config_dict = get_config_dict()
         
-        # Create manager to get supported languages
-        manager = CodegenManager(
-            project_root=config.project_dir,
-            database=config_data.active_database,
-            branch=config_data.active_branch,
-            tenant="main"
-        )
-        
-        supported = manager.get_supported_languages()
+        # Create handler to get supported languages
+        handler = CodegenHandler(config_dict)
+        supported = handler.get_supported_languages(project_root=config.project_dir)
         
         table = RichTable(title="Supported Languages")
         table.add_column("Language", style="cyan")
         table.add_column("Status", style="green")
+        table.add_column("Source", style="blue")
         
         for lang in supported:
             status = "Available" if lang == "python" else "Coming Soon"
-            table.add_row(lang, status)
+            source = "Remote API" if handler.is_remote else "Local"
+            table.add_row(lang, status, source)
         
         console.print(table)
         
@@ -66,13 +63,17 @@ def generate(
     tenant: str = typer.Option("main", "--tenant", "-t", help="Tenant name"),
     include_tables: bool = typer.Option(True, "--tables/--no-tables", help="Include table models"),
     include_views: bool = typer.Option(True, "--views/--no-views", help="Include view models"),
-    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing files")
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing files"),
+    api_url: Optional[str] = typer.Option(None, "--api-url", help="API URL for remote generation"),
+    api_key: Optional[str] = typer.Option(None, "--api-key", help="API key for remote generation"),
+    local: bool = typer.Option(False, "--local", help="Force local generation even if API configured")
 ):
     """Generate model files for the specified language."""
     language = validate_required_arg(language, "language", ctx)
     output_dir = validate_required_arg(output_dir, "output_dir", ctx)
     try:
         config, config_data = get_config_with_data()
+        config_dict = get_config_dict()
         
         # Use provided values or defaults from config
         db_name = database or config_data.active_database
@@ -87,46 +88,53 @@ def generate(
             console.print("Use --force to overwrite existing files.")
             raise typer.Exit(1)
         
-        # Create manager
-        manager = CodegenManager(
-            project_root=config.project_dir,
-            database=db_name,
-            branch=branch_name,
-            tenant=tenant
+        # Create handler with API options
+        handler = CodegenHandler(
+            config_data=config_dict,
+            api_url=api_url,
+            api_key=api_key,
+            force_local=local
         )
         
         # Validate language
-        supported = manager.get_supported_languages()
+        supported = handler.get_supported_languages(project_root=config.project_dir)
         if language not in supported:
             console.print(f"[red]❌ Language '{language}' not supported.[/red]")
             console.print(f"Available languages: {', '.join(supported)}")
             raise typer.Exit(1)
         
         # Show what will be generated
-        console.print(f"[blue]🔧 Generating {language} models...[/blue]")
+        source = "Remote API" if handler.is_remote else "Local"
+        console.print(f"[blue]🔧 Generating {language} models via {source}...[/blue]")
         console.print(f"Database: {db_name}")
         console.print(f"Branch: {branch_name}")
         console.print(f"Tenant: {tenant}")
         console.print(f"Output: {output_path}")
         console.print(f"Include tables: {include_tables}")
         console.print(f"Include views: {include_views}")
+        if handler.is_remote:
+            console.print(f"API URL: {handler.api_url}")
         console.print()
         
         # Generate models
-        results = manager.generate_models(
+        results = handler.generate_models(
             language=language,
             output_dir=output_path,
+            database=db_name,
+            branch=branch_name,
+            tenant=tenant,
             include_tables=include_tables,
-            include_views=include_views
+            include_views=include_views,
+            project_root=config.project_dir
         )
         
         # Display results
         console.print(f"[green]✅ Generated {len(results['files_generated'])} files[/green]")
         
-        if results["tables_processed"]:
+        if results.get("tables_processed"):
             console.print(f"Tables processed: {', '.join(results['tables_processed'])}")
         
-        if results["views_processed"]:
+        if results.get("views_processed"):
             console.print(f"Views processed: {', '.join(results['views_processed'])}")
         
         console.print(f"Output directory: {results['output_dir']}")

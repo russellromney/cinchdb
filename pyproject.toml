@@ -26,6 +26,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "python-multipart>=0.0.12",
+    "requests>=2.28.0",
 ]
 
 [project.urls]
@@ -48,4 +49,5 @@ dev-dependencies = [
     "pytest-cov>=4.0.0",
     "ruff>=0.5.0",
     "mypy>=1.0.0",
+    "responses>=0.23.0",
 ]

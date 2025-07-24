@@ -4,7 +4,6 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from cinchdb.config import Config
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
@@ -46,23 +45,19 @@ class CopyTableRequest(BaseModel):
 
 @router.get("/", response_model=List[TableInfo])
 async def list_tables(
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_read_permission)
 ):
     """List all tables in a branch."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_read_permission(auth, branch_name)
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
+        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
         tables = table_mgr.list_tables()
         
         result = []
@@ -98,18 +93,14 @@ async def list_tables(
 @router.post("/")
 async def create_table(
     request: CreateTableRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     apply: bool = Query(True, description="Apply changes to all tenants"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Create a new table."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
@@ -134,11 +125,11 @@ async def create_table(
         ))
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
+        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
         table_mgr.create_table(request.name, columns)
         
         # Apply to all tenants if requested
-        if apply and tenant == "main":
+        if apply:
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
             applier.apply_all_unapplied()
         
@@ -151,28 +142,24 @@ async def create_table(
 @router.delete("/{name}")
 async def delete_table(
     name: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     apply: bool = Query(True, description="Apply changes to all tenants"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Delete a table."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
+        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
         table_mgr.delete_table(name)
         
         # Apply to all tenants if requested
-        if apply and tenant == "main":
+        if apply:
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
             applier.apply_all_unapplied()
         
@@ -185,28 +172,24 @@ async def delete_table(
 @router.post("/copy")
 async def copy_table(
     request: CopyTableRequest,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     apply: bool = Query(True, description="Apply changes to all tenants"),
     auth: AuthContext = Depends(require_write_permission)
 ):
     """Copy a table to a new table."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_write_permission(auth, branch_name)
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
+        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
         table_mgr.copy_table(request.source, request.target, request.copy_data)
         
         # Apply to all tenants if requested
-        if apply and tenant == "main":
+        if apply:
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
             applier.apply_all_unapplied()
         
@@ -220,23 +203,19 @@ async def copy_table(
 @router.get("/{name}")
 async def get_table_info(
     name: str,
-    database: Optional[str] = Query(None, description="Database name (defaults to active)"),
-    branch: Optional[str] = Query(None, description="Branch name (defaults to active)"),
-    tenant: str = Query("main", description="Tenant name"),
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
     auth: AuthContext = Depends(require_read_permission)
 ) -> TableInfo:
     """Get information about a specific table."""
-    config = Config(auth.project_dir)
-    config_data = config.load()
-    
-    db_name = database or config_data.active_database
-    branch_name = branch or config_data.active_branch
+    db_name = database
+    branch_name = branch
     
     # Check branch permissions
     await require_read_permission(auth, branch_name)
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
+        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
         table = table_mgr.get_table(name)
         
         # Convert columns

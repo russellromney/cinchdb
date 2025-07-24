@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from cinchdb.managers.table import TableManager
+from cinchdb.core.database import CinchDB
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
@@ -57,8 +57,8 @@ async def list_tables(
     await require_read_permission(auth, branch_name)
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
-        tables = table_mgr.list_tables()
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        tables = db.tables.list_tables()
         
         result = []
         for table in tables:
@@ -125,8 +125,8 @@ async def create_table(
         ))
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
-        table_mgr.create_table(request.name, columns)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.tables.create_table(request.name, columns)
         
         # Apply to all tenants if requested
         if apply:
@@ -155,8 +155,8 @@ async def delete_table(
     await require_write_permission(auth, branch_name)
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
-        table_mgr.delete_table(name)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.tables.delete_table(name)
         
         # Apply to all tenants if requested
         if apply:
@@ -185,8 +185,8 @@ async def copy_table(
     await require_write_permission(auth, branch_name)
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
-        table_mgr.copy_table(request.source, request.target, request.copy_data)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.tables.copy_table(request.source, request.target, request.copy_data)
         
         # Apply to all tenants if requested
         if apply:
@@ -215,8 +215,8 @@ async def get_table_info(
     await require_read_permission(auth, branch_name)
     
     try:
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, "main")
-        table = table_mgr.get_table(name)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        table = db.tables.get_table(name)
         
         # Convert columns
         columns = []

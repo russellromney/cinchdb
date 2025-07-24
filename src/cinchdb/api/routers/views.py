@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from cinchdb.managers.view import ViewModel
+from cinchdb.core.database import CinchDB
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
 
@@ -47,8 +47,8 @@ async def list_views(
     await require_read_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
-        views = view_mgr.list_views()
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        views = db.views.list_views()
         
         result = []
         for view in views:
@@ -81,8 +81,8 @@ async def create_view(
     await require_write_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
-        view_mgr.create_view(request.name, request.sql, request.description)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.views.create_view(request.name, request.sql, request.description)
         
         # Apply to all tenants if requested
         if apply:
@@ -112,8 +112,8 @@ async def update_view(
     await require_write_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
-        view_mgr.update_view(name, request.sql, request.description)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.views.update_view(name, request.sql, request.description)
         
         # Apply to all tenants if requested
         if apply:
@@ -142,8 +142,8 @@ async def delete_view(
     await require_write_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
-        view_mgr.delete_view(name)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.views.delete_view(name)
         
         # Apply to all tenants if requested
         if apply:
@@ -171,8 +171,8 @@ async def get_view_info(
     await require_read_permission(auth, branch_name)
     
     try:
-        view_mgr = ViewModel(auth.project_dir, db_name, branch_name, "main")
-        view = view_mgr.get_view(name)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        view = db.views.get_view(name)
         
         return ViewInfo(
             name=view.name,

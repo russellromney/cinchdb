@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from cinchdb.managers.column import ColumnManager
+from cinchdb.core.database import CinchDB
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
@@ -52,8 +52,8 @@ async def list_columns(
     await require_read_permission(auth, branch_name)
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
-        columns = column_mgr.list_columns(table)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        columns = db.columns.list_columns(table)
         
         result = []
         for col in columns:
@@ -96,14 +96,14 @@ async def add_column(
         )
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
         column = Column(
             name=request.name,
             type=request.type.upper(),
             nullable=request.nullable,
             default=request.default
         )
-        column_mgr.add_column(table, column)
+        db.columns.add_column(table, column)
         
         # Apply to all tenants if requested
         if apply:
@@ -133,8 +133,8 @@ async def drop_column(
     await require_write_permission(auth, branch_name)
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
-        column_mgr.drop_column(table, column)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.columns.drop_column(table, column)
         
         # Apply to all tenants if requested
         if apply:
@@ -164,8 +164,8 @@ async def rename_column(
     await require_write_permission(auth, branch_name)
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
-        column_mgr.rename_column(table, request.old_name, request.new_name)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.columns.rename_column(table, request.old_name, request.new_name)
         
         # Apply to all tenants if requested
         if apply:
@@ -194,8 +194,8 @@ async def get_column_info(
     await require_read_permission(auth, branch_name)
     
     try:
-        column_mgr = ColumnManager(auth.project_dir, db_name, branch_name, "main")
-        col = column_mgr.get_column_info(table, column)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        col = db.columns.get_column_info(table, column)
         
         return ColumnInfo(
             name=col.name,

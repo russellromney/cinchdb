@@ -152,7 +152,7 @@ class TestNewAPIFunctionality:
         data_endpoints = [r for r in all_routes if '/tables/' in r.path and '/data' in r.path]
         assert len(data_endpoints) >= 6, f"Expected at least 6 data endpoints, got {len(data_endpoints)}"
         
-        # Count codegen endpoints (should have language listing and generation)
+        # Count codegen endpoints (should have language listing, files generation, and info)
         codegen_endpoints = [r for r in all_routes if '/codegen' in r.path]
         assert len(codegen_endpoints) >= 3, f"Expected at least 3 codegen endpoints, got {len(codegen_endpoints)}"
         

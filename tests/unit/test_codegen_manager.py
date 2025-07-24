@@ -82,7 +82,7 @@ class TestCodegenManager:
         # Check results structure
         assert results["language"] == "python"
         assert results["output_dir"] == str(output_dir)
-        assert len(results["files_generated"]) == 3  # users.py, posts.py, __init__.py
+        assert len(results["files_generated"]) == 4  # users.py, posts.py, cinch_models.py, __init__.py
         assert len(results["tables_processed"]) == 2
         assert "users" in results["tables_processed"]
         assert "posts" in results["tables_processed"]
@@ -92,6 +92,7 @@ class TestCodegenManager:
         assert (output_dir / "__init__.py").exists()
         assert (output_dir / "users.py").exists()
         assert (output_dir / "posts.py").exists()
+        assert (output_dir / "cinch_models.py").exists()
         
         # Check users.py content
         users_content = (output_dir / "users.py").read_text()
@@ -150,13 +151,14 @@ class TestCodegenManager:
         # Check results
         assert len(results["tables_processed"]) == 2
         assert len(results["views_processed"]) == 1
-        assert len(results["files_generated"]) == 4  # 2 tables + 1 view + __init__.py
+        assert len(results["files_generated"]) == 5  # 2 tables + 1 view + cinch_models.py + __init__.py
         
         # Check all files exist
         assert (output_dir / "__init__.py").exists()
         assert (output_dir / "users.py").exists()
         assert (output_dir / "posts.py").exists()
         assert (output_dir / "user_posts_view.py").exists()
+        assert (output_dir / "cinch_models.py").exists()
     
     def test_generate_typescript_placeholder(self, codegen_manager, temp_project):
         """Test TypeScript generation (currently placeholder)."""

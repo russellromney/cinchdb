@@ -6,8 +6,8 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from cinchdb.config import Config
-from cinchdb.managers.branch import BranchManager
-from cinchdb.managers.merge_manager import MergeManager, MergeError
+from cinchdb.core.database import CinchDB
+from cinchdb.managers.merge_manager import MergeError
 from cinchdb.managers.change_comparator import ChangeComparator
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
 
@@ -69,8 +69,8 @@ async def list_branches(
     db_name = database
     
     try:
-        branch_mgr = BranchManager(auth.project_dir, db_name)
-        branches = branch_mgr.list_branches()
+        db = CinchDB(database=db_name, branch="main", tenant="main", project_dir=auth.project_dir)
+        branches = db.branches.list_branches()
         
         result = []
         for branch in branches:
@@ -116,8 +116,8 @@ async def create_branch(
         )
     
     try:
-        branch_mgr = BranchManager(auth.project_dir, db_name)
-        branch = branch_mgr.create_branch(request.name, request.source)
+        db = CinchDB(database=db_name, branch="main", tenant="main", project_dir=auth.project_dir)
+        branch = db.branches.create_branch(request.name, request.source)
         
         return {
             "message": f"Created branch '{request.name}' from '{request.source}'",
@@ -155,8 +155,8 @@ async def delete_branch(
         )
     
     try:
-        branch_mgr = BranchManager(auth.project_dir, db_name)
-        branch_mgr.delete_branch(name)
+        db = CinchDB(database=db_name, branch="main", tenant="main", project_dir=auth.project_dir)
+        db.branches.delete_branch(name)
         
         # If this was the active branch, switch to main
         if config_data.active_branch == name and config_data.active_database == db_name:
@@ -186,8 +186,8 @@ async def switch_branch(
         )
     
     try:
-        branch_mgr = BranchManager(auth.project_dir, db_name)
-        branch_mgr.switch_branch(name)
+        db = CinchDB(database=db_name, branch="main", tenant="main", project_dir=auth.project_dir)
+        db.branches.switch_branch(name)
         
         return {
             "message": f"Switched to branch '{name}'",
@@ -253,8 +253,8 @@ async def check_merge_feasibility(
     await require_read_permission(auth, target)
     
     try:
-        merge_mgr = MergeManager(auth.project_dir, db_name)
-        result = merge_mgr.can_merge(source, target)
+        db = CinchDB(database=db_name, branch="main", tenant="main", project_dir=auth.project_dir)
+        result = db.merge.can_merge(source, target)
         
         return MergeCheckResult(**result)
         
@@ -279,14 +279,14 @@ async def merge_branches(
     await require_write_permission(auth, target)
     
     try:
-        merge_mgr = MergeManager(auth.project_dir, db_name)
+        db = CinchDB(database=db_name, branch="main", tenant="main", project_dir=auth.project_dir)
         
         if target == "main":
             # Use the merge_into_main method for main branch protection
-            result = merge_mgr.merge_into_main(source, force=force, dry_run=dry_run)
+            result = db.merge.merge_into_main(source, force=force, dry_run=dry_run)
         else:
             # Use internal merge method for non-main branches
-            result = merge_mgr._merge_branches_internal(source, target, force=force, dry_run=dry_run)
+            result = db.merge._merge_branches_internal(source, target, force=force, dry_run=dry_run)
         
         return result
         
@@ -312,8 +312,8 @@ async def merge_into_main_branch(
     await require_write_permission(auth, "main")
     
     try:
-        merge_mgr = MergeManager(auth.project_dir, db_name)
-        result = merge_mgr.merge_into_main(source, force=force, dry_run=dry_run)
+        db = CinchDB(database=db_name, branch="main", tenant="main", project_dir=auth.project_dir)
+        result = db.merge.merge_into_main(source, force=force, dry_run=dry_run)
         
         return result
         

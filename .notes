@@ -4,13 +4,6 @@ base command:
 
 okay. read claude claude.md and the design and implementation files, check over the files in .claude-memory, and carefully consider claude.md as you move forward. make sure to focus on testing, and use the temp file for noodling if you need (refer to claude.md for how to clean this up). your role is a senior engineer at a startup, but don't pre-optimize. consider how things already work and if your implementations match the designs. if told to do something silly, please just let me know and stop before implementing the task. your task is: 
 
-does it make sense to unify the codegen models behind a single access point? like instead of User you do "models = CinchModels(connect(...))" then "models.User(...)". don't write any code, but consider if this is a good idea, then suggest some feedback and implementation options in a proposal
-
-the API should be using a CinchDB instance rather than using XXManager for every call
-
 we need to be able to use the api for all relevant operations from the core package and the CLI.
 
 the CLI current cannot insert or update data. should it be able to? please provide feedback without touching any code
-
-make a Makefile command to just run python unit tests vs python integration tests, and keep the current "make test" command that runs everyrhintg, so that we don't have to run integration tests for every small change.
-

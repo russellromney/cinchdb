@@ -4,7 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from cinchdb.managers.tenant import TenantManager
+from cinchdb.core.database import CinchDB
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
 
 
@@ -49,8 +49,8 @@ async def list_tenants(
     await require_read_permission(auth, branch_name)
     
     try:
-        tenant_mgr = TenantManager(auth.project_dir, db_name, branch_name)
-        tenants = tenant_mgr.list_tenants()
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        tenants = db.tenants.list_tenants()
         
         result = []
         for tenant in tenants:
@@ -86,8 +86,8 @@ async def create_tenant(
     await require_write_permission(auth, branch_name)
     
     try:
-        tenant_mgr = TenantManager(auth.project_dir, db_name, branch_name)
-        tenant_mgr.create_tenant(request.name)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.tenants.create_tenant(request.name)
         
         return {"message": f"Created tenant '{request.name}'"}
         
@@ -113,8 +113,8 @@ async def delete_tenant(
     await require_write_permission(auth, branch_name)
     
     try:
-        tenant_mgr = TenantManager(auth.project_dir, db_name, branch_name)
-        tenant_mgr.delete_tenant(name)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.tenants.delete_tenant(name)
         
         return {"message": f"Deleted tenant '{name}'"}
         
@@ -141,8 +141,8 @@ async def rename_tenant(
     await require_write_permission(auth, branch_name)
     
     try:
-        tenant_mgr = TenantManager(auth.project_dir, db_name, branch_name)
-        tenant_mgr.rename_tenant(name, request.new_name)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.tenants.rename_tenant(name, request.new_name)
         
         return {"message": f"Renamed tenant '{name}' to '{request.new_name}'"}
         
@@ -165,8 +165,8 @@ async def copy_tenant(
     await require_write_permission(auth, branch_name)
     
     try:
-        tenant_mgr = TenantManager(auth.project_dir, db_name, branch_name)
-        tenant_mgr.copy_tenant(request.source, request.target, request.copy_data)
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        db.tenants.copy_tenant(request.source, request.target, request.copy_data)
         
         data_msg = "with data" if request.copy_data else "without data"
         return {"message": f"Copied tenant '{request.source}' to '{request.target}' {data_msg}"}

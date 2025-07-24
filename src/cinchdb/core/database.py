@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from cinchdb.managers.view import ViewModel
     from cinchdb.managers.branch import BranchManager
     from cinchdb.managers.tenant import TenantManager
+    from cinchdb.managers.codegen import CodegenManager
+    from cinchdb.managers.merge_manager import MergeManager
 
 
 class CinchDB:
@@ -103,6 +105,8 @@ class CinchDB:
         self._view_manager: Optional["ViewModel"] = None
         self._branch_manager: Optional["BranchManager"] = None
         self._tenant_manager: Optional["TenantManager"] = None
+        self._codegen_manager: Optional["CodegenManager"] = None
+        self._merge_manager: Optional["MergeManager"] = None
     
     @property
     def session(self):
@@ -245,6 +249,26 @@ class CinchDB:
             from cinchdb.managers.data import DataManager
             self._data_manager = DataManager(self.project_dir, self.database, self.branch, self.tenant)
         return self._data_manager
+    
+    @property
+    def codegen(self) -> "CodegenManager":
+        """Access code generation operations (local only)."""
+        if not self.is_local:
+            raise RuntimeError("Direct manager access not available for remote connections")
+        if self._codegen_manager is None:
+            from cinchdb.managers.codegen import CodegenManager
+            self._codegen_manager = CodegenManager(self.project_dir, self.database, self.branch, self.tenant)
+        return self._codegen_manager
+    
+    @property
+    def merge(self) -> "MergeManager":
+        """Access merge operations (local only)."""
+        if not self.is_local:
+            raise RuntimeError("Direct manager access not available for remote connections")
+        if self._merge_manager is None:
+            from cinchdb.managers.merge_manager import MergeManager
+            self._merge_manager = MergeManager(self.project_dir, self.database)
+        return self._merge_manager
     
     # Convenience methods for common operations
     

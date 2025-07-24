@@ -146,13 +146,53 @@ class CodegenManager:
                 class_name = f"{self._to_pascal_case(view.name)}View"
                 model_imports.append(f"from .{self._to_snake_case(view.name)}_view import {class_name}")
         
-        # Write __init__.py with all imports
+        # Generate CinchModels container class
+        cinch_models_content = self._generate_cinch_models_class()
+        cinch_models_path = output_dir / "cinch_models.py"
+        with open(cinch_models_path, 'w') as f:
+            f.write(cinch_models_content)
+        results["files_generated"].append("cinch_models.py")
+        
+        # Write __init__.py with all imports and factory function
         if model_imports:
+            # Import CinchModels
+            init_content.append("from .cinch_models import CinchModels")
             init_content.extend(model_imports)
             init_content.append("")  # Empty line
             
+            # Create model registry
+            init_content.append("# Model registry for dynamic loading")
+            init_content.append("_MODEL_REGISTRY = {")
+            if include_tables:
+                for table_name in results["tables_processed"]:
+                    class_name = self._to_pascal_case(table_name)
+                    init_content.append(f"    '{class_name}': {class_name},")
+            if include_views:
+                for view_name in results["views_processed"]:
+                    class_name = f"{self._to_pascal_case(view_name)}View"
+                    init_content.append(f"    '{class_name}': {class_name},")
+            init_content.append("}")
+            init_content.append("")
+            
+            # Add factory function
+            init_content.extend([
+                "def create_models(connection) -> CinchModels:",
+                '    """Create unified models interface.',
+                "",
+                "    Args:",
+                "        connection: CinchDB instance (local or remote)",
+                "",
+                "    Returns:",
+                "        CinchModels container with all generated models",
+                '    """',
+                "    models = CinchModels(connection)",
+                "    models._model_registry = _MODEL_REGISTRY",
+                "    return models",
+                ""
+            ])
+            
             # Add __all__ export
-            all_exports = []
+            all_exports = ["'CinchModels'", "'create_models'"]
             if include_tables:
                 for table_name in results["tables_processed"]:
                     all_exports.append(f'"{self._to_pascal_case(table_name)}"')
@@ -206,21 +246,10 @@ class CodegenManager:
             "",
             "    @classmethod",
             "    def _get_data_manager(cls) -> DataManager:",
-            '        """Get or create data manager instance."""',
+            '        """Get data manager instance (set by CinchModels container)."""',
             "        if cls._data_manager is None:",
-            '            raise RuntimeError("Model not initialized. Call set_connection() first.")',
+            '            raise RuntimeError("Model not initialized. Access models through CinchModels container.")',
             "        return cls._data_manager",
-            "",
-            "    @classmethod",
-            "    def set_connection(",
-            "        cls,",
-            "        project_root: Path,",
-            "        database: str,",
-            "        branch: str,",
-            "        tenant: str = 'main'",
-            "    ) -> None:",
-            '        """Set database connection for this model."""',
-            "        cls._data_manager = DataManager(project_root, database, branch, tenant)",
             "",
             "    @classmethod",
             f"    def select(cls, limit: Optional[int] = None, offset: Optional[int] = None, **filters) -> List['{class_name}']:",
@@ -408,3 +437,70 @@ class CodegenManager:
         # Split on underscores and capitalize each part
         parts = name.replace('-', '_').split('_')
         return ''.join(word.capitalize() for word in parts if word)
+    
+    def _generate_cinch_models_class(self) -> str:
+        """Generate the CinchModels container class."""
+        content = [
+            '"""CinchModels container class for unified model access."""',
+            "",
+            "from typing import Dict, Any, Optional",
+            "from cinchdb.core.database import CinchDB",
+            "from cinchdb.managers.data import DataManager",
+            "",
+            "",
+            "class CinchModels:",
+            '    """Unified interface for generated models."""',
+            "",
+            "    def __init__(self, connection: CinchDB):",
+            '        """Initialize with a CinchDB connection.',
+            "",
+            "        Args:",
+            "            connection: CinchDB instance (local or remote)",
+            '        """',
+            "        if not isinstance(connection, CinchDB):",
+            '            raise TypeError("CinchModels requires a CinchDB connection instance")',
+            "",
+            "        self._connection = connection",
+            "        self._models = {}  # Lazy loaded model cache",
+            "        self._model_registry = {}  # Map of model names to classes",
+            "        self._tenant_override = None  # Optional tenant override",
+            "",
+            "    def __getattr__(self, name: str):",
+            '        """Lazy load and return model class with connection set."""',
+            "        if name not in self._models:",
+            "            if name not in self._model_registry:",
+            '                raise AttributeError(f"Model \'{name}\' not found")',
+            "",
+            "            model_class = self._model_registry[name]",
+            "",
+            "            # Determine tenant to use (override or connection default)",
+            "            tenant = self._tenant_override or self._connection.tenant",
+            "",
+            "            # Initialize model with connection context",
+            "            if self._connection.is_local:",
+            "                # Create DataManager for local connections",
+            "                data_manager = DataManager(",
+            "                    self._connection.project_dir,",
+            "                    self._connection.database,",
+            "                    self._connection.branch,",
+            "                    tenant",
+            "                )",
+            "                model_class._data_manager = data_manager",
+            "            else:",
+            "                # Remote connections not yet supported in codegen",
+            '                raise NotImplementedError("Remote connections not yet supported in generated models")',
+            "",
+            "            self._models[name] = model_class",
+            "",
+            "        return self._models[name]",
+            "",
+            "    def with_tenant(self, tenant: str) -> 'CinchModels':",
+            '        """Create models interface for a specific tenant with connection context override."""',
+            "        # Create a new CinchModels with same connection but different tenant context",
+            "        new_models = CinchModels(self._connection)",
+            "        new_models._tenant_override = tenant",
+            "        new_models._model_registry = self._model_registry",
+            "        return new_models"
+        ]
+        
+        return "\n".join(content)

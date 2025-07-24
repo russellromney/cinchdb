@@ -4,8 +4,7 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from pydantic import BaseModel, Field
 
-from cinchdb.managers.data import DataManager
-from cinchdb.managers.table import TableManager
+from cinchdb.core.database import CinchDB
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
 
 
@@ -98,11 +97,11 @@ async def list_table_data(
     await require_read_permission(auth, branch_name)
     
     try:
-        # Verify table exists
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table_mgr.get_table(table_name)  # This will raise ValueError if table doesn't exist
+        # Create CinchDB instance
+        db = CinchDB(database=db_name, branch=branch_name, tenant=tenant, project_dir=auth.project_dir)
         
-        data_mgr = DataManager(auth.project_dir, db_name, branch_name, tenant)
+        # Verify table exists
+        db.tables.get_table(table_name)  # This will raise ValueError if table doesn't exist
         
         # Create a generic model for the table
         table_model = create_table_model(table_name)
@@ -113,7 +112,7 @@ async def list_table_data(
         filters = {}
         
         # Get records
-        records = data_mgr.select(table_model, limit=limit, offset=offset, **filters)
+        records = db.data.select(table_model, limit=limit, offset=offset, **filters)
         
         # Convert to dict format for response
         return [record.model_dump() if hasattr(record, 'model_dump') else record.__dict__ for record in records]
@@ -139,14 +138,15 @@ async def get_record_by_id(
     await require_read_permission(auth, branch_name)
     
     try:
-        # Verify table exists
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table_mgr.get_table(table_name)
+        # Create CinchDB instance
+        db = CinchDB(database=db_name, branch=branch_name, tenant=tenant, project_dir=auth.project_dir)
         
-        data_mgr = DataManager(auth.project_dir, db_name, branch_name, tenant)
+        # Verify table exists
+        db.tables.get_table(table_name)
+        
         table_model = create_table_model(table_name)
         
-        record = data_mgr.find_by_id(table_model, record_id)
+        record = db.data.find_by_id(table_model, record_id)
         
         if not record:
             raise HTTPException(status_code=404, detail=f"Record with ID {record_id} not found")
@@ -174,18 +174,19 @@ async def create_record(
     await require_write_permission(auth, branch_name)
     
     try:
-        # Verify table exists
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table_mgr.get_table(table_name)
+        # Create CinchDB instance
+        db = CinchDB(database=db_name, branch=branch_name, tenant=tenant, project_dir=auth.project_dir)
         
-        data_mgr = DataManager(auth.project_dir, db_name, branch_name, tenant)
+        # Verify table exists
+        db.tables.get_table(table_name)
+        
         table_model = create_table_model(table_name)
         
         # Create model instance from request data
         instance = table_model(**request.data)
         
         # Create the record
-        created_record = data_mgr.create(instance)
+        created_record = db.data.create(instance)
         
         return created_record.model_dump() if hasattr(created_record, 'model_dump') else created_record.__dict__
         
@@ -213,11 +214,12 @@ async def update_record(
     await require_write_permission(auth, branch_name)
     
     try:
-        # Verify table exists
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table_mgr.get_table(table_name)
+        # Create CinchDB instance
+        db = CinchDB(database=db_name, branch=branch_name, tenant=tenant, project_dir=auth.project_dir)
         
-        data_mgr = DataManager(auth.project_dir, db_name, branch_name, tenant)
+        # Verify table exists
+        db.tables.get_table(table_name)
+        
         table_model = create_table_model(table_name)
         
         # Ensure the ID is in the data
@@ -228,7 +230,7 @@ async def update_record(
         instance = table_model(**update_data)
         
         # Update the record
-        updated_record = data_mgr.update(instance)
+        updated_record = db.data.update(instance)
         
         return updated_record.model_dump() if hasattr(updated_record, 'model_dump') else updated_record.__dict__
         
@@ -255,15 +257,16 @@ async def delete_record(
     await require_write_permission(auth, branch_name)
     
     try:
-        # Verify table exists
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table_mgr.get_table(table_name)
+        # Create CinchDB instance
+        db = CinchDB(database=db_name, branch=branch_name, tenant=tenant, project_dir=auth.project_dir)
         
-        data_mgr = DataManager(auth.project_dir, db_name, branch_name, tenant)
+        # Verify table exists
+        db.tables.get_table(table_name)
+        
         table_model = create_table_model(table_name)
         
         # Delete the record
-        deleted = data_mgr.delete_by_id(table_model, record_id)
+        deleted = db.data.delete_by_id(table_model, record_id)
         
         if not deleted:
             raise HTTPException(status_code=404, detail=f"Record with ID {record_id} not found")
@@ -291,18 +294,19 @@ async def bulk_create_records(
     await require_write_permission(auth, branch_name)
     
     try:
-        # Verify table exists
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table_mgr.get_table(table_name)
+        # Create CinchDB instance
+        db = CinchDB(database=db_name, branch=branch_name, tenant=tenant, project_dir=auth.project_dir)
         
-        data_mgr = DataManager(auth.project_dir, db_name, branch_name, tenant)
+        # Verify table exists
+        db.tables.get_table(table_name)
+        
         table_model = create_table_model(table_name)
         
         # Create model instances from request data
         instances = [table_model(**record_data) for record_data in request.records]
         
         # Bulk create
-        created_records = data_mgr.bulk_create(instances)
+        created_records = db.data.bulk_create(instances)
         
         return [record.model_dump() if hasattr(record, 'model_dump') else record.__dict__ 
                 for record in created_records]
@@ -342,15 +346,16 @@ async def delete_records_with_filters(
         )
     
     try:
-        # Verify table exists
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table_mgr.get_table(table_name)
+        # Create CinchDB instance
+        db = CinchDB(database=db_name, branch=branch_name, tenant=tenant, project_dir=auth.project_dir)
         
-        data_mgr = DataManager(auth.project_dir, db_name, branch_name, tenant)
+        # Verify table exists
+        db.tables.get_table(table_name)
+        
         table_model = create_table_model(table_name)
         
         # Delete records with filters
-        deleted_count = data_mgr.delete(table_model, **filters)
+        deleted_count = db.data.delete(table_model, **filters)
         
         return {"message": f"Deleted {deleted_count} records from table '{table_name}'", "count": deleted_count}
         
@@ -383,15 +388,16 @@ async def count_records(
             filters[key] = value
     
     try:
-        # Verify table exists
-        table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table_mgr.get_table(table_name)
+        # Create CinchDB instance
+        db = CinchDB(database=db_name, branch=branch_name, tenant=tenant, project_dir=auth.project_dir)
         
-        data_mgr = DataManager(auth.project_dir, db_name, branch_name, tenant)
+        # Verify table exists
+        db.tables.get_table(table_name)
+        
         table_model = create_table_model(table_name)
         
         # Count records
-        count = data_mgr.count(table_model, **filters)
+        count = db.data.count(table_model, **filters)
         
         return {"count": count, "table": table_name, "filters": filters}
         

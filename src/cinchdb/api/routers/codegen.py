@@ -1,14 +1,12 @@
 """Code generation router for CinchDB API."""
 
-import zipfile
 import tempfile
 from typing import List, Dict
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from cinchdb.managers.codegen import CodegenManager
+from cinchdb.core.database import CinchDB
 from cinchdb.api.auth import AuthContext, require_read_permission
 
 
@@ -28,26 +26,15 @@ class GenerateModelsRequest(BaseModel):
     include_views: bool = True
 
 
-class GenerateModelsResponse(BaseModel):
-    """Response from model generation."""
-    language: str
-    files_generated: List[str]
-    tables_processed: List[str]
-    views_processed: List[str]
-    download_url: str
-
-
 @router.get("/languages", response_model=List[CodegenLanguage])
-async def list_supported_languages(
-    auth: AuthContext = Depends(require_read_permission)
-):
+async def list_supported_languages():
     """List supported code generation languages."""
-    # Using a temporary codegen manager to get supported languages
+    # Using a temporary CinchDB to get supported languages
     # This doesn't require specific database/branch so we use dummy values
     temp_project = Path(tempfile.mkdtemp())
     try:
-        codegen_mgr = CodegenManager(temp_project, "dummy", "dummy", "dummy")
-        languages = codegen_mgr.get_supported_languages()
+        db = CinchDB(database="dummy", branch="dummy", tenant="dummy", project_dir=temp_project)
+        languages = db.codegen.get_supported_languages()
         
         # Map languages to descriptions
         language_info = {
@@ -68,129 +55,8 @@ async def list_supported_languages(
         shutil.rmtree(temp_project, ignore_errors=True)
 
 
-@router.post("/generate", response_model=GenerateModelsResponse)
-async def generate_models(
-    request: GenerateModelsRequest,
-    database: str = Query(..., description="Database name"),
-    branch: str = Query(..., description="Branch name"),
-    auth: AuthContext = Depends(require_read_permission)
-):
-    """Generate model files for the specified language and return as ZIP download."""
-    db_name = database
-    branch_name = branch
-    
-    # Check branch permissions
-    await require_read_permission(auth, branch_name)
-    
-    try:
-        # Create temporary directory for generation
-        temp_dir = Path(tempfile.mkdtemp())
-        output_dir = temp_dir / "generated_models"
-        
-        # Initialize codegen manager
-        codegen_mgr = CodegenManager(auth.project_dir, db_name, branch_name, "main")
-        
-        # Generate models
-        results = codegen_mgr.generate_models(
-            language=request.language,
-            output_dir=output_dir,
-            include_tables=request.include_tables,
-            include_views=request.include_views
-        )
-        
-        # Create ZIP file with generated models
-        zip_path = temp_dir / f"cinchdb_models_{request.language}.zip"
-        
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file_name in results["files_generated"]:
-                file_path = output_dir / file_name
-                if file_path.exists():
-                    # Add file to ZIP with just the filename (no directory structure)
-                    zipf.write(file_path, file_name)
-        
-        # Store the ZIP file path for download (in a real implementation, 
-        # you might want to use a more sophisticated temporary file management system)
-        download_filename = f"cinchdb_models_{request.language}_{db_name}_{branch_name}.zip"
-        
-        # In a production system, you might store this in a cache or temporary storage
-        # For now, we'll return the file directly
-        
-        return GenerateModelsResponse(
-            language=results["language"],
-            files_generated=results["files_generated"],
-            tables_processed=results["tables_processed"],
-            views_processed=results["views_processed"],
-            download_url=f"/api/v1/codegen/download/{download_filename}"
-        )
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Code generation failed: {str(e)}")
 
 
-@router.get("/generate/download/{filename}")
-async def download_generated_models(
-    filename: str,
-    database: str = Query(..., description="Database name"),
-    branch: str = Query(..., description="Branch name"),
-    auth: AuthContext = Depends(require_read_permission)
-):
-    """Download previously generated model files as ZIP."""
-    db_name = database
-    branch_name = branch
-    
-    # Check branch permissions
-    await require_read_permission(auth, branch_name)
-    
-    # Parse filename to extract language and validate request
-    if not filename.startswith("cinchdb_models_"):
-        raise HTTPException(status_code=400, detail="Invalid filename format")
-    
-    try:
-        # Extract language from filename
-        parts = filename.split("_")
-        if len(parts) < 3:
-            raise HTTPException(status_code=400, detail="Invalid filename format")
-        
-        language = parts[2]  # cinchdb_models_<language>_...
-        
-        # Re-generate the models (since we don't persist them)
-        # In a production system, you might cache generated files
-        temp_dir = Path(tempfile.mkdtemp())
-        output_dir = temp_dir / "generated_models"
-        
-        # Initialize codegen manager
-        codegen_mgr = CodegenManager(auth.project_dir, db_name, branch_name, "main")
-        
-        # Generate models
-        results = codegen_mgr.generate_models(
-            language=language,
-            output_dir=output_dir,
-            include_tables=True,
-            include_views=True
-        )
-        
-        # Create ZIP file
-        zip_path = temp_dir / filename
-        
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for file_name in results["files_generated"]:
-                file_path = output_dir / file_name
-                if file_path.exists():
-                    zipf.write(file_path, file_name)
-        
-        # Return ZIP file as download
-        return FileResponse(
-            path=str(zip_path),
-            filename=filename,
-            media_type="application/zip"
-        )
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
 
 @router.post("/generate/files", response_model=Dict[str, str])
@@ -212,8 +78,9 @@ async def generate_model_files_content(
         temp_dir = Path(tempfile.mkdtemp())
         output_dir = temp_dir / "generated_models"
         
-        # Initialize codegen manager
-        codegen_mgr = CodegenManager(auth.project_dir, db_name, branch_name, "main")
+        # Initialize CinchDB and get codegen manager
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        codegen_mgr = db.codegen
         
         # Generate models
         results = codegen_mgr.generate_models(
@@ -258,17 +125,19 @@ async def get_codegen_info(
     await require_read_permission(auth, branch_name)
     
     try:
-        # Initialize codegen manager
-        codegen_mgr = CodegenManager(auth.project_dir, db_name, branch_name, "main")
+        # Initialize CinchDB and get codegen manager
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        codegen_mgr = db.codegen
         
-        # Get available tables and views
-        tables = codegen_mgr.table_manager.list_tables()
-        views = codegen_mgr.view_manager.list_views()
+        # Get available tables and views using CinchDB
+        db = CinchDB(database=db_name, branch=branch_name, tenant="main", project_dir=auth.project_dir)
+        tables = db.tables.list_tables()
+        views = db.views.list_views()
         
         return {
             "database": db_name,
             "branch": branch_name,
-            "tenant": tenant,
+            "tenant": "main",
             "supported_languages": codegen_mgr.get_supported_languages(),
             "available_tables": [table.name for table in tables],
             "available_views": [view.name for view in views],

@@ -7,7 +7,7 @@ from .base import CinchDBBaseModel
 
 class View(CinchDBBaseModel):
     """Represents a SQL view in the database."""
-    
+
     name: str = Field(description="View name")
     database: str = Field(description="Database name")
     branch: str = Field(description="Branch name")

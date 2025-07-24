@@ -28,26 +28,30 @@ def list_tables():
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
     tables = table_mgr.list_tables()
-    
+
     if not tables:
         console.print("[yellow]No tables found[/yellow]")
         return
-    
+
     # Create a table
-    table = RichTable(title=f"Tables db={db_name} branch={branch_name}",title_justify='left')
+    table = RichTable(
+        title=f"Tables db={db_name} branch={branch_name}", title_justify="left"
+    )
     table.add_column("Name", style="cyan")
     table.add_column("Columns", style="green")
     table.add_column("Created", style="yellow")
-    
+
     for tbl in tables:
         # Count user-defined columns (exclude automatic ones)
-        user_columns = len([c for c in tbl.columns if c.name not in ["id", "created_at", "updated_at"]])
+        user_columns = len(
+            [c for c in tbl.columns if c.name not in ["id", "created_at", "updated_at"]]
+        )
         tbl.columns[0].name  # Placeholder - we don't track table creation time
         table.add_row(tbl.name, str(user_columns), "-")
-    
+
     console.print(table)
 
 
@@ -55,14 +59,18 @@ def list_tables():
 def create(
     ctx: typer.Context,
     name: Optional[str] = typer.Argument(None, help="Name of the table"),
-    columns: Optional[List[str]] = typer.Argument(None, help="Column definitions (format: name:type[:nullable])"),
-    apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
+    columns: Optional[List[str]] = typer.Argument(
+        None, help="Column definitions (format: name:type[:nullable])"
+    ),
+    apply: bool = typer.Option(
+        True, "--apply/--no-apply", help="Apply changes to all tenants"
+    ),
 ):
     """Create a new table.
-    
+
     Column format: name:type[:nullable]
     Types: TEXT, INTEGER, REAL, BLOB, NUMERIC
-    
+
     Examples:
         cinch table create users name:TEXT email:TEXT:nullable age:INTEGER:nullable
         cinch table create posts title:TEXT content:TEXT published:INTEGER
@@ -75,7 +83,7 @@ def create(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     # Parse columns
     parsed_columns = []
     for col_def in columns:
@@ -84,25 +92,29 @@ def create(
             console.print(f"[red]❌ Invalid column definition: '{col_def}'[/red]")
             console.print("[yellow]Format: name:type[:nullable][/yellow]")
             raise typer.Exit(1)
-        
+
         col_name = parts[0]
         col_type = parts[1].upper()
         nullable = len(parts) > 2 and parts[2].lower() == "nullable"
-        
+
         if col_type not in ["TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC"]:
             console.print(f"[red]❌ Invalid type: '{col_type}'[/red]")
-            console.print("[yellow]Valid types: TEXT, INTEGER, REAL, BLOB, NUMERIC[/yellow]")
+            console.print(
+                "[yellow]Valid types: TEXT, INTEGER, REAL, BLOB, NUMERIC[/yellow]"
+            )
             raise typer.Exit(1)
-        
+
         parsed_columns.append(Column(name=col_name, type=col_type, nullable=nullable))
-    
+
     try:
         table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
         table_mgr.create_table(name, parsed_columns)
-        console.print(f"[green]✅ Created table '{name}' with {len(parsed_columns)} columns[/green]")
-        
+        console.print(
+            f"[green]✅ Created table '{name}' with {len(parsed_columns)} columns[/green]"
+        )
+
         # Changes are automatically applied to all tenants by the manager
-        
+
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)
@@ -112,34 +124,38 @@ def create(
 def delete(
     ctx: typer.Context,
     name: Optional[str] = typer.Argument(None, help="Name of the table to delete"),
-    force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation"),
-    apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Force deletion without confirmation"
+    ),
+    apply: bool = typer.Option(
+        True, "--apply/--no-apply", help="Apply changes to all tenants"
+    ),
 ):
     """Delete a table."""
     name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     # Confirmation
     if not force:
         confirm = typer.confirm(f"Are you sure you want to delete table '{name}'?")
         if not confirm:
             console.print("[yellow]Cancelled[/yellow]")
             raise typer.Exit(0)
-    
+
     try:
         table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
         table_mgr.delete_table(name)
         console.print(f"[green]✅ Deleted table '{name}'[/green]")
-        
+
         if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
                 console.print("[green]✅ Applied changes to all tenants[/green]")
-        
+
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)
@@ -150,8 +166,12 @@ def copy(
     ctx: typer.Context,
     source: Optional[str] = typer.Argument(None, help="Source table name"),
     target: Optional[str] = typer.Argument(None, help="Target table name"),
-    data: bool = typer.Option(True, "--data/--no-data", help="Copy data along with structure"),
-    apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
+    data: bool = typer.Option(
+        True, "--data/--no-data", help="Copy data along with structure"
+    ),
+    apply: bool = typer.Option(
+        True, "--apply/--no-apply", help="Apply changes to all tenants"
+    ),
 ):
     """Copy a table to a new table."""
     source = validate_required_arg(source, "source", ctx)
@@ -159,19 +179,19 @@ def copy(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     try:
         table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
         table_mgr.copy_table(source, target, copy_data=data)
         console.print(f"[green]✅ Copied table '{source}' to '{target}'[/green]")
-        
+
         if apply:
             # Apply to all tenants
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
                 console.print("[green]✅ Applied changes to all tenants[/green]")
-        
+
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)
@@ -179,25 +199,24 @@ def copy(
 
 @app.command()
 def info(
-    ctx: typer.Context,
-    name: Optional[str] = typer.Argument(None, help="Table name")
+    ctx: typer.Context, name: Optional[str] = typer.Argument(None, help="Table name")
 ):
     """Show detailed information about a table."""
     name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     try:
         table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
         table = table_mgr.get_table(name)
-        
+
         # Display info
         console.print(f"\n[bold]Table: {table.name}[/bold]")
         console.print(f"Database: {db_name}")
         console.print(f"Branch: {branch_name}")
         console.print("Tenant: main")
-        
+
         # Display columns
         console.print("\n[bold]Columns:[/bold]")
         col_table = RichTable()
@@ -206,15 +225,15 @@ def info(
         col_table.add_column("Nullable", style="yellow")
         col_table.add_column("Primary Key", style="red")
         col_table.add_column("Default", style="blue")
-        
+
         for col in table.columns:
             nullable = "Yes" if col.nullable else "No"
             pk = "Yes" if col.primary_key else "No"
             default = col.default or "-"
             col_table.add_row(col.name, col.type, nullable, pk, default)
-        
+
         console.print(col_table)
-        
+
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)

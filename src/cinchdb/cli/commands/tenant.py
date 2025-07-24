@@ -38,23 +38,25 @@ def list_tenants():
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
     tenants = tenant_mgr.list_tenants()
-    
+
     if not tenants:
         console.print("[yellow]No tenants found[/yellow]")
         return
-    
+
     # Create a table
-    table = RichTable(title=f"Tenants db={db_name} branch={branch_name}",title_justify='left')
+    table = RichTable(
+        title=f"Tenants db={db_name} branch={branch_name}", title_justify="left"
+    )
     table.add_column("Name", style="cyan")
     table.add_column("Protected", style="yellow")
-    
+
     for tenant in tenants:
         is_protected = "✓" if tenant.is_main else ""
         table.add_row(tenant.name, is_protected)
-    
+
     console.print(table)
 
 
@@ -62,20 +64,22 @@ def list_tenants():
 def create(
     ctx: typer.Context,
     name: Optional[str] = typer.Argument(None, help="Name of the tenant to create"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="Tenant description")
+    description: Optional[str] = typer.Option(
+        None, "--description", "-d", help="Tenant description"
+    ),
 ):
     """Create a new tenant."""
     name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     try:
         tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
         tenant_mgr.create_tenant(name, description)
         console.print(f"[green]✅ Created tenant '{name}'[/green]")
         console.print("[yellow]Note: Tenant has same schema as main tenant[/yellow]")
-        
+
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)
@@ -85,30 +89,32 @@ def create(
 def delete(
     ctx: typer.Context,
     name: Optional[str] = typer.Argument(None, help="Name of the tenant to delete"),
-    force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation")
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Force deletion without confirmation"
+    ),
 ):
     """Delete a tenant."""
     name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     if name == "main":
         console.print("[red]❌ Cannot delete the main tenant[/red]")
         raise typer.Exit(1)
-    
+
     # Confirmation
     if not force:
         confirm = typer.confirm(f"Are you sure you want to delete tenant '{name}'?")
         if not confirm:
             console.print("[yellow]Cancelled[/yellow]")
             raise typer.Exit(0)
-    
+
     try:
         tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
         tenant_mgr.delete_tenant(name)
         console.print(f"[green]✅ Deleted tenant '{name}'[/green]")
-        
+
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)
@@ -119,7 +125,9 @@ def copy(
     ctx: typer.Context,
     source: Optional[str] = typer.Argument(None, help="Source tenant name"),
     target: Optional[str] = typer.Argument(None, help="Target tenant name"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="Target tenant description")
+    description: Optional[str] = typer.Option(
+        None, "--description", "-d", help="Target tenant description"
+    ),
 ):
     """Copy a tenant to a new tenant (including data)."""
     source = validate_required_arg(source, "source", ctx)
@@ -127,12 +135,12 @@ def copy(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     try:
         tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
         tenant_mgr.copy_tenant(source, target, description)
         console.print(f"[green]✅ Copied tenant '{source}' to '{target}'[/green]")
-        
+
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)
@@ -142,7 +150,7 @@ def copy(
 def rename(
     ctx: typer.Context,
     old_name: Optional[str] = typer.Argument(None, help="Current tenant name"),
-    new_name: Optional[str] = typer.Argument(None, help="New tenant name")
+    new_name: Optional[str] = typer.Argument(None, help="New tenant name"),
 ):
     """Rename a tenant."""
     old_name = validate_required_arg(old_name, "old_name", ctx)
@@ -150,16 +158,16 @@ def rename(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    
+
     if old_name == "main":
         console.print("[red]❌ Cannot rename the main tenant[/red]")
         raise typer.Exit(1)
-    
+
     try:
         tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
         tenant_mgr.rename_tenant(old_name, new_name)
         console.print(f"[green]✅ Renamed tenant '{old_name}' to '{new_name}'[/green]")
-        
+
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)

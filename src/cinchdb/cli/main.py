@@ -14,6 +14,7 @@ app = typer.Typer(
     invoke_without_command=True,
 )
 
+
 @app.callback()
 def main(ctx: typer.Context):
     """
@@ -33,32 +34,43 @@ app.add_typer(table.app, name="table", help="Table management commands")
 app.add_typer(column.app, name="column", help="Column management commands")
 app.add_typer(view.app, name="view", help="View management commands")
 app.add_typer(codegen.app, name="codegen", help="Code generation commands")
+
+
 # Add query as direct command instead of subtyper
 @app.command()
 def query(
     sql: str = typer.Argument(..., help="SQL query to execute"),
     tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
-    format: Optional[str] = typer.Option("table", "--format", "-f", help="Output format (table, json, csv)"),
-    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of rows")
+    format: Optional[str] = typer.Option(
+        "table", "--format", "-f", help="Output format (table, json, csv)"
+    ),
+    limit: Optional[int] = typer.Option(
+        None, "--limit", "-l", help="Limit number of rows"
+    ),
 ):
     """Execute a SQL query."""
     from cinchdb.cli.commands.query import execute_query
+
     execute_query(sql, tenant, format, limit)
 
 
 @app.command()
 def init(
-    path: Optional[Path] = typer.Argument(None, help="Directory to initialize project in (default: current directory)")
+    path: Optional[Path] = typer.Argument(
+        None, help="Directory to initialize project in (default: current directory)"
+    ),
 ):
     """Initialize a new CinchDB project."""
     from cinchdb.config import Config
-    
+
     project_path = path or Path.cwd()
-    
+
     try:
         config = Config(project_path)
         config.init_project()
-        typer.secho(f"✅ Initialized CinchDB project in {project_path}", fg=typer.colors.GREEN)
+        typer.secho(
+            f"✅ Initialized CinchDB project in {project_path}", fg=typer.colors.GREEN
+        )
     except FileExistsError:
         typer.secho(f"❌ Project already exists in {project_path}", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -68,6 +80,7 @@ def init(
 def version():
     """Show CinchDB version."""
     from cinchdb import __version__
+
     typer.echo(f"CinchDB version {__version__}")
 
 

@@ -13,7 +13,7 @@ from cinchdb.managers.codegen import CodegenManager
 
 __all__ = [
     "BranchManager",
-    "TenantManager", 
+    "TenantManager",
     "ChangeTracker",
     "ChangeApplier",
     "ChangeComparator",

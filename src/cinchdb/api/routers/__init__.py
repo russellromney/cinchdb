@@ -9,17 +9,17 @@ from cinchdb.api.routers import (
     tables,
     columns,
     views,
-    query
+    query,
 )
 
 __all__ = [
     "auth",
-    "projects", 
+    "projects",
     "databases",
     "branches",
     "tenants",
     "tables",
     "columns",
     "views",
-    "query"
+    "query",
 ]

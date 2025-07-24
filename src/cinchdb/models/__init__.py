@@ -13,7 +13,7 @@ __all__ = [
     "CinchDBBaseModel",
     "CinchDBTableModel",
     "Project",
-    "Database", 
+    "Database",
     "Branch",
     "Tenant",
     "Table",

@@ -4,6 +4,4 @@ base command:
 
 okay. read claude claude.md and the design and implementation files, check over the files in .claude-memory, and carefully consider claude.md as you move forward. make sure to focus on testing, and use the temp file for noodling if you need (refer to claude.md for how to clean this up). your role is a senior engineer at a startup, but don't pre-optimize. consider how things already work and if your implementations match the designs. if told to do something silly, please just let me know and stop before implementing the task. your task is: 
 
-we need to be able to use the api for all relevant operations from the core package and the CLI.
-
 the CLI current cannot insert or update data. should it be able to? please provide feedback without touching any code

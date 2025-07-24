@@ -16,7 +16,7 @@ from cinchdb.api.routers import (
     views,
     query,
     data,
-    codegen
+    codegen,
 )
 
 
@@ -38,7 +38,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
 )
 
 # Configure CORS
@@ -67,11 +67,7 @@ app.include_router(codegen.router, prefix="/api/v1/codegen", tags=["codegen"])
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {
-        "name": "CinchDB API",
-        "version": __version__,
-        "status": "running"
-    }
+    return {"name": "CinchDB API", "version": __version__, "status": "running"}
 
 
 @app.get("/health")

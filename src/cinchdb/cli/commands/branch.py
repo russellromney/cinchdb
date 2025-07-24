@@ -10,8 +10,16 @@ from cinchdb.config import Config
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.branch import BranchManager
 
-app = typer.Typer(help="Branch management commands", no_args_is_help=True)
+app = typer.Typer(help="Branch management commands", invoke_without_command=True)
 console = Console()
+
+
+@app.callback()
+def callback(ctx: typer.Context):
+    """Show help when no subcommand is provided."""
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit(0)
 
 
 def get_config() -> Config:
@@ -67,7 +75,7 @@ def create(
     
     try:
         branch_mgr = BranchManager(config.project_dir, db_name)
-        branch = branch_mgr.create_branch(source_branch, name)
+        branch_mgr.create_branch(source_branch, name)
         console.print(f"[green]✅ Created branch '{name}' from '{source_branch}'[/green]")
         
         if switch:

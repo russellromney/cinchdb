@@ -11,8 +11,19 @@ app = typer.Typer(
     name="cinch",
     help="CinchDB - A Git-like SQLite database management system",
     add_completion=False,
-    no_args_is_help=True,
+    invoke_without_command=True,
 )
+
+@app.callback()
+def main(ctx: typer.Context):
+    """
+    CinchDB - A Git-like SQLite database management system
+    """
+    if ctx.invoked_subcommand is None:
+        # No subcommand was invoked, show help
+        print(ctx.get_help())
+        raise typer.Exit(0)
+
 
 # Add command groups
 app.add_typer(database.app, name="db", help="Database management commands")

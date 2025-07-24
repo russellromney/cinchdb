@@ -10,8 +10,16 @@ from cinchdb.core.path_utils import list_databases
 from cinchdb.models import Database
 from cinchdb.cli.utils import get_config_with_data, set_active_database, set_active_branch
 
-app = typer.Typer(help="Database management commands", no_args_is_help=True)
+app = typer.Typer(help="Database management commands", invoke_without_command=True)
 console = Console()
+
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    """Database management commands."""
+    if ctx.invoked_subcommand is None:
+        print(ctx.get_help())
+        raise typer.Exit(0)
 
 
 @app.command(name="list")

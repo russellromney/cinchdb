@@ -10,8 +10,16 @@ from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
 from cinchdb.cli.utils import get_config_with_data
 
-app = typer.Typer(help="Column management commands", no_args_is_help=True)
+app = typer.Typer(help="Column management commands", invoke_without_command=True)
 console = Console()
+
+
+@app.callback()
+def callback(ctx: typer.Context):
+    """Show help when no subcommand is provided."""
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit(0)
 
 
 @app.command(name="list")

@@ -111,3 +111,63 @@
 - Manager pattern allows easy addition of new operations
 - Model base classes can be extended
 - Plugin system could be added via entry points
+
+## CLI Design Decisions
+
+### 11. No Global Tenant Flag
+**Decision**: Only `query` and `tenant` commands have `--tenant` flag
+**Rationale**:
+- Schema changes always apply to all tenants
+- Reduces confusion about which operations are tenant-specific
+- Query and tenant management are the only tenant-aware operations
+- Enforces design principle of consistent schema across tenants
+
+### 12. Help on No Arguments
+**Decision**: All CLI commands show help when called with no arguments
+**Rationale**:
+- Better user experience for discovery
+- Prevents accidental operations
+- Consistent behavior across all command levels
+- Standard pattern in modern CLI tools
+
+### 13. No fastentrypoints
+**Decision**: Don't use fastentrypoints for CLI optimization
+**Rationale**:
+- Modern Python/setuptools don't have pkg_resources overhead
+- CinchDB already uses lazy imports via Typer
+- Additional complexity not justified
+- Performance is already good with current structure
+
+## API Design Decisions
+
+### 14. UUID4 API Keys
+**Decision**: Use UUID4 for API authentication
+**Rationale**:
+- Simple and secure
+- No external auth dependencies
+- Easy to generate and revoke
+- Matches design specification
+
+### 15. Branch-Specific Permissions
+**Decision**: API keys can be restricted to specific branches
+**Rationale**:
+- Enables fine-grained access control
+- Useful for CI/CD scenarios
+- Protects production branches
+- Flexible permission model
+
+### 16. Separate Read/Write Permissions
+**Decision**: API keys have either read or write permission
+**Rationale**:
+- Simple permission model
+- Clear security boundaries
+- Easy to understand and implement
+- Covers most use cases
+
+### 17. All SDK Operations via REST
+**Decision**: Every SDK operation available through API
+**Rationale**:
+- Complete feature parity
+- Enables remote management
+- Consistent interface
+- Simplifies client implementations

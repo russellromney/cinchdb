@@ -9,8 +9,16 @@ from cinchdb.managers.view import ViewModel
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.cli.utils import get_config_with_data
 
-app = typer.Typer(help="View management commands", no_args_is_help=True)
+app = typer.Typer(help="View management commands", invoke_without_command=True)
 console = Console()
+
+
+@app.callback()
+def callback(ctx: typer.Context):
+    """Show help when no subcommand is provided."""
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit(0)
 
 
 @app.command(name="list")
@@ -153,7 +161,7 @@ def info(
         console.print(f"\n[bold]View: {view.name}[/bold]")
         console.print(f"Database: {db_name}")
         console.print(f"Branch: {branch_name}")
-        console.print(f"Tenant: {tenant}")
+        console.print(f"Tenant: main")
         console.print(f"\n[bold]SQL:[/bold]")
         console.print(view.sql_statement)
         

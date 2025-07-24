@@ -163,3 +163,94 @@ with open(path, "w") as f:
 - Copy schema from main tenant
 - Clear all data from tables
 - Preserve structure only
+
+## CLI Patterns
+
+### Command Structure
+- Use Typer with callbacks for help display (not `no_args_is_help=True`)
+- Lazy import commands to improve startup performance
+- Group related commands under subcommands (db, branch, table, etc.)
+- Always show help when no arguments provided:
+```python
+app = typer.Typer(help="Description", invoke_without_command=True)
+
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context):
+    if ctx.invoked_subcommand is None:
+        print(ctx.get_help())
+        raise typer.Exit(0)
+```
+
+### Option Patterns
+```python
+# Required arguments
+name: str = typer.Argument(..., help="Description")
+
+# Optional with defaults
+force: bool = typer.Option(False, "--force", "-f", help="Description")
+
+# Options with choices
+format: str = typer.Option("table", "--format", "-f", help="Output format (table, json, csv)")
+```
+
+### Output Patterns
+- Use Rich Console for colored output
+- Success: `[green]✅ Message[/green]`
+- Error: `[red]❌ Message[/red]`
+- Warning: `[yellow]Message[/yellow]`
+- Tables: Use RichTable for structured data
+
+### Tenant Flag Usage
+- Only `query` and `tenant` commands have `--tenant` flag
+- All other commands operate on main tenant and apply to all
+
+## API Patterns
+
+### Authentication
+- UUID4 API keys stored in config.toml
+- Read/write permissions
+- Optional branch-specific restrictions
+- Header: `X-API-Key`
+
+### Router Structure
+```python
+router = APIRouter()
+
+@router.get("/", response_model=List[Model])
+async def list_items(
+    auth: AuthContext = Depends(require_read_permission)
+):
+    """List all items."""
+    
+@router.post("/")
+async def create_item(
+    request: CreateRequest,
+    auth: AuthContext = Depends(require_write_permission)
+):
+    """Create new item."""
+```
+
+### Error Handling
+```python
+if not condition:
+    raise HTTPException(status_code=400, detail="Message")
+```
+
+### Query Parameters
+```python
+database: Optional[str] = Query(None, description="Database name (defaults to active)")
+branch: Optional[str] = Query(None, description="Branch name (defaults to active)")
+```
+
+## Performance Patterns
+
+### Lazy Imports
+- Import heavy modules inside functions, not at module level
+- Use Typer's built-in lazy loading for subcommands
+- Don't import pkg_resources (not needed with modern setuptools)
+
+### CLI Optimization
+- Modern Python/setuptools don't need fastentrypoints
+- Use `python -O` for production (removes assertions)
+- Pre-compile with `python -m compileall`
+- Profile with `python -X importtime`

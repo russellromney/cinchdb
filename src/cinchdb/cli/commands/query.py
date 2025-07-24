@@ -11,8 +11,16 @@ from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.cli.utils import get_config_with_data
 
-app = typer.Typer(help="Execute SQL queries", no_args_is_help=True)
+app = typer.Typer(help="Execute SQL queries", invoke_without_command=True)
 console = Console()
+
+
+@app.callback()
+def callback(ctx: typer.Context):
+    """Show help when no subcommand is provided."""
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit(0)
 
 
 @app.command()

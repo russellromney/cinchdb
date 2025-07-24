@@ -1,7 +1,7 @@
 """View/Model management for CinchDB."""
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from cinchdb.models import View, Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
@@ -77,10 +77,6 @@ class ViewModel:
         # Create the view
         create_sql = f"CREATE VIEW {view_name} AS {sql_statement}"
         
-        with DatabaseConnection(self.db_path) as conn:
-            conn.execute(create_sql)
-            conn.commit()
-        
         # Track the change
         change = Change(
             type=ChangeType.CREATE_VIEW,
@@ -93,6 +89,11 @@ class ViewModel:
             sql=create_sql
         )
         self.change_tracker.add_change(change)
+        
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)
         
         # Return the created view
         return View(
@@ -120,14 +121,7 @@ class ViewModel:
             raise ValueError(f"View '{view_name}' does not exist")
         
         # SQLite doesn't support CREATE OR REPLACE VIEW, so we need to drop and recreate
-        with DatabaseConnection(self.db_path) as conn:
-            # Drop the existing view
-            conn.execute(f"DROP VIEW {view_name}")
-            
-            # Create with new SQL
-            create_sql = f"CREATE VIEW {view_name} AS {sql_statement}"
-            conn.execute(create_sql)
-            conn.commit()
+        create_sql = f"CREATE VIEW {view_name} AS {sql_statement}"
         
         # Track the change
         change = Change(
@@ -136,11 +130,17 @@ class ViewModel:
             entity_name=view_name,
             branch=self.branch,
             details={
-                "sql_statement": sql_statement
+                "sql_statement": sql_statement,
+                "drop_sql": f"DROP VIEW {view_name}"
             },
             sql=create_sql
         )
         self.change_tracker.add_change(change)
+        
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)
         
         # Return the updated view
         return View(
@@ -166,10 +166,6 @@ class ViewModel:
         # Drop the view
         drop_sql = f"DROP VIEW {view_name}"
         
-        with DatabaseConnection(self.db_path) as conn:
-            conn.execute(drop_sql)
-            conn.commit()
-        
         # Track the change
         change = Change(
             type=ChangeType.DROP_VIEW,
@@ -179,6 +175,11 @@ class ViewModel:
             sql=drop_sql
         )
         self.change_tracker.add_change(change)
+        
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)
     
     def get_view(self, view_name: str) -> View:
         """Get information about a specific view.

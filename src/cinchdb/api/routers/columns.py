@@ -117,7 +117,7 @@ async def add_column(
         # Apply to all tenants if requested
         if apply and tenant == "main":
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
+            applier.apply_all_unapplied()
         
         return {"message": f"Added column '{request.name}' to table '{table}'"}
         
@@ -152,7 +152,7 @@ async def drop_column(
         # Apply to all tenants if requested
         if apply and tenant == "main":
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
+            applier.apply_all_unapplied()
         
         return {"message": f"Dropped column '{column}' from table '{table}'"}
         
@@ -187,7 +187,7 @@ async def rename_column(
         # Apply to all tenants if requested
         if apply and tenant == "main":
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
+            applier.apply_all_unapplied()
         
         return {"message": f"Renamed column '{request.old_name}' to '{request.new_name}' in table '{table}'"}
         

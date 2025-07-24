@@ -1,6 +1,5 @@
 """Tests for CinchDB data models."""
 
-import pytest
 from datetime import datetime
 from cinchdb.models import (
     Project, Database, Branch, Tenant, 

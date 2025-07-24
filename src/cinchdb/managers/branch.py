@@ -12,7 +12,6 @@ from cinchdb.core.path_utils import (
     get_database_path,
     get_branch_path,
     list_branches,
-    ensure_directory,
 )
 
 
@@ -86,10 +85,8 @@ class BranchManager:
         metadata["created_at"] = datetime.now(timezone.utc).isoformat()
         self.update_branch_metadata(new_branch_name, metadata)
         
-        # Reset changes.json for new branch
-        changes_path = new_path / "changes.json"
-        with open(changes_path, "w") as f:
-            json.dump([], f, indent=2)
+        # New branch inherits all changes from source branch
+        # (changes.json is already copied by copytree, so nothing to do here)
         
         return Branch(
             name=new_branch_name,
@@ -167,3 +164,14 @@ class BranchManager:
         
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
+    
+    def branch_exists(self, branch_name: str) -> bool:
+        """Check if a branch exists.
+        
+        Args:
+            branch_name: Branch name to check
+            
+        Returns:
+            True if branch exists, False otherwise
+        """
+        return branch_name in list_branches(self.project_root, self.database)

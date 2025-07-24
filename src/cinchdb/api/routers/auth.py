@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from cinchdb.api.auth import (
-    APIKey,
     APIKeyManager,
     AuthContext,
     verify_api_key,

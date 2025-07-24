@@ -135,12 +135,12 @@ async def create_table(
     
     try:
         table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table = table_mgr.create_table(request.name, columns)
+        table_mgr.create_table(request.name, columns)
         
         # Apply to all tenants if requested
         if apply and tenant == "main":
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
+            applier.apply_all_unapplied()
         
         return {"message": f"Created table '{request.name}' with {len(columns)} columns"}
         
@@ -174,7 +174,7 @@ async def delete_table(
         # Apply to all tenants if requested
         if apply and tenant == "main":
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
+            applier.apply_all_unapplied()
         
         return {"message": f"Deleted table '{name}'"}
         
@@ -203,12 +203,12 @@ async def copy_table(
     
     try:
         table_mgr = TableManager(auth.project_dir, db_name, branch_name, tenant)
-        table = table_mgr.copy_table(request.source, request.target, request.copy_data)
+        table_mgr.copy_table(request.source, request.target, request.copy_data)
         
         # Apply to all tenants if requested
         if apply and tenant == "main":
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
+            applier.apply_all_unapplied()
         
         data_msg = "with data" if request.copy_data else "without data"
         return {"message": f"Copied table '{request.source}' to '{request.target}' {data_msg}"}

@@ -7,7 +7,6 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from cinchdb.api.app import app as fastapi_app
 from cinchdb.api.auth import APIKeyManager
 from cinchdb.core.path_utils import get_project_root
 
@@ -40,7 +39,7 @@ def serve(
         console.print("[yellow]Run 'cinch init' to create a project[/yellow]")
         raise typer.Exit(1)
     
-    console.print(f"[green]Starting CinchDB API server[/green]")
+    console.print("[green]Starting CinchDB API server[/green]")
     console.print(f"Project: {project_path}")
     console.print(f"Host: {host}:{port}")
     
@@ -48,7 +47,7 @@ def serve(
     if create_key:
         manager = APIKeyManager(project_path)
         api_key = manager.create_key("Initial API Key", permissions="write")
-        console.print(f"\n[bold green]Created API key:[/bold green]")
+        console.print("\n[bold green]Created API key:[/bold green]")
         console.print(f"[yellow]Key: {api_key.key}[/yellow]")
         console.print(f"[yellow]Permissions: {api_key.permissions}[/yellow]")
         console.print("\n[bold]Save this key - it won't be shown again![/bold]\n")

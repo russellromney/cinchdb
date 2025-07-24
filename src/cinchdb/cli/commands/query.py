@@ -1,9 +1,7 @@
 """Query execution command for CinchDB CLI."""
 
 import typer
-import json
 from typing import Optional
-from pathlib import Path
 from rich.console import Console
 from rich.table import Table as RichTable
 
@@ -15,28 +13,8 @@ app = typer.Typer(help="Execute SQL queries", invoke_without_command=True)
 console = Console()
 
 
-@app.callback()
-def callback(ctx: typer.Context):
-    """Show help when no subcommand is provided."""
-    if ctx.invoked_subcommand is None:
-        console.print(ctx.get_help())
-        raise typer.Exit(0)
-
-
-@app.command()
-def execute(
-    sql: str = typer.Argument(..., help="SQL query to execute"),
-    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
-    format: Optional[str] = typer.Option("table", "--format", "-f", help="Output format (table, json, csv)"),
-    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of rows")
-):
-    """Execute a SQL query.
-    
-    Examples:
-        cinch query "SELECT * FROM users"
-        cinch query "SELECT * FROM users WHERE active = 1" --format json
-        cinch query "SELECT COUNT(*) FROM posts" --tenant tenant1
-    """
+def execute_query(sql: str, tenant: str, format: str, limit: Optional[int]):
+    """Execute a SQL query."""
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -107,3 +85,26 @@ def execute(
     except Exception as e:
         console.print(f"[red]❌ Query error: {e}[/red]")
         raise typer.Exit(1)
+
+
+@app.callback()
+def main(
+    ctx: typer.Context,
+    sql: Optional[str] = typer.Argument(None, help="SQL query to execute"),
+    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
+    format: Optional[str] = typer.Option("table", "--format", "-f", help="Output format (table, json, csv)"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of rows")
+):
+    """Execute a SQL query.
+    
+    Examples:
+        cinch query "SELECT * FROM users"
+        cinch query "SELECT * FROM users WHERE active = 1" --format json
+        cinch query "SELECT COUNT(*) FROM posts" --tenant tenant1
+    """
+    # If no subcommand is invoked and we have SQL, execute it
+    if ctx.invoked_subcommand is None:
+        if not sql:
+            console.print(ctx.get_help())
+            raise typer.Exit(0)
+        execute_query(sql, tenant, format, limit)

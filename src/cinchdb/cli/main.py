@@ -5,7 +5,7 @@ from typing import Optional
 from pathlib import Path
 
 # Import command groups
-from cinchdb.cli.commands import database, branch, tenant, table, column, view, query
+from cinchdb.cli.commands import database, branch, tenant, table, column, view, codegen
 
 app = typer.Typer(
     name="cinch",
@@ -32,7 +32,18 @@ app.add_typer(tenant.app, name="tenant", help="Tenant management commands")
 app.add_typer(table.app, name="table", help="Table management commands")
 app.add_typer(column.app, name="column", help="Column management commands")
 app.add_typer(view.app, name="view", help="View management commands")
-app.add_typer(query.app, name="query", help="Query execution")
+app.add_typer(codegen.app, name="codegen", help="Code generation commands")
+# Add query as direct command instead of subtyper
+@app.command()
+def query(
+    sql: str = typer.Argument(..., help="SQL query to execute"),
+    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
+    format: Optional[str] = typer.Option("table", "--format", "-f", help="Output format (table, json, csv)"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-l", help="Limit number of rows")
+):
+    """Execute a SQL query."""
+    from cinchdb.cli.commands.query import execute_query
+    execute_query(sql, tenant, format, limit)
 
 
 @app.command()

@@ -1,9 +1,7 @@
 """Table management for CinchDB."""
 
-import uuid
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
+from typing import List
 
 from cinchdb.models import Table, Column, Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
@@ -108,12 +106,7 @@ class TableManager:
         
         create_sql = f"CREATE TABLE {table_name} ({', '.join(sql_parts)})"
         
-        # Execute in main tenant
-        with DatabaseConnection(self.db_path) as conn:
-            conn.execute(create_sql)
-            conn.commit()
-        
-        # Track the change
+        # Track the change first (as unapplied)
         change = Change(
             type=ChangeType.CREATE_TABLE,
             entity_type="table",
@@ -125,6 +118,11 @@ class TableManager:
             sql=create_sql
         )
         self.change_tracker.add_change(change)
+        
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)
         
         # Return the created table
         return Table(
@@ -200,11 +198,6 @@ class TableManager:
         # Build DROP TABLE SQL
         drop_sql = f"DROP TABLE {table_name}"
         
-        # Execute in main tenant
-        with DatabaseConnection(self.db_path) as conn:
-            conn.execute(drop_sql)
-            conn.commit()
-        
         # Track the change
         change = Change(
             type=ChangeType.DROP_TABLE,
@@ -214,6 +207,11 @@ class TableManager:
             sql=drop_sql
         )
         self.change_tracker.add_change(change)
+        
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)
     
     def copy_table(self, source_table: str, target_table: str, copy_data: bool = True) -> Table:
         """Copy a table to a new table.
@@ -254,21 +252,12 @@ class TableManager:
         
         create_sql = f"CREATE TABLE {target_table} ({', '.join(sql_parts)})"
         
-        with DatabaseConnection(self.db_path) as conn:
-            # Create the table
-            conn.execute(create_sql)
-            
-            # Copy data if requested
-            if copy_data:
-                # Get column names
-                col_names = [col.name for col in source.columns]
-                col_list = ", ".join(col_names)
-                
-                # Copy data
-                copy_sql = f"INSERT INTO {target_table} ({col_list}) SELECT {col_list} FROM {source_table}"
-                conn.execute(copy_sql)
-            
-            conn.commit()
+        # Build copy data SQL if requested
+        copy_sql = None
+        if copy_data:
+            col_names = [col.name for col in source.columns]
+            col_list = ", ".join(col_names)
+            copy_sql = f"INSERT INTO {target_table} ({col_list}) SELECT {col_list} FROM {source_table}"
         
         # Track the change
         change = Change(
@@ -279,11 +268,17 @@ class TableManager:
             details={
                 "columns": [col.model_dump() for col in source.columns],
                 "copied_from": source_table,
-                "with_data": copy_data
+                "with_data": copy_data,
+                "copy_sql": copy_sql
             },
             sql=create_sql
         )
         self.change_tracker.add_change(change)
+        
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)
         
         # Return the new table
         return Table(

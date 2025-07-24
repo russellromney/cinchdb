@@ -1,7 +1,6 @@
 """Tests for SQLite connection management."""
 
 import pytest
-import sqlite3
 from pathlib import Path
 import tempfile
 import shutil

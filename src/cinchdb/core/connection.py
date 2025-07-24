@@ -2,7 +2,7 @@
 
 import sqlite3
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, List
 from contextlib import contextmanager
 
 

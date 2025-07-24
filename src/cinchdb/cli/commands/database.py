@@ -1,13 +1,11 @@
 """Database management commands for CinchDB CLI."""
 
 import typer
-from pathlib import Path
 from typing import Optional
 from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.core.path_utils import list_databases
-from cinchdb.models import Database
 from cinchdb.cli.utils import get_config_with_data, set_active_database, set_active_branch
 
 app = typer.Typer(help="Database management commands", invoke_without_command=True)
@@ -80,10 +78,11 @@ def create(
     
     # Create branch metadata
     import json
+    from datetime import datetime, timezone
     metadata = {
         "name": "main",
         "parent": None,
-        "created_at": Database(name=name).created_at.isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     with open(main_branch / "metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)

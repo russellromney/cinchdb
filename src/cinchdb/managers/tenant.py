@@ -1,14 +1,12 @@
 """Tenant management for CinchDB."""
 
 import shutil
-import sqlite3
 from pathlib import Path
 from typing import List, Optional
 
 from cinchdb.models import Tenant
 from cinchdb.core.path_utils import (
     get_branch_path,
-    get_tenant_path,
     get_tenant_db_path,
     list_tenants,
 )

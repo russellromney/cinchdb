@@ -1,7 +1,7 @@
 """Path utilities for CinchDB."""
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 
 def get_project_root(start_path: Path) -> Path:

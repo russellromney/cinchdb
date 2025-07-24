@@ -1,8 +1,7 @@
 """Column management for CinchDB."""
 
 from pathlib import Path
-from typing import List, Optional
-from datetime import datetime, timezone
+from typing import List
 
 from cinchdb.models import Column, Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
@@ -81,12 +80,7 @@ class ColumnManager:
         
         alter_sql = f"ALTER TABLE {table_name} ADD COLUMN {col_def}"
         
-        # Execute
-        with DatabaseConnection(self.db_path) as conn:
-            conn.execute(alter_sql)
-            conn.commit()
-        
-        # Track the change
+        # Track the change first (as unapplied)
         change = Change(
             type=ChangeType.ADD_COLUMN,
             entity_type="column",
@@ -99,6 +93,11 @@ class ColumnManager:
             sql=alter_sql
         )
         self.change_tracker.add_change(change)
+        
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)
     
     def drop_column(self, table_name: str, column_name: str) -> None:
         """Drop a column from a table.
@@ -152,35 +151,35 @@ class ColumnManager:
         # Column names for copying
         col_names = [col.name for col in new_columns]
         col_list = ", ".join(col_names)
+        copy_sql = f"INSERT INTO {temp_table} ({col_list}) SELECT {col_list} FROM {table_name}"
+        drop_sql = f"DROP TABLE {table_name}"
+        rename_sql = f"ALTER TABLE {temp_table} RENAME TO {table_name}"
         
-        with DatabaseConnection(self.db_path) as conn:
-            # Create new table
-            conn.execute(create_sql)
-            
-            # Copy data
-            copy_sql = f"INSERT INTO {temp_table} ({col_list}) SELECT {col_list} FROM {table_name}"
-            conn.execute(copy_sql)
-            
-            # Drop old table
-            conn.execute(f"DROP TABLE {table_name}")
-            
-            # Rename new table
-            conn.execute(f"ALTER TABLE {temp_table} RENAME TO {table_name}")
-            
-            conn.commit()
-        
-        # Track the change
+        # Track the change with individual SQL statements
         change = Change(
             type=ChangeType.DROP_COLUMN,
             entity_type="column",
             entity_name=column_name,
             branch=self.branch,
             details={
-                "table": table_name
+                "table": table_name,
+                "temp_table": temp_table,
+                "statements": [
+                    ("CREATE", create_sql),
+                    ("COPY", copy_sql),
+                    ("DROP", drop_sql),
+                    ("RENAME", rename_sql)
+                ],
+                "remaining_columns": [col.model_dump() for col in new_columns]
             },
             sql=f"-- DROP COLUMN {column_name} FROM {table_name}"
         )
         self.change_tracker.add_change(change)
+        
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)
     
     def rename_column(self, table_name: str, old_name: str, new_name: str) -> None:
         """Rename a column in a table.
@@ -219,13 +218,8 @@ class ColumnManager:
         # Try using ALTER TABLE RENAME COLUMN (SQLite 3.25.0+)
         rename_sql = f"ALTER TABLE {table_name} RENAME COLUMN {old_name} TO {new_name}"
         
-        try:
-            with DatabaseConnection(self.db_path) as conn:
-                conn.execute(rename_sql)
-                conn.commit()
-        except Exception:
-            # Fallback for older SQLite versions - recreate table
-            self._rename_column_via_recreate(table_name, old_name, new_name, existing_columns)
+        # Check if we need fallback SQL for older SQLite versions
+        fallback_sqls = self._get_rename_column_fallback_sqls(table_name, old_name, new_name, existing_columns)
         
         # Track the change
         change = Change(
@@ -235,11 +229,17 @@ class ColumnManager:
             branch=self.branch,
             details={
                 "table": table_name,
-                "old_name": old_name
+                "old_name": old_name,
+                "fallback_sqls": fallback_sqls
             },
             sql=rename_sql
         )
         self.change_tracker.add_change(change)
+        
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)
     
     def get_column_info(self, table_name: str, column_name: str) -> Column:
         """Get information about a specific column.
@@ -261,6 +261,73 @@ class ColumnManager:
                 return col
         
         raise ValueError(f"Column '{column_name}' does not exist in table '{table_name}'")
+    
+    def _get_rename_column_fallback_sqls(self, table_name: str, old_name: str, new_name: str, 
+                                        existing_columns: List[Column]) -> dict:
+        """Generate fallback SQL for rename column operation (for older SQLite versions).
+        
+        Args:
+            table_name: Name of the table
+            old_name: Current column name
+            new_name: New column name
+            existing_columns: List of existing columns
+            
+        Returns:
+            Dictionary with all SQL statements needed for fallback
+        """
+        temp_table = f"{table_name}_temp"
+        
+        # Build new column list with renamed column
+        new_columns = []
+        old_col_names = []
+        new_col_names = []
+        
+        for col in existing_columns:
+            old_col_names.append(col.name)
+            if col.name == old_name:
+                new_col = Column(
+                    name=new_name,
+                    type=col.type,
+                    nullable=col.nullable,
+                    default=col.default,
+                    primary_key=col.primary_key,
+                    unique=col.unique
+                )
+                new_columns.append(new_col)
+                new_col_names.append(new_name)
+            else:
+                new_columns.append(col)
+                new_col_names.append(col.name)
+        
+        # Create new table
+        col_defs = []
+        for col in new_columns:
+            col_def = f"{col.name} {col.type}"
+            if col.primary_key:
+                col_def += " PRIMARY KEY"
+            if not col.nullable:
+                col_def += " NOT NULL"
+            if col.default is not None:
+                col_def += f" DEFAULT {col.default}"
+            col_defs.append(col_def)
+        
+        create_sql = f"CREATE TABLE {temp_table} ({', '.join(col_defs)})"
+        
+        # Copy data with column mapping
+        old_list = ", ".join(old_col_names)
+        new_list = ", ".join(new_col_names)
+        copy_sql = f"INSERT INTO {temp_table} ({new_list}) SELECT {old_list} FROM {table_name}"
+        drop_sql = f"DROP TABLE {table_name}"
+        rename_sql = f"ALTER TABLE {temp_table} RENAME TO {table_name}"
+        
+        return {
+            "temp_table": temp_table,
+            "create_sql": create_sql,
+            "copy_sql": copy_sql,
+            "drop_sql": drop_sql,
+            "rename_sql": rename_sql,
+            "new_columns": [col.model_dump() for col in new_columns]
+        }
     
     def _rename_column_via_recreate(self, table_name: str, old_name: str, new_name: str, 
                                    existing_columns: List[Column]) -> None:

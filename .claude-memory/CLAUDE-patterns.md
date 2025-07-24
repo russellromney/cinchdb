@@ -249,8 +249,148 @@ branch: Optional[str] = Query(None, description="Branch name (defaults to active
 - Use Typer's built-in lazy loading for subcommands
 - Don't import pkg_resources (not needed with modern setuptools)
 
-### CLI Optimization
+### CLI Optimization  
 - Modern Python/setuptools don't need fastentrypoints
 - Use `python -O` for production (removes assertions)
 - Pre-compile with `python -m compileall`
 - Profile with `python -X importtime`
+
+## Code Quality Patterns
+
+### Linting and Formatting
+```bash
+# Run ruff for linting and auto-fixing
+uv run ruff check --fix src/ tests/
+
+# Use unsafe fixes for remaining issues
+uv run ruff check --fix --unsafe-fixes src/ tests/
+
+# Format code
+uv run ruff format src/ tests/
+```
+
+### Exception Handling Best Practices
+```python
+# Good: Specific exception types
+try:
+    risky_operation()
+except ValueError as e:
+    handle_value_error(e)
+except Exception as e:
+    handle_general_error(e)
+
+# Avoid: Bare except statements
+try:
+    risky_operation()
+except:  # ❌ Don't do this
+    pass
+```
+
+### Boolean Comparisons
+```python
+# Good: Direct boolean usage
+if result["can_merge"]:
+    proceed_with_merge()
+
+if not result["has_conflicts"]:
+    apply_changes()
+
+# Avoid: Explicit boolean comparisons  
+if result["can_merge"] == True:  # ❌ Don't do this
+    proceed_with_merge()
+```
+
+### Variable Usage
+```python
+# Good: Use return values when needed
+changes_applied = applier.apply_all_unapplied()
+if changes_applied > 0:
+    log_success()
+
+# Good: Call without assignment when result not needed
+applier.apply_all_unapplied()  # Result not used
+
+# Avoid: Unused variable assignments
+applied = applier.apply_all_unapplied()  # ❌ Variable never used
+```
+
+## Codegen Patterns
+
+### Model Generation
+```python
+class CodegenManager:
+    def generate_models(self, language, output_dir, include_tables=True, include_views=True):
+        """Generate models with proper type mapping."""
+        
+    def _sqlite_to_python_type(self, sqlite_type: str, column_name: str = ""):
+        """Handle special cases for timestamp fields."""
+        if column_name in ["created_at", "updated_at"]:
+            return "datetime"
+```
+
+### Type Mapping Rules
+- TEXT → str (except created_at/updated_at → datetime)
+- INTEGER → int
+- REAL/FLOAT/DOUBLE → float
+- BLOB → bytes
+- NUMERIC → float
+
+### Generated Model Structure
+```python
+class ModelName(BaseModel):
+    """Generated model for table_name table."""
+    
+    # Fields with proper types and defaults
+    id: str = Field(description="id field")
+    created_at: datetime = Field(description="created_at field", default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = Field(description="updated_at field", default=None)
+    
+    class Config:
+        from_attributes = True
+        json_schema_extra = {"table_name": "table_name"}
+```
+
+### Directory Structure
+```
+generated_models/
+├── __init__.py          # Exports all models
+├── table_name.py        # Individual table models
+└── view_name_view.py    # View models (read-only)
+```
+
+### CLI Command Structure
+- `codegen languages` - List supported languages
+- `codegen generate <language> <output_dir>` - Generate models
+- Support --tables/--views flags for selective generation
+- --force flag for overwriting existing files
+
+### Test Maintenance Patterns
+
+```bash
+# Run full test suite
+make test
+
+# Run only Python tests
+make test-python
+
+# Run with coverage
+uv run pytest tests/ --cov=src --cov-report=html
+
+# Run specific test file
+uv run pytest tests/unit/test_codegen_manager.py -v
+```
+
+### Project Health Checks
+```bash
+# Complete health check workflow
+make test-python          # All tests must pass
+make lint-python          # All linting issues must be clean
+make typecheck-python     # Type check (warnings acceptable)
+make format-python        # Format code consistently
+```
+
+### CI/CD Patterns
+- Always fix failing tests before proceeding with new features
+- Use ruff for consistent code formatting and linting
+- Maintain comprehensive test coverage for all new features
+- TypeScript SDK can have placeholder status with `--passWithNoTests`

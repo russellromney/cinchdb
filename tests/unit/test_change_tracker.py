@@ -1,11 +1,9 @@
 """Tests for ChangeTracker."""
 
 import pytest
-import json
 from pathlib import Path
 import tempfile
 import shutil
-from datetime import datetime
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.models import Change, ChangeType
 from cinchdb.config import Config

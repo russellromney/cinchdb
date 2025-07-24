@@ -2,10 +2,10 @@
 
 import json
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List
 from datetime import datetime, timezone
 
-from cinchdb.models import Change, ChangeType
+from cinchdb.models import Change
 from cinchdb.core.path_utils import get_branch_path
 
 
@@ -142,6 +142,26 @@ class ChangeTracker:
         """
         changes = self.get_changes()
         return any(c.id == change_id for c in changes)
+    
+    def remove_change(self, change_id: str) -> bool:
+        """Remove a change from the branch.
+        
+        Args:
+            change_id: ID of change to remove
+            
+        Returns:
+            True if change was removed, False if not found
+        """
+        changes = self.get_changes()
+        
+        # Find and remove the change
+        for i, change in enumerate(changes):
+            if change.id == change_id:
+                changes.pop(i)
+                self._save_changes(changes)
+                return True
+        
+        return False
     
     def _save_changes(self, changes: List[Change]) -> None:
         """Save changes to disk.

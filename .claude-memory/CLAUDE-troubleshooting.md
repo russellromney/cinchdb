@@ -53,5 +53,42 @@ if not query.strip().upper().startswith("SELECT"):
 **Solution**: Use the `get_config_with_data()` utility function:
 ```python
 config, config_data = get_config_with_data()
-db_name = config_data.get("database", "main")
+db_name = config_data.active_database
+branch_name = config_data.active_branch
 ```
+
+## Test Issues
+
+### TypeScript tests failing with "No tests found"
+**Problem**: Jest exits with code 1 when no test files are found in TypeScript SDK.
+
+**Solution**: Add `--passWithNoTests` flag to jest configuration:
+```json
+{
+  "scripts": {
+    "test": "jest --passWithNoTests"
+  }
+}
+```
+
+### Python linting failures blocking CI
+**Problem**: ruff check finds unused variables, imports, bare excepts, boolean comparisons.
+
+**Solution**: Use ruff auto-fix capabilities:
+```bash
+# Fix safe issues automatically
+uv run ruff check --fix src/ tests/
+
+# Fix remaining issues with unsafe fixes
+uv run ruff check --fix --unsafe-fixes src/ tests/
+
+# Fix specific patterns
+uv run ruff check --fix src/ tests/ --select E712  # Boolean comparisons
+```
+
+**Common Patterns to Fix**:
+- `except:` → `except Exception:`
+- `== True` → use `if condition:`
+- `== False` → use `if not condition:`
+- Remove unused variables: `applied = func()` → `func()`
+- Remove unused imports

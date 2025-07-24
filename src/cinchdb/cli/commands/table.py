@@ -1,8 +1,7 @@
 """Table management commands for CinchDB CLI."""
 
 import typer
-from typing import Optional, List
-from pathlib import Path
+from typing import List
 from rich.console import Console
 from rich.table import Table as RichTable
 
@@ -38,7 +37,7 @@ def list_tables():
         return
     
     # Create a table
-    table = RichTable(title=f"Tables in '{db_name}/{branch_name}'")
+    table = RichTable(title=f"Tables db={db_name} branch={branch_name}",title_justify='left')
     table.add_column("Name", style="cyan")
     table.add_column("Columns", style="green")
     table.add_column("Created", style="yellow")
@@ -46,7 +45,7 @@ def list_tables():
     for tbl in tables:
         # Count user-defined columns (exclude automatic ones)
         user_columns = len([c for c in tbl.columns if c.name not in ["id", "created_at", "updated_at"]])
-        created = tbl.columns[0].name  # Placeholder - we don't track table creation time
+        tbl.columns[0].name  # Placeholder - we don't track table creation time
         table.add_row(tbl.name, str(user_columns), "-")
     
     console.print(table)
@@ -93,15 +92,10 @@ def create(
     
     try:
         table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
-        table = table_mgr.create_table(name, parsed_columns)
+        table_mgr.create_table(name, parsed_columns)
         console.print(f"[green]✅ Created table '{name}' with {len(parsed_columns)} columns[/green]")
         
-        if apply:
-            # Apply to all tenants
-            applier = ChangeApplier(config.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
-            if applied > 0:
-                console.print(f"[green]✅ Applied changes to all tenants[/green]")
+        # Changes are automatically applied to all tenants by the manager
         
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -136,7 +130,7 @@ def delete(
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
-                console.print(f"[green]✅ Applied changes to all tenants[/green]")
+                console.print("[green]✅ Applied changes to all tenants[/green]")
         
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -157,7 +151,7 @@ def copy(
     
     try:
         table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
-        table = table_mgr.copy_table(source, target, copy_data=data)
+        table_mgr.copy_table(source, target, copy_data=data)
         console.print(f"[green]✅ Copied table '{source}' to '{target}'[/green]")
         
         if apply:
@@ -165,7 +159,7 @@ def copy(
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
-                console.print(f"[green]✅ Applied changes to all tenants[/green]")
+                console.print("[green]✅ Applied changes to all tenants[/green]")
         
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -189,7 +183,7 @@ def info(
         console.print(f"\n[bold]Table: {table.name}[/bold]")
         console.print(f"Database: {db_name}")
         console.print(f"Branch: {branch_name}")
-        console.print(f"Tenant: main")
+        console.print("Tenant: main")
         
         # Display columns
         console.print("\n[bold]Columns:[/bold]")

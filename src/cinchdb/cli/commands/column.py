@@ -89,7 +89,7 @@ def add(
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
-                console.print(f"[green]✅ Applied changes to all tenants[/green]")
+                console.print("[green]✅ Applied changes to all tenants[/green]")
         
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -126,7 +126,7 @@ def drop(
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
-                console.print(f"[green]✅ Applied changes to all tenants[/green]")
+                console.print("[green]✅ Applied changes to all tenants[/green]")
         
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -156,7 +156,7 @@ def rename(
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
-                console.print(f"[green]✅ Applied changes to all tenants[/green]")
+                console.print("[green]✅ Applied changes to all tenants[/green]")
         
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")

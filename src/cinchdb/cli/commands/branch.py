@@ -9,6 +9,7 @@ from rich.table import Table as RichTable
 from cinchdb.config import Config
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.branch import BranchManager
+from cinchdb.cli.utils import get_config_with_data, set_active_branch
 
 app = typer.Typer(help="Branch management commands", invoke_without_command=True)
 console = Console()
@@ -34,8 +35,8 @@ def get_config() -> Config:
 @app.command(name="list")
 def list_branches():
     """List all branches in the current database."""
-    config = get_config()
-    db_name = config.get_active_database()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
     
     branch_mgr = BranchManager(config.project_dir, db_name)
     branches = branch_mgr.list_branches()
@@ -51,12 +52,12 @@ def list_branches():
     table.add_column("Parent", style="yellow")
     table.add_column("Protected", style="red")
     
-    current_branch = config.get_active_branch()
+    current_branch = config_data.active_branch
     
     for branch in branches:
         is_active = "✓" if branch.name == current_branch else ""
         is_protected = "✓" if branch.name == "main" else ""
-        parent = branch.parent or "-"
+        parent = branch.parent_branch or "-"
         table.add_row(branch.name, is_active, parent, is_protected)
     
     console.print(table)
@@ -69,9 +70,9 @@ def create(
     switch: bool = typer.Option(False, "--switch", help="Switch to the new branch after creation")
 ):
     """Create a new branch."""
-    config = get_config()
-    db_name = config.get_active_database()
-    source_branch = source or config.get_active_branch()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    source_branch = source or config_data.active_branch
     
     try:
         branch_mgr = BranchManager(config.project_dir, db_name)
@@ -79,7 +80,7 @@ def create(
         console.print(f"[green]✅ Created branch '{name}' from '{source_branch}'[/green]")
         
         if switch:
-            branch_mgr.switch_branch(name)
+            set_active_branch(config, name)
             console.print(f"[green]✅ Switched to branch '{name}'[/green]")
             
     except ValueError as e:
@@ -93,8 +94,8 @@ def delete(
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation")
 ):
     """Delete a branch."""
-    config = get_config()
-    db_name = config.get_active_database()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
     
     if name == "main":
         console.print("[red]❌ Cannot delete the main branch[/red]")
@@ -122,12 +123,12 @@ def switch(
     name: str = typer.Argument(..., help="Name of the branch to switch to")
 ):
     """Switch to a different branch."""
-    config = get_config()
-    db_name = config.get_active_database()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
     
     try:
-        branch_mgr = BranchManager(config.project_dir, db_name)
-        branch_mgr.switch_branch(name)
+        BranchManager(config.project_dir, db_name)
+        set_active_branch(config, name)
         console.print(f"[green]✅ Switched to branch '{name}'[/green]")
         
     except ValueError as e:
@@ -140,9 +141,9 @@ def info(
     name: Optional[str] = typer.Argument(None, help="Branch name (default: current)")
 ):
     """Show information about a branch."""
-    config = get_config()
-    db_name = config.get_active_database()
-    branch_name = name or config.get_active_branch()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    branch_name = name or config_data.active_branch
     
     try:
         branch_mgr = BranchManager(config.project_dir, db_name)
@@ -156,8 +157,16 @@ def info(
         # Display info
         console.print(f"\n[bold]Branch: {branch.name}[/bold]")
         console.print(f"Database: {db_name}")
-        console.print(f"Parent: {branch.parent or 'None'}")
-        console.print(f"Created: {branch.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        console.print(f"Parent: {branch.parent_branch or 'None'}")
+        created_at = branch.metadata.get('created_at', 'Unknown')
+        if created_at != 'Unknown':
+            from datetime import datetime
+            try:
+                dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                created_at = dt.strftime('%Y-%m-%d %H:%M:%S')
+            except Exception:
+                pass
+        console.print(f"Created: {created_at}")
         console.print(f"Protected: {'Yes' if branch.name == 'main' else 'No'}")
         
         # Count tenants
@@ -174,6 +183,126 @@ def info(
         console.print(f"Total Changes: {len(changes)}")
         console.print(f"Unapplied Changes: {len(unapplied)}")
         
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def merge(
+    source: str = typer.Argument(..., help="Source branch to merge from"),
+    target: Optional[str] = typer.Option(None, "--target", "-t", help="Target branch (default: current)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force merge even with conflicts"),
+    preview: bool = typer.Option(False, "--preview", "-p", help="Show merge preview without executing")
+):
+    """Merge changes from source branch into target branch."""
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    target_branch = target or config_data.active_branch
+    
+    from cinchdb.managers.merge_manager import MergeManager, MergeError
+    
+    try:
+        merge_mgr = MergeManager(config.project_dir, db_name)
+        
+        if preview:
+            # Show merge preview
+            preview_result = merge_mgr.get_merge_preview(source, target_branch)
+            
+            if not preview_result["can_merge"]:
+                console.print(f"[red]❌ Cannot merge: {preview_result['reason']}[/red]")
+                if "conflicts" in preview_result:
+                    console.print("[yellow]Conflicts:[/yellow]")
+                    for conflict in preview_result["conflicts"]:
+                        console.print(f"  • {conflict}")
+                raise typer.Exit(1)
+            
+            console.print(f"\n[bold]Merge Preview: {source} → {target_branch}[/bold]")
+            console.print(f"Merge Type: {preview_result['merge_type']}")
+            console.print(f"Changes to merge: {preview_result['changes_to_merge']}")
+            console.print(f"Target has changes: {preview_result.get('target_has_changes', False)}")
+            
+            if preview_result["changes_by_type"]:
+                console.print("\n[bold]Changes by type:[/bold]")
+                for entity_type, changes in preview_result["changes_by_type"].items():
+                    console.print(f"  {entity_type}: {len(changes)} changes")
+                    for change in changes[:3]:  # Show first 3
+                        console.print(f"    • {change['operation']} {change['entity_name']}")
+                    if len(changes) > 3:
+                        console.print(f"    • ... and {len(changes) - 3} more")
+            
+            return
+        
+        # Perform actual merge
+        result = merge_mgr.merge_branches(source, target_branch, force=force)
+        
+        if result["success"]:
+            console.print(f"[green]✅ {result['message']}[/green]")
+            console.print(f"Merge type: {result.get('merge_type', 'unknown')}")
+        else:
+            console.print(f"[red]❌ Merge failed: {result.get('message', 'Unknown error')}[/red]")
+            raise typer.Exit(1)
+            
+    except MergeError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def merge_into_main(
+    source: str = typer.Argument(..., help="Source branch to merge into main"),
+    preview: bool = typer.Option(False, "--preview", "-p", help="Show merge preview without executing")
+):
+    """Merge a branch into main branch (the primary way to get changes into main)."""
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    
+    from cinchdb.managers.merge_manager import MergeManager, MergeError
+    
+    try:
+        merge_mgr = MergeManager(config.project_dir, db_name)
+        
+        if preview:
+            # Show merge preview for main branch
+            preview_result = merge_mgr.get_merge_preview(source, "main")
+            
+            if not preview_result["can_merge"]:
+                console.print(f"[red]❌ Cannot merge into main: {preview_result['reason']}[/red]")
+                if "conflicts" in preview_result:
+                    console.print("[yellow]Conflicts:[/yellow]")
+                    for conflict in preview_result["conflicts"]:
+                        console.print(f"  • {conflict}")
+                raise typer.Exit(1)
+            
+            console.print(f"\n[bold]Merge Preview: {source} → main[/bold]")
+            console.print(f"Merge Type: {preview_result['merge_type']}")
+            console.print(f"Changes to merge: {preview_result['changes_to_merge']}")
+            
+            if preview_result["changes_by_type"]:
+                console.print("\n[bold]Changes to be merged:[/bold]")
+                for entity_type, changes in preview_result["changes_by_type"].items():
+                    console.print(f"  {entity_type}: {len(changes)} changes")
+                    for change in changes:
+                        console.print(f"    • {change['operation']} {change['entity_name']}")
+            
+            return
+        
+        # Perform merge into main
+        result = merge_mgr.merge_into_main(source)
+        
+        if result["success"]:
+            console.print(f"[green]✅ {result['message']}[/green]")
+            console.print("[green]Main branch has been updated![/green]")
+        else:
+            console.print(f"[red]❌ Merge into main failed: {result.get('message', 'Unknown error')}[/red]")
+            raise typer.Exit(1)
+            
+    except MergeError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)

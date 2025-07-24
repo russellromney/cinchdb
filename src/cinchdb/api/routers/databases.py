@@ -1,14 +1,12 @@
 """Databases router for CinchDB API."""
 
 from typing import List
-from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from cinchdb.config import Config
 from cinchdb.core.path_utils import list_databases
 from cinchdb.api.auth import AuthContext, require_write_permission, require_read_permission
-from cinchdb.models import Database
 
 
 router = APIRouter()

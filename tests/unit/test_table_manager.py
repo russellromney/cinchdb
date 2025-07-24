@@ -8,7 +8,7 @@ from cinchdb.config import Config
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.change_applier import ChangeApplier
-from cinchdb.models import Table, Column, ChangeType
+from cinchdb.models import Column, ChangeType
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
 
@@ -269,7 +269,7 @@ class TestTableManager:
         tenant_mgr = TenantManager(temp_project, "main", "main")
         tenant_mgr.create_tenant("tenant2")
         
-        # Create table in main tenant (this tracks the change)
+        # Create table (this automatically applies to all tenants)
         columns = [Column(name="data", type="TEXT")]
         table_manager.create_table("shared_table", columns)
         
@@ -281,24 +281,15 @@ class TestTableManager:
             )
             assert cursor.fetchone() is not None
         
-        # Verify table doesn't exist in tenant2 yet
+        # Verify table automatically exists in tenant2 due to auto-application
         db_path2 = get_tenant_db_path(temp_project, "main", "main", "tenant2")
         with DatabaseConnection(db_path2) as conn:
             cursor = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='shared_table'"
             )
-            assert cursor.fetchone() is None
-        
-        # Apply the change to tenant2
-        applier = ChangeApplier(temp_project, "main", "main")
-        change = applier.change_tracker.get_unapplied_changes()[0]
-        
-        # Apply only to tenant2
-        applier._apply_change_to_tenant(change, "tenant2")
-        
-        # Now verify table exists in tenant2
-        with DatabaseConnection(db_path2) as conn:
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='shared_table'"
-            )
             assert cursor.fetchone() is not None
+        
+        # Verify change is marked as applied
+        applier = ChangeApplier(temp_project, "main", "main")
+        unapplied_changes = applier.change_tracker.get_unapplied_changes()
+        assert len(unapplied_changes) == 0

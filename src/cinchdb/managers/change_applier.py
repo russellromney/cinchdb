@@ -1,7 +1,6 @@
 """Change application logic for CinchDB."""
 
 from pathlib import Path
-from typing import List, Optional
 import logging
 
 from cinchdb.models import Change, ChangeType
@@ -118,9 +117,28 @@ class ChangeApplier:
         
         with DatabaseConnection(db_path) as conn:
             try:
-                # Execute the SQL
-                conn.execute(change.sql)
-                conn.commit()
+                # Check if this is a complex operation with multiple statements
+                if change.details and "statements" in change.details:
+                    # Execute multiple statements in sequence within a transaction
+                    conn.execute("BEGIN")
+                    for step_name, sql in change.details["statements"]:
+                        conn.execute(sql)
+                    conn.execute("COMMIT")
+                elif change.type == ChangeType.UPDATE_VIEW:
+                    # For view updates, first drop the existing view if it exists
+                    view_name = change.entity_name
+                    conn.execute(f"DROP VIEW IF EXISTS {view_name}")
+                    conn.execute(change.sql)
+                    conn.commit()
+                elif change.type == ChangeType.CREATE_TABLE and change.details and change.details.get("copy_sql"):
+                    # For table copy operations, create table and copy data
+                    conn.execute(change.sql)  # CREATE TABLE
+                    conn.execute(change.details["copy_sql"])  # INSERT data
+                    conn.commit()
+                else:
+                    # Regular single statement execution
+                    conn.execute(change.sql)
+                    conn.commit()
                 logger.debug(f"Applied {change.type} to tenant '{tenant_name}'")
             except Exception as e:
                 conn.rollback()

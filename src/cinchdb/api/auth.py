@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Dict, List, Literal
+from typing import Optional, List, Literal
 from pathlib import Path
 
 from fastapi import HTTPException, Security, Depends

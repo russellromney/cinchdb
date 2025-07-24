@@ -236,7 +236,7 @@ class TestViewModel:
         tenant_mgr = TenantManager(temp_project, "main", "main")
         tenant_mgr.create_tenant("tenant2")
         
-        # Create view in main tenant
+        # Create view (this automatically applies to all tenants)
         managers["view"].create_view("user_summary", "SELECT id, name FROM users")
         
         # Verify view exists in main tenant
@@ -247,22 +247,15 @@ class TestViewModel:
             )
             assert cursor.fetchone() is not None
         
-        # Verify view doesn't exist in tenant2 yet
+        # Verify view automatically exists in tenant2 due to auto-application
         db_path2 = get_tenant_db_path(temp_project, "main", "main", "tenant2")
         with DatabaseConnection(db_path2) as conn:
             cursor = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='view' AND name='user_summary'"
             )
-            assert cursor.fetchone() is None
-        
-        # Apply the change to tenant2
-        applier = ChangeApplier(temp_project, "main", "main")
-        change = applier.change_tracker.get_unapplied_changes()[-1]  # Get the view creation change
-        applier._apply_change_to_tenant(change, "tenant2")
-        
-        # Now verify view exists in tenant2
-        with DatabaseConnection(db_path2) as conn:
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='view' AND name='user_summary'"
-            )
             assert cursor.fetchone() is not None
+        
+        # Verify change is marked as applied
+        applier = ChangeApplier(temp_project, "main", "main")
+        unapplied_changes = applier.change_tracker.get_unapplied_changes()
+        assert len(unapplied_changes) == 0

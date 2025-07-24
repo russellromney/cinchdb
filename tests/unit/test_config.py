@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 import tempfile
 import shutil
-from cinchdb.config import Config, ProjectConfig
+from cinchdb.config import Config
 
 
 class TestConfig:

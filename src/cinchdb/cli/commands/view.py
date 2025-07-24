@@ -1,7 +1,6 @@
 """View management commands for CinchDB CLI."""
 
 import typer
-from typing import Optional
 from rich.console import Console
 from rich.table import Table as RichTable
 
@@ -36,7 +35,7 @@ def list_views():
         return
     
     # Create a table
-    table = RichTable(title=f"Views in '{db_name}/{branch_name}'")
+    table = RichTable(title=f"Views db={db_name} branch={branch_name}",title_justify='left')
     table.add_column("Name", style="cyan")
     table.add_column("SQL Length", style="green")
     table.add_column("Created", style="yellow")
@@ -66,7 +65,7 @@ def create(
     
     try:
         view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
-        view = view_mgr.create_view(name, sql)
+        view_mgr.create_view(name, sql)
         console.print(f"[green]✅ Created view '{name}'[/green]")
         
         if apply:
@@ -74,7 +73,7 @@ def create(
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
-                console.print(f"[green]✅ Applied changes to all tenants[/green]")
+                console.print("[green]✅ Applied changes to all tenants[/green]")
         
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -102,7 +101,7 @@ def update(
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
-                console.print(f"[green]✅ Applied changes to all tenants[/green]")
+                console.print("[green]✅ Applied changes to all tenants[/green]")
         
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -137,7 +136,7 @@ def delete(
             applier = ChangeApplier(config.project_dir, db_name, branch_name)
             applied = applier.apply_all_unapplied()
             if applied > 0:
-                console.print(f"[green]✅ Applied changes to all tenants[/green]")
+                console.print("[green]✅ Applied changes to all tenants[/green]")
         
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -161,8 +160,8 @@ def info(
         console.print(f"\n[bold]View: {view.name}[/bold]")
         console.print(f"Database: {db_name}")
         console.print(f"Branch: {branch_name}")
-        console.print(f"Tenant: main")
-        console.print(f"\n[bold]SQL:[/bold]")
+        console.print("Tenant: main")
+        console.print("\n[bold]SQL:[/bold]")
         console.print(view.sql_statement)
         
     except ValueError as e:

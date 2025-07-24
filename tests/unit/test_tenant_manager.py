@@ -6,7 +6,6 @@ import tempfile
 import shutil
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.config import Config
-from cinchdb.models import Tenant
 from cinchdb.core.connection import DatabaseConnection
 
 

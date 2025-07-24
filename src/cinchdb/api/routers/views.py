@@ -91,12 +91,12 @@ async def create_view(
     
     try:
         view_mgr = ViewModel(auth.project_dir, db_name, branch_name, tenant)
-        view = view_mgr.create_view(request.name, request.sql, request.description)
+        view_mgr.create_view(request.name, request.sql, request.description)
         
         # Apply to all tenants if requested
         if apply and tenant == "main":
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
+            applier.apply_all_unapplied()
         
         return {"message": f"Created view '{request.name}'"}
         
@@ -131,7 +131,7 @@ async def update_view(
         # Apply to all tenants if requested
         if apply and tenant == "main":
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
+            applier.apply_all_unapplied()
         
         return {"message": f"Updated view '{name}'"}
         
@@ -165,7 +165,7 @@ async def delete_view(
         # Apply to all tenants if requested
         if apply and tenant == "main":
             applier = ChangeApplier(auth.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
+            applier.apply_all_unapplied()
         
         return {"message": f"Deleted view '{name}'"}
         

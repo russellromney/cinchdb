@@ -1,13 +1,11 @@
 """Tests for BranchManager."""
 
 import pytest
-import json
 from pathlib import Path
 import tempfile
 import shutil
 from cinchdb.managers.branch import BranchManager
 from cinchdb.config import Config
-from cinchdb.models import Branch
 
 
 class TestBranchManager:

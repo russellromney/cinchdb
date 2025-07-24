@@ -9,6 +9,7 @@ from rich.table import Table as RichTable
 from cinchdb.config import Config
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.tenant import TenantManager
+from cinchdb.cli.utils import get_config_with_data
 
 app = typer.Typer(help="Tenant management commands", invoke_without_command=True)
 console = Console()
@@ -34,9 +35,9 @@ def get_config() -> Config:
 @app.command(name="list")
 def list_tenants():
     """List all tenants in the current branch."""
-    config = get_config()
-    db_name = config.get_active_database()
-    branch_name = config.get_active_branch()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    branch_name = config_data.active_branch
     
     tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
     tenants = tenant_mgr.list_tenants()
@@ -46,7 +47,7 @@ def list_tenants():
         return
     
     # Create a table
-    table = RichTable(title=f"Tenants in '{db_name}/{branch_name}'")
+    table = RichTable(title=f"Tenants db={db_name} branch={branch_name}",title_justify='left')
     table.add_column("Name", style="cyan")
     table.add_column("Protected", style="yellow")
     
@@ -63,13 +64,13 @@ def create(
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Tenant description")
 ):
     """Create a new tenant."""
-    config = get_config()
-    db_name = config.get_active_database()
-    branch_name = config.get_active_branch()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    branch_name = config_data.active_branch
     
     try:
         tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
-        tenant = tenant_mgr.create_tenant(name, description)
+        tenant_mgr.create_tenant(name, description)
         console.print(f"[green]✅ Created tenant '{name}'[/green]")
         console.print("[yellow]Note: Tenant has same schema as main tenant[/yellow]")
         
@@ -84,9 +85,9 @@ def delete(
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation")
 ):
     """Delete a tenant."""
-    config = get_config()
-    db_name = config.get_active_database()
-    branch_name = config.get_active_branch()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    branch_name = config_data.active_branch
     
     if name == "main":
         console.print("[red]❌ Cannot delete the main tenant[/red]")
@@ -116,13 +117,13 @@ def copy(
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Target tenant description")
 ):
     """Copy a tenant to a new tenant (including data)."""
-    config = get_config()
-    db_name = config.get_active_database()
-    branch_name = config.get_active_branch()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    branch_name = config_data.active_branch
     
     try:
         tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
-        tenant = tenant_mgr.copy_tenant(source, target, description)
+        tenant_mgr.copy_tenant(source, target, description)
         console.print(f"[green]✅ Copied tenant '{source}' to '{target}'[/green]")
         
     except ValueError as e:
@@ -136,9 +137,9 @@ def rename(
     new_name: str = typer.Argument(..., help="New tenant name")
 ):
     """Rename a tenant."""
-    config = get_config()
-    db_name = config.get_active_database()
-    branch_name = config.get_active_branch()
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    branch_name = config_data.active_branch
     
     if old_name == "main":
         console.print("[red]❌ Cannot rename the main tenant[/red]")

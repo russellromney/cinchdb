@@ -2,8 +2,8 @@
 
 ## Current Session State
 - **Date**: 2025-07-24
-- **Phase**: Phase 1 - Core Foundation COMPLETE
-- **Current Focus**: Phase 1 implementation finished, ready for Phase 2
+- **Phase**: Phase 2 - Branch and Tenant Management (In Progress)
+- **Current Focus**: BranchManager and TenantManager complete, moving to change tracking
 
 ## Completed Tasks
 1. ✅ Initialized Python project with uv
@@ -36,6 +36,25 @@
    - Row factory for dict-like access
    - Connection pooling for multi-tenant scenarios
    - All connection features tested
+12. ✅ Changed CLI command from "cinchdb" to "cinch"
+   - Updated pyproject.toml scripts
+   - Added `make install-dev` command
+   - Basic CLI with init and version commands
+13. ✅ Implemented BranchManager class (Phase 2.1)
+   - Create branches by copying from source
+   - Delete branches (with main branch protection)
+   - List branches with metadata
+   - Switch active branch in config
+   - Branch metadata management
+   - Full test coverage (12 tests)
+14. ✅ Implemented TenantManager class (Phase 2.2)
+   - Create tenants with schema copying
+   - Delete tenants (with main tenant protection)
+   - Copy tenants with data
+   - Rename tenants
+   - List tenants
+   - Get tenant database connections
+   - Full test coverage (13 tests)
 
 ## Monorepo Structure
 ```
@@ -93,22 +112,31 @@ Following "Start Simple" principle:
 - `cinch` - Main CLI command (after install)
 - `cinch-server` - Start API server
 
-## Phase 1 Summary
-Phase 1 (Core Foundation) is now complete with:
-- Configuration management (Config class)
-- Data models (with proper base class separation)
-- Path utilities for directory management
-- SQLite connection with WAL mode and pooling
-- **32 unit tests** all passing
+## Phase 2 Progress
+Phase 2 (Branch and Tenant Management) progress:
+- ✅ BranchManager class implemented and tested
+- ✅ TenantManager class implemented and tested
+- ⏳ Change tracking (next)
+- ⏳ Metadata management
 
-## Next Steps - Phase 2: Branch and Tenant Management
-1. Implement BranchManager class
-2. Implement TenantManager class
-3. Design and implement change tracking
-4. Add metadata management
+## Current Test Status
+- **57 unit tests** all passing
+- BranchManager: 12 tests
+- TenantManager: 13 tests
+- Config: 5 tests
+- Connection: 8 tests
+- Models: 10 tests
+- Path utils: 9 tests
+
+## Next Steps
+1. Design and implement change tracking (Phase 2.3)
+2. Complete metadata management
+3. Move to Phase 3: Schema Management
 
 ## Key Technical Decisions
 - WAL mode with autocheckpoint disabled for better concurrency
 - Row factory for dict-like access to query results
 - Connection pooling for efficient multi-tenant access
 - Strict separation between table models and metadata models
+- Branch creation copies all tenants (as per design)
+- Tenant creation copies schema but not data from main tenant

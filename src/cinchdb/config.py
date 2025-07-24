@@ -101,6 +101,10 @@ class Config:
         with open(db_path / "changes.json", "w") as f:
             json.dump([], f, indent=2)
         
-        # Create main tenant directory
+        # Create main tenant directory and database
         tenant_dir = db_path / "tenants"
         tenant_dir.mkdir(exist_ok=True)
+        
+        # Create main tenant database file
+        main_db = tenant_dir / "main.db"
+        main_db.touch()

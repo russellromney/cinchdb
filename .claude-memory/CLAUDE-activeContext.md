@@ -90,6 +90,8 @@ Following "Start Simple" principle:
 - `make test` - Run all tests
 - `make lint` - Check code quality
 - `make build-all` - Build everything
+- `cinch` - Main CLI command (after install)
+- `cinch-server` - Start API server
 
 ## Phase 1 Summary
 Phase 1 (Core Foundation) is now complete with:

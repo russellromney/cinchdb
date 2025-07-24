@@ -35,8 +35,8 @@ Repository = "https://github.com/yourusername/cinchdb"
 Issues = "https://github.com/yourusername/cinchdb/issues"
 
 [project.scripts]
-cinchdb = "cinchdb.cli.main:app"
-cinchdb-server = "cinchdb.api.main:start_server"
+cinch = "cinchdb.cli.main:app"
+cinch-server = "cinchdb.api.main:start_server"
 
 [build-system]
 requires = ["hatchling"]

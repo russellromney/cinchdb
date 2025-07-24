@@ -54,7 +54,7 @@ dev: dev-api dev-frontend
 	@echo "Starting CinchDB development environment..."
 
 dev-api:
-	uv run python -m cinchdb.api.main
+	uv run cinch-server
 
 dev-frontend:
 	cd frontend && npm run dev

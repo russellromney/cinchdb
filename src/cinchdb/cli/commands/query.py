@@ -5,9 +5,8 @@ from typing import Optional
 from rich.console import Console
 from rich.table import Table as RichTable
 
-from cinchdb.core.path_utils import get_tenant_db_path
-from cinchdb.core.connection import DatabaseConnection
 from cinchdb.cli.utils import get_config_with_data
+from cinchdb.managers.query import QueryManager
 
 app = typer.Typer(help="Execute SQL queries", invoke_without_command=True)
 console = Console()
@@ -24,64 +23,57 @@ def execute_query(sql: str, tenant: str, format: str, limit: Optional[int]):
     if limit and "LIMIT" not in sql.upper():
         query_sql = f"{sql} LIMIT {limit}"
     
-    # Get database path
-    db_path = get_tenant_db_path(config.project_dir, db_name, branch_name, tenant)
+    # Create QueryManager
+    query_manager = QueryManager(config.project_dir, db_name, branch_name, tenant)
     
     try:
-        with DatabaseConnection(db_path) as conn:
-            cursor = conn.execute(query_sql)
+        # Check if this is a SELECT query
+        is_select = query_sql.strip().upper().startswith('SELECT')
+        
+        if is_select:
+            # Execute SELECT query
+            rows = query_manager.execute(query_sql)
             
-            # Check if this is a SELECT query
-            is_select = query_sql.strip().upper().startswith('SELECT')
-            
-            if is_select:
-                rows = cursor.fetchall()
-                
-                if not rows:
-                    console.print("[yellow]No results[/yellow]")
-                    return
-                
-                # Get column names
-                columns = [desc[0] for desc in cursor.description]
-            
-                if format == "json":
-                    # JSON output
-                    result = []
-                    for row in rows:
-                        result.append(dict(zip(columns, row)))
-                    console.print_json(data=result)
-                    
-                elif format == "csv":
-                    # CSV output
-                    import csv
-                    import sys
-                    writer = csv.writer(sys.stdout)
-                    writer.writerow(columns)
-                    for row in rows:
-                        writer.writerow(row)
-                        
-                else:
-                    # Table output (default)
-                    table = RichTable(title=f"Query Results ({len(rows)} rows)")
-                    
-                    # Add columns
-                    for col in columns:
-                        table.add_column(col, style="cyan")
-                    
-                    # Add rows
-                    for row in rows:
-                        # Convert all values to strings
-                        str_row = [str(val) if val is not None else "NULL" for val in row]
-                        table.add_row(*str_row)
-                    
-                    console.print(table)
-            else:
-                # For INSERT/UPDATE/DELETE, commit and show affected rows
-                conn.commit()
-                affected = cursor.rowcount
-                console.print(f"[green]✅ Query executed successfully. Rows affected: {affected}[/green]")
+            if not rows:
+                console.print("[yellow]No results[/yellow]")
                 return
+            
+            # Get column names from first row
+            columns = list(rows[0].keys()) if rows else []
+        
+            if format == "json":
+                # JSON output - rows are already dicts
+                console.print_json(data=rows)
                 
+            elif format == "csv":
+                # CSV output
+                import csv
+                import sys
+                writer = csv.writer(sys.stdout)
+                writer.writerow(columns)
+                for row in rows:
+                    writer.writerow([row[col] for col in columns])
+                    
+            else:
+                # Table output (default)
+                table = RichTable(title=f"Query Results ({len(rows)} rows)")
+                
+                # Add columns
+                for col in columns:
+                    table.add_column(col, style="cyan")
+                
+                # Add rows
+                for row in rows:
+                    # Convert all values to strings
+                    str_row = [str(row[col]) if row[col] is not None else "NULL" for col in columns]
+                    table.add_row(*str_row)
+                
+                console.print(table)
+        else:
+            # For INSERT/UPDATE/DELETE, use execute_non_query
+            affected = query_manager.execute_non_query(query_sql)
+            console.print(f"[green]✅ Query executed successfully. Rows affected: {affected}[/green]")
+            
     except Exception as e:
         console.print(f"[red]❌ Query error: {e}[/red]")
         raise typer.Exit(1)

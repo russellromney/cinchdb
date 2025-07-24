@@ -17,7 +17,7 @@ This project uses a structured memory bank system with specialized context files
 * **CLAUDE-patterns.md** - Established code patterns and conventions (if exists)
 * **CLAUDE-decisions.md** - Architecture decisions and rationale (if exists)
 * **CLAUDE-troubleshooting.md** - Common issues and proven solutions (if exists)
-* **CLAUDE-temp.md** - Temporary scratch pad (only read when referenced)
+* **CLAUDE-temp.md** - Temporary scratch pad (only read when referenced, cleared after every task)
 
 **Important:** Always reference the active context file first to understand what's currently being worked on and maintain session continuity. Proactively delete or update any information from these files that is irrelevant or outdated.
 
@@ -62,9 +62,10 @@ When asked to backup Memory Bank System files, copy the core context files above
 * Consider writing tests for new functionality before implementation
 * Run tests after significant changes (check README for commands)
 * Fix failing tests before proceeding
+* Run tests from the Makefile if it exists
 
 ### Project Context
 * This is an alpha project - prioritize sensible changes over backward compatibility
 * Update existing tests/docs/examples rather than creating new ones
 * Code quality should remain excellent
-* Never read venv/cache folders or modify the root ".tasks" file
+* Never read venv/cache folders or modify the root ".tasks" or ".notes" files

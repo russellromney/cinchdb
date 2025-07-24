@@ -4,6 +4,24 @@ import sqlite3
 from pathlib import Path
 from typing import Optional, Dict, List
 from contextlib import contextmanager
+from datetime import datetime
+
+
+# Custom datetime adapter and converter for SQLite
+def adapt_datetime(dt):
+    """Convert datetime to ISO 8601 string."""
+    return dt.isoformat()
+
+
+def convert_datetime(val):
+    """Convert ISO 8601 string to datetime."""
+    return datetime.fromisoformat(val.decode())
+
+
+# Register the adapter and converter
+sqlite3.register_adapter(datetime, adapt_datetime)
+sqlite3.register_converter("TIMESTAMP", convert_datetime)
+sqlite3.register_converter("DATETIME", convert_datetime)
 
 
 class DatabaseConnection:
@@ -25,7 +43,11 @@ class DatabaseConnection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         
         # Connect with row factory for dict-like access
-        self._conn = sqlite3.connect(str(self.path))
+        # detect_types=PARSE_DECLTYPES tells SQLite to use our registered converters
+        self._conn = sqlite3.connect(
+            str(self.path),
+            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+        )
         self._conn.row_factory = sqlite3.Row
         
         # Configure WAL mode and settings
@@ -105,6 +127,8 @@ class DatabaseConnection:
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit context manager."""
+        # Parameters are required by context manager protocol but not used
+        _ = (exc_type, exc_val, exc_tb)
         self.close()
         return False
 

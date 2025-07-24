@@ -294,7 +294,7 @@ class TestCLIIntegration:
         # Try to run command outside project
         result = self.run_command(["table", "list"], cwd=temp_project, check=False)
         assert result.returncode != 0
-        assert "Not in a CinchDB project directory" in result.stderr
+        assert "No CinchDB project found from" in result.stderr
         
         # Initialize project for other tests
         self.run_command(["init"], cwd=temp_project)

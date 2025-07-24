@@ -1,0 +1,7 @@
+notes
+
+what is your opinion of the way the merge feature is designed, given the goals of the project? 
+
+in the current change tracking and merge code, changes should have both migration commands stored in the table: "up" and "down", so for adding a table we should store the "create table ..." statement as well as the "drop table ...". do you think this is a good idea? do not change code, but respond with your feedback and an idea of how this could work 
+
+the current mediator pattern (managers) works, but it's kind of challenging for the user as there isn't one object that they can just do all operations from like "db = cinch.connect(database, branch)" or "cinch.connect_api(url, database, branch)" then "results = db.query('select * from users')". please do not write any code, but create an idea for how to implement this, either on top of the existing structure or to replace it. give your recommendation for how to move forward.

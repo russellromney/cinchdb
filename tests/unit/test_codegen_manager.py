@@ -99,8 +99,8 @@ class TestCodegenManager:
         assert "name: str" in users_content
         assert "email: str" in users_content
         assert "age: Optional[int]" in users_content
-        assert "id: str" in users_content
-        assert "created_at: datetime" in users_content
+        assert "id: Optional[str]" in users_content
+        assert "created_at: Optional[datetime]" in users_content
         assert "updated_at: Optional[datetime]" in users_content
         
         # Check __init__.py content
@@ -232,17 +232,17 @@ class TestCodegenManager:
         assert "age: Optional[int]" in field
         assert "default=None" in field
         
-        # ID field (special case)
+        # ID field (special case - now Optional for CRUD operations)
         col = Column(name="id", type="TEXT", nullable=False, primary_key=True)
         field = codegen_manager._generate_python_field(col)
-        assert "id: str" in field
-        assert "Optional" not in field
+        assert "id: Optional[str]" in field
+        assert "default=None" in field
         
-        # Created at field (special case)
+        # Created at field (special case - now Optional for model creation)
         col = Column(name="created_at", type="TEXT", nullable=False)
         field = codegen_manager._generate_python_field(col)
-        assert "created_at: datetime" in field
-        assert "default_factory=datetime.utcnow" in field
+        assert "created_at: Optional[datetime]" in field
+        assert "default=None" in field
     
     def test_generated_model_imports(self, codegen_manager, temp_project):
         """Test that generated models have correct imports."""
@@ -274,6 +274,6 @@ class TestCodegenManager:
         
         # Check model config
         users_content = (output_dir / "users.py").read_text()
-        assert "class Config:" in users_content
-        assert "from_attributes = True" in users_content
+        assert "model_config = ConfigDict(" in users_content
+        assert "from_attributes=True" in users_content
         assert '"table_name": "users"' in users_content

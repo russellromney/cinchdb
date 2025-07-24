@@ -4,6 +4,40 @@
 
 CinchDB provides a simple Python SDK and CLI for managing SQLite databases with Git-like branching workflows and built-in multi-tenant architecture. Whether you need to manage database schema changes across environments or isolate tenant data, CinchDB makes it straightforward.
 
+Here's a quick CLI example (the `cinchdb` Python package has all the same functionality):
+
+```bash
+pip install cinchdb
+
+# simple initialization
+cinch init 
+
+# create, modify, and query tables
+cinch table create users name:TEXT
+cinch query 'select * from users'
+
+# git-like branching
+cinch branch create test
+cinch branch switch test
+cinch table create products name:TEXT
+cinch branch switch main
+cinch branch merge test # safe merges with atomic txns and rollback
+cinch table list 
+>> users, products
+
+## tenant support
+cinch tenant create lebron
+cinch tenant list
+>> main, lebron
+cinch branch create new
+cinch branch switch new
+cinch tenant list # new branches have the same tenants and data
+>> main, lebron
+
+## built in API server
+cinch-server serve # launch API
+```
+
 ## What is CinchDB?
 
 CinchDB is a database management system that combines the simplicity of SQLite with the power of version control workflows. It enables you to:
@@ -41,8 +75,8 @@ CinchDB consists of six integrated components:
 2. **FastAPI API**: Remote server that exposes SDK functionality via REST endpoints  
 3. **TypeScript SDK**: API client for Node.js backends and JavaScript webapps
 4. **Python CLI**: Command-line interface built on the Python SDK
-5. **NextJS Frontend**: Web interface for database exploration and management
-6. **Documentation Site**: Unified documentation with tutorials and API references
+5. **NextJS Frontend**: Web interface for database exploration and management (soon)
+6. **Documentation Site**: Unified documentation with tutorials and API references (soon)
 
 ## Installation
 
@@ -501,12 +535,11 @@ The `CinchDB` class (returned by connect functions) provides:
 
 ### REST API
 
-The FastAPI server provides RESTful endpoints for all CinchDB operations:
+The FastAPI server provides endpoints for remote CinchDB operations:
 
 - **Authentication**: UUID-based API keys with read/write permissions
 - **Documentation**: Interactive API docs at `/docs` and `/redoc`
 - **Health Check**: System status at `/health`
-- **All Operations**: Full CLI functionality available via REST endpoints
 
 Start the server with `cinch-server serve` and visit `http://localhost:8000/docs` for interactive documentation.
 
@@ -526,7 +559,7 @@ We welcome contributions! Please see our contributing guidelines and code of con
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
 
 ## Support
 
@@ -536,13 +569,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Roadmap
 
-- [ ] Enhanced frontend with query builder and schema designer
+- [ ] Enhanced frontend
 - [ ] TypeScript SDK with full feature parity
-- [ ] Advanced branching workflows (cherry-pick, rebase)
-- [ ] Performance optimizations for large datasets
 - [ ] Cloud deployment templates (Docker, Kubernetes)
-- [ ] Integration with popular ORMs (SQLAlchemy, Prisma)
-- [ ] Real-time collaboration features
 - [ ] Backup and restore functionality
 
 ---

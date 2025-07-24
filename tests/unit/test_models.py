@@ -60,7 +60,7 @@ class TestModels:
     
     def test_table_creation_with_defaults(self):
         """Test creating a table with default columns."""
-        table = Table(name="users")
+        table = Table(name="users", database="main", branch="main")
         
         assert table.name == "users"
         assert len(table.columns) == 3  # id, created_at, updated_at
@@ -85,7 +85,7 @@ class TestModels:
             Column(name="email", type="TEXT", unique=True)
         ]
         
-        table = Table(name="users", columns=columns)
+        table = Table(name="users", database="main", branch="main", columns=columns)
         
         # Should have custom columns plus defaults
         assert len(table.columns) == 6  # 3 custom + 3 defaults

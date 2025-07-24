@@ -1,0 +1,146 @@
+"""Tenant management commands for CinchDB CLI."""
+
+import typer
+from typing import Optional
+from pathlib import Path
+from rich.console import Console
+from rich.table import Table as RichTable
+
+from cinchdb.config import Config
+from cinchdb.core.path_utils import get_project_root
+from cinchdb.managers.tenant import TenantManager
+
+app = typer.Typer(help="Tenant management commands")
+console = Console()
+
+
+def get_config() -> Config:
+    """Get config from current directory."""
+    project_root = get_project_root(Path.cwd())
+    if not project_root:
+        console.print("[red]❌ Not in a CinchDB project directory[/red]")
+        raise typer.Exit(1)
+    return Config(project_root)
+
+
+@app.command(name="list")
+def list_tenants():
+    """List all tenants in the current branch."""
+    config = get_config()
+    db_name = config.get_active_database()
+    branch_name = config.get_active_branch()
+    
+    tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+    tenants = tenant_mgr.list_tenants()
+    
+    if not tenants:
+        console.print("[yellow]No tenants found[/yellow]")
+        return
+    
+    # Create a table
+    table = RichTable(title=f"Tenants in '{db_name}/{branch_name}'")
+    table.add_column("Name", style="cyan")
+    table.add_column("Protected", style="yellow")
+    
+    for tenant in tenants:
+        is_protected = "✓" if tenant.is_main else ""
+        table.add_row(tenant.name, is_protected)
+    
+    console.print(table)
+
+
+@app.command()
+def create(
+    name: str = typer.Argument(..., help="Name of the tenant to create"),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="Tenant description")
+):
+    """Create a new tenant."""
+    config = get_config()
+    db_name = config.get_active_database()
+    branch_name = config.get_active_branch()
+    
+    try:
+        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        tenant = tenant_mgr.create_tenant(name, description)
+        console.print(f"[green]✅ Created tenant '{name}'[/green]")
+        console.print("[yellow]Note: Tenant has same schema as main tenant[/yellow]")
+        
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def delete(
+    name: str = typer.Argument(..., help="Name of the tenant to delete"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation")
+):
+    """Delete a tenant."""
+    config = get_config()
+    db_name = config.get_active_database()
+    branch_name = config.get_active_branch()
+    
+    if name == "main":
+        console.print("[red]❌ Cannot delete the main tenant[/red]")
+        raise typer.Exit(1)
+    
+    # Confirmation
+    if not force:
+        confirm = typer.confirm(f"Are you sure you want to delete tenant '{name}'?")
+        if not confirm:
+            console.print("[yellow]Cancelled[/yellow]")
+            raise typer.Exit(0)
+    
+    try:
+        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        tenant_mgr.delete_tenant(name)
+        console.print(f"[green]✅ Deleted tenant '{name}'[/green]")
+        
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def copy(
+    source: str = typer.Argument(..., help="Source tenant name"),
+    target: str = typer.Argument(..., help="Target tenant name"),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="Target tenant description")
+):
+    """Copy a tenant to a new tenant (including data)."""
+    config = get_config()
+    db_name = config.get_active_database()
+    branch_name = config.get_active_branch()
+    
+    try:
+        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        tenant = tenant_mgr.copy_tenant(source, target, description)
+        console.print(f"[green]✅ Copied tenant '{source}' to '{target}'[/green]")
+        
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def rename(
+    old_name: str = typer.Argument(..., help="Current tenant name"),
+    new_name: str = typer.Argument(..., help="New tenant name")
+):
+    """Rename a tenant."""
+    config = get_config()
+    db_name = config.get_active_database()
+    branch_name = config.get_active_branch()
+    
+    if old_name == "main":
+        console.print("[red]❌ Cannot rename the main tenant[/red]")
+        raise typer.Exit(1)
+    
+    try:
+        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        tenant_mgr.rename_tenant(old_name, new_name)
+        console.print(f"[green]✅ Renamed tenant '{old_name}' to '{new_name}'[/green]")
+        
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)

@@ -26,6 +26,8 @@ class Table(CinchDBBaseModel):
     """Represents a table in the database."""
     
     name: str = Field(description="Table name")
+    database: str = Field(description="Database name")
+    branch: str = Field(description="Branch name")
     columns: List[Column] = Field(default_factory=list, description="Table columns")
     
     def __init__(self, **data):

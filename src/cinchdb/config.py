@@ -88,9 +88,7 @@ class Config:
         # Create metadata files
         from datetime import datetime, timezone
         metadata = {
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "tables": {},
-            "views": {}
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         import json

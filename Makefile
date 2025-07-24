@@ -1,7 +1,7 @@
 .PHONY: help install install-dev install-all dev test coverage lint format typecheck clean \
         build-python build-ts build-frontend build-docs \
         dev-api dev-frontend dev-docs \
-        test-python test-ts test-integration \
+        test-python test-ts test-integration test-unit test-python-integration \
         all
 
 # Default target
@@ -21,9 +21,10 @@ help:
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test             - Run all tests"
-	@echo "  make test-python      - Run Python tests only"
+	@echo "  make test-python      - Run all Python tests"
+	@echo "  make test-unit        - Run Python unit tests only"
+	@echo "  make test-integration - Run Python integration tests only"
 	@echo "  make test-ts          - Run TypeScript SDK tests"
-	@echo "  make test-integration - Run integration tests"
 	@echo "  make coverage         - Run tests with coverage report"
 	@echo ""
 	@echo "Code Quality:"
@@ -70,6 +71,12 @@ dev-docs:
 test-python:
 	uv run pytest tests/
 
+test-unit:
+	uv run pytest tests/unit/ -v
+
+test-python-integration:
+	uv run pytest tests/integration/ -v
+
 coverage:
 	uv run pytest --cov=cinchdb --cov-report=html --cov-report=term tests/
 
@@ -106,9 +113,8 @@ build-frontend:
 build-docs:
 	cd docs && npm run build
 
-# Integration tests
-test-integration:
-	uv run pytest tests/integration/ -v
+# Integration tests (alias for test-python-integration)
+test-integration: test-python-integration
 
 # Combined targets
 test: test-python test-ts

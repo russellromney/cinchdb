@@ -137,22 +137,17 @@ class TestBranchManager:
         metadata = branch_manager.get_branch_metadata("main")
         
         assert "created_at" in metadata
-        assert metadata["tables"] == {}
-        assert metadata["views"] == {}
     
     def test_update_branch_metadata(self, branch_manager):
         """Test updating branch metadata."""
         # Get current metadata
         metadata = branch_manager.get_branch_metadata("main")
         
-        # Update it
-        metadata["tables"]["users"] = {
-            "columns": ["id", "name", "email"]
-        }
+        # Update it with custom field
+        metadata["custom_field"] = "custom_value"
         
         branch_manager.update_branch_metadata("main", metadata)
         
         # Read it back
         updated = branch_manager.get_branch_metadata("main")
-        assert "users" in updated["tables"]
-        assert updated["tables"]["users"]["columns"] == ["id", "name", "email"]
+        assert updated["custom_field"] == "custom_value"

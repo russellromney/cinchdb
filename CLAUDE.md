@@ -18,6 +18,7 @@ This project uses a structured memory bank system with specialized context files
 * **CLAUDE-decisions.md** - Architecture decisions and rationale (if exists)
 * **CLAUDE-troubleshooting.md** - Common issues and proven solutions (if exists)
 * **CLAUDE-temp.md** - Temporary scratch pad (only read when referenced, cleared after every task)
+* **CLAUDE-proposal.md** - Where you write proposals instead of writing them inline. Clear each proposal after implementation. 
 
 **Important:** Always reference the active context file first to understand what's currently being worked on and maintain session continuity. Proactively delete or update any information from these files that is irrelevant or outdated.
 

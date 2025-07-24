@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.core.path_utils import list_databases
-from cinchdb.cli.utils import get_config_with_data, set_active_database, set_active_branch
+from cinchdb.cli.utils import get_config_with_data, set_active_database, set_active_branch, validate_required_arg
 
 app = typer.Typer(help="Database management commands", invoke_without_command=True)
 console = Console()
@@ -48,11 +48,13 @@ def list_dbs():
 
 @app.command()
 def create(
-    name: str = typer.Argument(..., help="Name of the database to create"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the database to create"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Database description"),
     switch: bool = typer.Option(False, "--switch", "-s", help="Switch to the new database after creation")
 ):
     """Create a new database."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     
     # Create database directory structure
@@ -100,10 +102,12 @@ def create(
 
 @app.command()
 def delete(
-    name: str = typer.Argument(..., help="Name of the database to delete"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the database to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation")
 ):
     """Delete a database."""
+    name = validate_required_arg(name, "name", ctx)
     if name == "main":
         console.print("[red]❌ Cannot delete the main database[/red]")
         raise typer.Exit(1)
@@ -173,9 +177,11 @@ def info(
 
 @app.command()
 def switch(
-    name: str = typer.Argument(..., help="Name of the database to switch to")
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the database to switch to")
 ):
     """Switch to a different database."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     
     # Check if database exists

@@ -8,7 +8,7 @@ from rich.table import Table as RichTable
 from cinchdb.managers.column import ColumnManager
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
-from cinchdb.cli.utils import get_config_with_data
+from cinchdb.cli.utils import get_config_with_data, validate_required_arg
 
 app = typer.Typer(help="Column management commands", invoke_without_command=True)
 console = Console()
@@ -24,9 +24,11 @@ def callback(ctx: typer.Context):
 
 @app.command(name="list")
 def list_columns(
-    table: str = typer.Argument(..., help="Table name")
+    ctx: typer.Context,
+    table: Optional[str] = typer.Argument(None, help="Table name")
 ):
     """List all columns in a table."""
+    table = validate_required_arg(table, "table", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -58,14 +60,18 @@ def list_columns(
 
 @app.command()
 def add(
-    table: str = typer.Argument(..., help="Table name"),
-    name: str = typer.Argument(..., help="Column name"),
-    type: str = typer.Argument(..., help="Column type (TEXT, INTEGER, REAL, BLOB, NUMERIC)"),
+    ctx: typer.Context,
+    table: Optional[str] = typer.Argument(None, help="Table name"),
+    name: Optional[str] = typer.Argument(None, help="Column name"),
+    type: Optional[str] = typer.Argument(None, help="Column type (TEXT, INTEGER, REAL, BLOB, NUMERIC)"),
     nullable: bool = typer.Option(True, "--nullable/--not-null", help="Allow NULL values"),
     default: Optional[str] = typer.Option(None, "--default", "-d", help="Default value"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Add a new column to a table."""
+    table = validate_required_arg(table, "table", ctx)
+    name = validate_required_arg(name, "name", ctx)
+    type = validate_required_arg(type, "type", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -98,12 +104,15 @@ def add(
 
 @app.command()
 def drop(
-    table: str = typer.Argument(..., help="Table name"),
-    name: str = typer.Argument(..., help="Column name to drop"),
+    ctx: typer.Context,
+    table: Optional[str] = typer.Argument(None, help="Table name"),
+    name: Optional[str] = typer.Argument(None, help="Column name to drop"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Drop a column from a table."""
+    table = validate_required_arg(table, "table", ctx)
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -135,12 +144,16 @@ def drop(
 
 @app.command()
 def rename(
-    table: str = typer.Argument(..., help="Table name"),
-    old_name: str = typer.Argument(..., help="Current column name"),
-    new_name: str = typer.Argument(..., help="New column name"),
+    ctx: typer.Context,
+    table: Optional[str] = typer.Argument(None, help="Table name"),
+    old_name: Optional[str] = typer.Argument(None, help="Current column name"),
+    new_name: Optional[str] = typer.Argument(None, help="New column name"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Rename a column in a table."""
+    table = validate_required_arg(table, "table", ctx)
+    old_name = validate_required_arg(old_name, "old_name", ctx)
+    new_name = validate_required_arg(new_name, "new_name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -165,10 +178,13 @@ def rename(
 
 @app.command()
 def info(
-    table: str = typer.Argument(..., help="Table name"),
-    name: str = typer.Argument(..., help="Column name")
+    ctx: typer.Context,
+    table: Optional[str] = typer.Argument(None, help="Table name"),
+    name: Optional[str] = typer.Argument(None, help="Column name")
 ):
     """Show detailed information about a column."""
+    table = validate_required_arg(table, "table", ctx)
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch

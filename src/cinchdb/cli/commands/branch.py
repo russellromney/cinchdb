@@ -9,7 +9,7 @@ from rich.table import Table as RichTable
 from cinchdb.config import Config
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.branch import BranchManager
-from cinchdb.cli.utils import get_config_with_data, set_active_branch
+from cinchdb.cli.utils import get_config_with_data, set_active_branch, validate_required_arg
 
 app = typer.Typer(help="Branch management commands", invoke_without_command=True)
 console = Console()
@@ -65,11 +65,13 @@ def list_branches():
 
 @app.command()
 def create(
-    name: str = typer.Argument(..., help="Name of the new branch"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the new branch"),
     source: Optional[str] = typer.Option(None, "--source", "-s", help="Source branch (default: current)"),
     switch: bool = typer.Option(False, "--switch", help="Switch to the new branch after creation")
 ):
     """Create a new branch."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     source_branch = source or config_data.active_branch
@@ -90,10 +92,12 @@ def create(
 
 @app.command()
 def delete(
-    name: str = typer.Argument(..., help="Name of the branch to delete"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the branch to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation")
 ):
     """Delete a branch."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     
@@ -120,9 +124,11 @@ def delete(
 
 @app.command()
 def switch(
-    name: str = typer.Argument(..., help="Name of the branch to switch to")
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the branch to switch to")
 ):
     """Switch to a different branch."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     
@@ -190,12 +196,14 @@ def info(
 
 @app.command()
 def merge(
-    source: str = typer.Argument(..., help="Source branch to merge from"),
+    ctx: typer.Context,
+    source: Optional[str] = typer.Argument(None, help="Source branch to merge from"),
     target: Optional[str] = typer.Option(None, "--target", "-t", help="Target branch (default: current)"),
     force: bool = typer.Option(False, "--force", "-f", help="Force merge even with conflicts"),
     preview: bool = typer.Option(False, "--preview", "-p", help="Show merge preview without executing")
 ):
     """Merge changes from source branch into target branch."""
+    source = validate_required_arg(source, "source", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     target_branch = target or config_data.active_branch
@@ -253,10 +261,12 @@ def merge(
 
 @app.command()
 def merge_into_main(
-    source: str = typer.Argument(..., help="Source branch to merge into main"),
+    ctx: typer.Context,
+    source: Optional[str] = typer.Argument(None, help="Source branch to merge into main"),
     preview: bool = typer.Option(False, "--preview", "-p", help="Show merge preview without executing")
 ):
     """Merge a branch into main branch (the primary way to get changes into main)."""
+    source = validate_required_arg(source, "source", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     

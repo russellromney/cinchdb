@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.table import Table as RichTable
 from typing import Optional
 
-from ..utils import get_config_with_data
+from ..utils import get_config_with_data, validate_required_arg
 from ...managers import CodegenManager
 
 console = Console()
@@ -58,8 +58,9 @@ def languages():
 
 @app.command()
 def generate(
-    language: str = typer.Argument(..., help="Target language (python, typescript)"),
-    output_dir: str = typer.Argument(..., help="Output directory for generated models"),
+    ctx: typer.Context,
+    language: Optional[str] = typer.Argument(None, help="Target language (python, typescript)"),
+    output_dir: Optional[str] = typer.Argument(None, help="Output directory for generated models"),
     database: Optional[str] = typer.Option(None, "--database", "-d", help="Database name (defaults to active)"),
     branch: Optional[str] = typer.Option(None, "--branch", "-b", help="Branch name (defaults to active)"),
     tenant: str = typer.Option("main", "--tenant", "-t", help="Tenant name"),
@@ -68,6 +69,8 @@ def generate(
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing files")
 ):
     """Generate model files for the specified language."""
+    language = validate_required_arg(language, "language", ctx)
+    output_dir = validate_required_arg(output_dir, "output_dir", ctx)
     try:
         config, config_data = get_config_with_data()
         

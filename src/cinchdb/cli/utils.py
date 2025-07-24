@@ -2,6 +2,7 @@
 
 import typer
 from pathlib import Path
+from typing import Optional
 from rich.console import Console
 
 from cinchdb.config import Config
@@ -43,3 +44,28 @@ def set_active_branch(config: Config, branch: str):
     config_data = config.load()
     config_data.active_branch = branch
     config.save(config_data)
+
+
+def validate_required_arg(
+    value: Optional[str], 
+    arg_name: str, 
+    ctx: typer.Context
+) -> str:
+    """Validate a required argument and show help if missing.
+    
+    Args:
+        value: The argument value
+        arg_name: Name of the argument (for error message)
+        ctx: Typer context
+        
+    Returns:
+        The validated value
+        
+    Raises:
+        typer.Exit: If value is None
+    """
+    if value is None:
+        console.print(ctx.get_help())
+        console.print(f"\n[red]❌ Error: Missing argument '{arg_name.upper()}'.[/red]")
+        raise typer.Exit(1)
+    return value

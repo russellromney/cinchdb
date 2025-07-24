@@ -1,14 +1,14 @@
 """Table management commands for CinchDB CLI."""
 
 import typer
-from typing import List
+from typing import List, Optional
 from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
-from cinchdb.cli.utils import get_config_with_data
+from cinchdb.cli.utils import get_config_with_data, validate_required_arg
 
 app = typer.Typer(help="Table management commands", invoke_without_command=True)
 console = Console()
@@ -53,8 +53,9 @@ def list_tables():
 
 @app.command()
 def create(
-    name: str = typer.Argument(..., help="Name of the table"),
-    columns: List[str] = typer.Argument(..., help="Column definitions (format: name:type[:nullable])"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the table"),
+    columns: Optional[List[str]] = typer.Argument(None, help="Column definitions (format: name:type[:nullable])"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Create a new table.
@@ -66,6 +67,11 @@ def create(
         cinch table create users name:TEXT email:TEXT:nullable age:INTEGER:nullable
         cinch table create posts title:TEXT content:TEXT published:INTEGER
     """
+    name = validate_required_arg(name, "name", ctx)
+    if not columns:
+        console.print(ctx.get_help())
+        console.print("\n[red]❌ Error: Missing argument 'COLUMNS'.[/red]")
+        raise typer.Exit(1)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -104,11 +110,13 @@ def create(
 
 @app.command()
 def delete(
-    name: str = typer.Argument(..., help="Name of the table to delete"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the table to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Delete a table."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -139,12 +147,15 @@ def delete(
 
 @app.command()
 def copy(
-    source: str = typer.Argument(..., help="Source table name"),
-    target: str = typer.Argument(..., help="Target table name"),
+    ctx: typer.Context,
+    source: Optional[str] = typer.Argument(None, help="Source table name"),
+    target: Optional[str] = typer.Argument(None, help="Target table name"),
     data: bool = typer.Option(True, "--data/--no-data", help="Copy data along with structure"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Copy a table to a new table."""
+    source = validate_required_arg(source, "source", ctx)
+    target = validate_required_arg(target, "target", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -168,9 +179,11 @@ def copy(
 
 @app.command()
 def info(
-    name: str = typer.Argument(..., help="Table name")
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Table name")
 ):
     """Show detailed information about a table."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch

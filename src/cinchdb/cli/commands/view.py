@@ -1,12 +1,13 @@
 """View management commands for CinchDB CLI."""
 
 import typer
+from typing import Optional
 from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.managers.view import ViewModel
 from cinchdb.managers.change_applier import ChangeApplier
-from cinchdb.cli.utils import get_config_with_data
+from cinchdb.cli.utils import get_config_with_data, validate_required_arg
 
 app = typer.Typer(help="View management commands", invoke_without_command=True)
 console = Console()
@@ -49,8 +50,9 @@ def list_views():
 
 @app.command()
 def create(
-    name: str = typer.Argument(..., help="Name of the view"),
-    sql: str = typer.Argument(..., help="SQL query for the view"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the view"),
+    sql: Optional[str] = typer.Argument(None, help="SQL query for the view"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Create a new view.
@@ -59,6 +61,8 @@ def create(
         cinch view create active_users "SELECT * FROM users WHERE is_active = 1"
         cinch view create user_stats "SELECT age, COUNT(*) as count FROM users GROUP BY age"
     """
+    name = validate_required_arg(name, "name", ctx)
+    sql = validate_required_arg(sql, "sql", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -82,11 +86,14 @@ def create(
 
 @app.command()
 def update(
-    name: str = typer.Argument(..., help="Name of the view to update"),
-    sql: str = typer.Argument(..., help="New SQL query for the view"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the view to update"),
+    sql: Optional[str] = typer.Argument(None, help="New SQL query for the view"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Update an existing view's SQL."""
+    name = validate_required_arg(name, "name", ctx)
+    sql = validate_required_arg(sql, "sql", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -110,11 +117,13 @@ def update(
 
 @app.command()
 def delete(
-    name: str = typer.Argument(..., help="Name of the view to delete"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the view to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation"),
     apply: bool = typer.Option(True, "--apply/--no-apply", help="Apply changes to all tenants")
 ):
     """Delete a view."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -145,9 +154,11 @@ def delete(
 
 @app.command()
 def info(
-    name: str = typer.Argument(..., help="View name")
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="View name")
 ):
     """Show detailed information about a view."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch

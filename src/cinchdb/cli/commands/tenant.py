@@ -9,7 +9,7 @@ from rich.table import Table as RichTable
 from cinchdb.config import Config
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.tenant import TenantManager
-from cinchdb.cli.utils import get_config_with_data
+from cinchdb.cli.utils import get_config_with_data, validate_required_arg
 
 app = typer.Typer(help="Tenant management commands", invoke_without_command=True)
 console = Console()
@@ -60,10 +60,12 @@ def list_tenants():
 
 @app.command()
 def create(
-    name: str = typer.Argument(..., help="Name of the tenant to create"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the tenant to create"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Tenant description")
 ):
     """Create a new tenant."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -81,10 +83,12 @@ def create(
 
 @app.command()
 def delete(
-    name: str = typer.Argument(..., help="Name of the tenant to delete"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Argument(None, help="Name of the tenant to delete"),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation")
 ):
     """Delete a tenant."""
+    name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -112,11 +116,14 @@ def delete(
 
 @app.command()
 def copy(
-    source: str = typer.Argument(..., help="Source tenant name"),
-    target: str = typer.Argument(..., help="Target tenant name"),
+    ctx: typer.Context,
+    source: Optional[str] = typer.Argument(None, help="Source tenant name"),
+    target: Optional[str] = typer.Argument(None, help="Target tenant name"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Target tenant description")
 ):
     """Copy a tenant to a new tenant (including data)."""
+    source = validate_required_arg(source, "source", ctx)
+    target = validate_required_arg(target, "target", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -133,10 +140,13 @@ def copy(
 
 @app.command()
 def rename(
-    old_name: str = typer.Argument(..., help="Current tenant name"),
-    new_name: str = typer.Argument(..., help="New tenant name")
+    ctx: typer.Context,
+    old_name: Optional[str] = typer.Argument(None, help="Current tenant name"),
+    new_name: Optional[str] = typer.Argument(None, help="New tenant name")
 ):
     """Rename a tenant."""
+    old_name = validate_required_arg(old_name, "old_name", ctx)
+    new_name = validate_required_arg(new_name, "new_name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch

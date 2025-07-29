@@ -1,6 +1,6 @@
 site_name: CinchDB
 site_description: Git-like SQLite database management with branching and multi-tenancy
-site_url: https://cinchdb.com
+site_url: https://russellromney.github.io/cinchdb/
 repo_url: https://github.com/russellromney/cinchdb
 repo_name: russellromney/cinchdb
 

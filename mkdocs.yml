@@ -1,0 +1,103 @@
+site_name: CinchDB
+site_description: Git-like SQLite database management with branching and multi-tenancy
+site_url: https://cinchdb.com
+repo_url: https://github.com/russellromney/cinchdb
+repo_name: russellromney/cinchdb
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            docstring_style: google
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Core Concepts: getting-started/concepts.md
+  - CLI Reference:
+    - Overview: cli/index.md
+    - Project: cli/project.md
+    - Database: cli/database.md
+    - Branch: cli/branch.md
+    - Table: cli/table.md
+    - Column: cli/column.md
+    - View: cli/view.md
+    - Query: cli/query.md
+    - Tenant: cli/tenant.md
+    - Remote: cli/remote.md
+    - Codegen: cli/codegen.md
+  - Python SDK:
+    - Overview: python-sdk/index.md
+    - Connection: python-sdk/connection.md
+    - Tables: python-sdk/tables.md
+    - Queries: python-sdk/queries.md
+    - Branches: python-sdk/branches.md
+    - Tenants: python-sdk/tenants.md
+    - API Reference: python-sdk/api-reference.md
+  - Tutorials:
+    - Building a Multi-Tenant App: tutorials/multi-tenant-app.md
+    - Schema Branching Workflow: tutorials/schema-branching.md
+    - Remote Deployment: tutorials/remote-deployment.md
+  - Concepts:
+    - Branching: concepts/branching.md
+    - Multi-Tenancy: concepts/multi-tenancy.md
+    - Change Tracking: concepts/change-tracking.md
+    - Remote Access: concepts/remote-access.md
+  - API Server:
+    - Deployment: api/deployment.md
+    - Authentication: api/authentication.md
+    - Endpoints: api/endpoints.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/russellromney/cinchdb

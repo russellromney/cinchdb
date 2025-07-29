@@ -128,7 +128,7 @@ cinch remote use production
 # These commands now execute remotely
 cinch table list
 cinch query "SELECT * FROM users"
-cinch branch create feature/new
+cinch branch create feature.new
 ```
 
 ### Temporary Remote Usage

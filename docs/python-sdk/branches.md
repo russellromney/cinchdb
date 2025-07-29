@@ -18,7 +18,7 @@ dev_db = main_db.switch_branch("development")
 ```python
 # Work with multiple branches
 main_db = cinchdb.connect("myapp", branch="main")
-feature_db = main_db.switch_branch("feature/new-schema")
+feature_db = main_db.switch_branch("feature.new-schema")
 
 # Compare schemas
 main_tables = main_db.query("SELECT name FROM sqlite_master WHERE type='table'")
@@ -45,10 +45,10 @@ if db.is_local:
 ```python
 if db.is_local:
     # Create from current branch
-    db.branches.create_branch("feature/add-products")
+    db.branches.create_branch("feature.add-products")
     
     # Create from specific branch
-    db.branches.create_branch("hotfix/bug-123", source_branch="main")
+    db.branches.create_branch("hotfix.bug-123", source_branch="main")
 ```
 
 ### Delete Branch
@@ -63,7 +63,7 @@ if db.is_local:
 ### Track Changes
 ```python
 # Make changes on feature branch
-feature_db = db.switch_branch("feature/new-schema")
+feature_db = db.switch_branch("feature.new-schema")
 feature_db.create_table("products", [
     Column(name="name", type="TEXT"),
     Column(name="price", type="REAL")
@@ -71,7 +71,7 @@ feature_db.create_table("products", [
 
 # View changes
 if feature_db.is_local:
-    changes = feature_db.branches.get_branch_changes("feature/new-schema")
+    changes = feature_db.branches.get_branch_changes("feature.new-schema")
     for change in changes:
         print(f"Change: {change.type} - {change.description}")
 ```
@@ -96,7 +96,7 @@ def compare_schemas(db1, db2):
 
 # Compare main and feature branch
 main_db = cinchdb.connect("myapp", branch="main")
-feature_db = cinchdb.connect("myapp", branch="feature/new")
+feature_db = cinchdb.connect("myapp", branch="feature.new")
 diff = compare_schemas(main_db, feature_db)
 ```
 
@@ -106,7 +106,7 @@ diff = compare_schemas(main_db, feature_db)
 ```python
 if db.is_local:
     # Merge feature into main
-    db.merge.merge_branches("feature/add-users", "main")
+    db.merge.merge_branches("feature.add-users", "main")
 ```
 
 ### Merge Workflow
@@ -144,7 +144,7 @@ def safe_merge(db, source_branch: str, target_branch: str = "main"):
 ```python
 # 1. Create feature branch
 db = cinchdb.connect("myapp")
-feature_db = db.switch_branch("main").switch_branch("feature/shopping-cart")
+feature_db = db.switch_branch("main").switch_branch("feature.shopping-cart")
 
 # 2. Make changes
 feature_db.create_table("cart_items", [
@@ -162,7 +162,7 @@ test_data = feature_db.insert("cart_items", {
 
 # 4. Merge when ready
 if db.is_local:
-    db.merge.merge_branches("feature/shopping-cart", "main")
+    db.merge.merge_branches("feature.shopping-cart", "main")
 ```
 
 ### Hotfix Workflow
@@ -170,23 +170,23 @@ if db.is_local:
 # 1. Create hotfix from main
 main_db = cinchdb.connect("myapp", branch="main")
 if main_db.is_local:
-    main_db.branches.create_branch("hotfix/critical-bug")
+    main_db.branches.create_branch("hotfix.critical-bug")
 
 # 2. Switch to hotfix
-hotfix_db = main_db.switch_branch("hotfix/critical-bug")
+hotfix_db = main_db.switch_branch("hotfix.critical-bug")
 
 # 3. Apply fix
 hotfix_db.query("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT false")
 
 # 4. Quick merge back
 if main_db.is_local:
-    main_db.merge.merge_branches("hotfix/critical-bug", "main")
+    main_db.merge.merge_branches("hotfix.critical-bug", "main")
 ```
 
 ### Experimental Features
 ```python
 # Create experimental branch
-exp_db = db.switch_branch("experimental/new-feature")
+exp_db = db.switch_branch("experimental.new-feature")
 
 # Try risky changes
 try:
@@ -199,11 +199,11 @@ try:
     if validate_results(results):
         # Merge if successful
         if db.is_local:
-            db.merge.merge_branches("experimental/new-feature", "main")
+            db.merge.merge_branches("experimental.new-feature", "main")
     else:
         # Abandon if not working
         if db.is_local:
-            db.branches.delete_branch("experimental/new-feature")
+            db.branches.delete_branch("experimental.new-feature")
 except Exception as e:
     print(f"Experiment failed: {e}")
     # Branch can be deleted without affecting main
@@ -215,7 +215,7 @@ Branches apply to all tenants:
 
 ```python
 # Create branch
-feature_db = db.switch_branch("feature/multi-tenant-update")
+feature_db = db.switch_branch("feature.multi-tenant-update")
 
 # Changes apply to all tenants
 feature_db.create_table("tenant_settings", [
@@ -237,22 +237,22 @@ for tenant in ["main", "customer_a", "customer_b"]:
 ### 1. Branch Naming
 ```python
 # Good branch names
-"feature/user-authentication"
-"bugfix/login-error"
-"hotfix/security-patch"
-"release/v2.0"
-"experimental/new-algorithm"
+"feature.user-authentication"
+"bugfix.login-error"
+"hotfix.security-patch"
+"release.v2.0"
+"experimental.new-algorithm"
 
 # Include ticket numbers
-"feature/PROJ-123-add-payments"
-"bugfix/BUG-456-fix-crash"
+"feature.PROJ-123-add-payments"
+"bugfix.BUG-456-fix-crash"
 ```
 
 ### 2. Branch Lifecycle
 ```python
 def feature_lifecycle(db, feature_name: str, implement_func):
     """Standard feature branch lifecycle."""
-    branch_name = f"feature/{feature_name}"
+    branch_name = f"feature.{feature_name}"
     
     # Create branch
     if db.is_local:
@@ -283,7 +283,7 @@ def feature_lifecycle(db, feature_name: str, implement_func):
 ### 3. Parallel Development
 ```python
 # Multiple developers can work on separate branches
-branches = ["feature/auth", "feature/payments", "feature/shipping"]
+branches = ["feature.auth", "feature.payments", "feature.shipping"]
 
 for branch in branches:
     branch_db = db.switch_branch(branch)
@@ -303,7 +303,7 @@ staging_db = remote_db.switch_branch("staging")
 
 # But cannot create/merge branches
 # Use CLI for remote branch management:
-# cinch branch create feature/new --remote production
+# cinch branch create feature.new --remote production
 ```
 
 ## Next Steps

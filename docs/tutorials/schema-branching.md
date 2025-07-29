@@ -18,10 +18,10 @@ Schema branching allows you to:
 cinch branch switch main
 
 # Create feature branch
-cinch branch create feature/add-user-profiles
+cinch branch create feature.add-user-profiles
 
 # Switch to new branch
-cinch branch switch feature/add-user-profiles
+cinch branch switch feature.add-user-profiles
 ```
 
 ### 2. Make Schema Changes
@@ -67,7 +67,7 @@ Multiple developers can work on different features simultaneously:
 import cinchdb
 
 # Developer A: Working on user features
-dev_a_db = cinchdb.connect("myapp", branch="feature/user-enhancements")
+dev_a_db = cinchdb.connect("myapp", branch="feature.user-enhancements")
 dev_a_db.create_table("user_preferences", [
     Column(name="user_id", type="TEXT"),
     Column(name="theme", type="TEXT"),
@@ -75,7 +75,7 @@ dev_a_db.create_table("user_preferences", [
 ])
 
 # Developer B: Working on product features
-dev_b_db = cinchdb.connect("myapp", branch="feature/product-catalog")
+dev_b_db = cinchdb.connect("myapp", branch="feature.product-catalog")
 dev_b_db.create_table("product_categories", [
     Column(name="name", type="TEXT"),
     Column(name="parent_id", type="TEXT", nullable=True),
@@ -113,7 +113,7 @@ class FeatureBranchManager:
 
 # Usage
 manager = FeatureBranchManager(cinchdb.connect("myapp"))
-manager.enable_feature("new_analytics", "feature/analytics-v2")
+manager.enable_feature("new_analytics", "feature.analytics-v2")
 
 # Queries use feature branch if enabled
 data = manager.query_with_feature("new_analytics", 
@@ -171,7 +171,7 @@ def migrate_column_type(db, branch_name: str):
 
 ```bash
 # Create branch for rename
-cinch branch create refactor/rename-columns
+cinch branch create refactor.rename-columns
 
 # Add new column
 cinch column add users display_name:TEXT?
@@ -194,7 +194,7 @@ import cinchdb
 class TestSchemaChanges:
     def test_new_user_profiles_table(self):
         # Connect to feature branch
-        db = cinchdb.connect("myapp", branch="feature/add-user-profiles")
+        db = cinchdb.connect("myapp", branch="feature.add-user-profiles")
         
         # Test table exists
         tables = db.query(
@@ -309,7 +309,7 @@ When branch has all changes from main:
 
 ```bash
 # No conflicts - direct merge
-cinch branch merge feature/simple-addition main
+cinch branch merge feature.simple-addition main
 ```
 
 ### 2. Review Before Merge
@@ -346,8 +346,8 @@ def review_branch_changes(db, source_branch: str, target_branch: str = "main"):
     return response.lower() == 'y'
 
 # Usage
-if review_branch_changes(db, "feature/risky-change"):
-    db.merge.merge_branches("feature/risky-change", "main")
+if review_branch_changes(db, "feature.risky-change"):
+    db.merge.merge_branches("feature.risky-change", "main")
 ```
 
 ### 3. Staged Rollout
@@ -380,7 +380,7 @@ def staged_branch_rollout(db, branch_name: str, tenant_groups: dict):
 
 ```bash
 # If merge hasn't happened, just delete branch
-cinch branch delete feature/bad-idea --force
+cinch branch delete feature.bad-idea --force
 ```
 
 ### Post-Merge Rollback
@@ -413,20 +413,20 @@ def create_rollback_branch(db, changes_to_reverse):
 
 ### 1. Branch Naming
 ```bash
-feature/description    # New features
-bugfix/issue-123      # Bug fixes  
-hotfix/urgent-fix     # Urgent production fixes
-refactor/cleanup      # Code improvements
-experiment/idea       # Experimental changes
+feature.description    # New features
+bugfix.issue-123      # Bug fixes  
+hotfix.urgent-fix     # Urgent production fixes
+refactor.cleanup      # Code improvements
+experiment.idea       # Experimental changes
 ```
 
 ### 2. Small, Focused Changes
 ```bash
 # Good: Single purpose
-cinch branch create feature/add-user-avatars
+cinch branch create feature.add-user-avatars
 
 # Bad: Too many changes
-cinch branch create feature/everything-update
+cinch branch create feature.everything-update
 ```
 
 ### 3. Document Changes
@@ -449,10 +449,10 @@ def document_branch(branch_name: str, description: str, changes: list):
 ### 4. Clean Up Merged Branches
 ```bash
 # After successful merge
-cinch branch delete feature/completed-feature
+cinch branch delete feature.completed-feature
 
 # List old branches
-cinch branch list | grep feature/
+cinch branch list | grep feature.
 ```
 
 ## Next Steps

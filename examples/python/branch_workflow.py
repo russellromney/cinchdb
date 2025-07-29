@@ -48,7 +48,7 @@ def feature_add_reviews(db):
         return
     
     # Create feature branch
-    feature_branch = "feature/product-reviews"
+    feature_branch = "feature.product-reviews"
     print(f"Creating branch: {feature_branch}")
     
     try:
@@ -147,7 +147,7 @@ def feature_add_inventory(db):
         return
     
     # Create feature branch
-    feature_branch = "feature/inventory-tracking"
+    feature_branch = "feature.inventory-tracking"
     print(f"Creating branch: {feature_branch}")
     
     try:
@@ -250,17 +250,17 @@ def merge_features(db):
     print(f"Tables on main: {[t['name'] for t in tables]}")
     
     # Merge product reviews
-    print("\nMerging feature/product-reviews...")
+    print("\nMerging feature.product-reviews...")
     try:
-        db.merge.merge_branches("feature/product-reviews", "main")
+        db.merge.merge_branches("feature.product-reviews", "main")
         print("✓ Successfully merged product reviews feature")
     except Exception as e:
         print(f"✗ Merge failed: {e}")
     
     # Merge inventory tracking
-    print("\nMerging feature/inventory-tracking...")
+    print("\nMerging feature.inventory-tracking...")
     try:
-        db.merge.merge_branches("feature/inventory-tracking", "main")
+        db.merge.merge_branches("feature.inventory-tracking", "main")
         print("✓ Successfully merged inventory tracking feature")
     except Exception as e:
         print(f"✗ Merge failed: {e}")

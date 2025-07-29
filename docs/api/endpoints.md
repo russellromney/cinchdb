@@ -309,7 +309,7 @@ Response:
       "is_default": true
     },
     {
-      "name": "feature/new-ui",
+      "name": "feature.new-ui",
       "created_at": "2024-01-10T00:00:00Z",
       "parent": "main",
       "is_default": false
@@ -328,7 +328,7 @@ Request:
 ```json
 {
   "database": "myapp",
-  "name": "feature/payments",
+  "name": "feature.payments",
   "from_branch": "main"
 }
 ```
@@ -343,7 +343,7 @@ Request:
 ```json
 {
   "database": "myapp",
-  "branch": "feature/payments"
+  "branch": "feature.payments"
 }
 ```
 
@@ -357,7 +357,7 @@ Request:
 ```json
 {
   "database": "myapp",
-  "source": "feature/payments",
+  "source": "feature.payments",
   "target": "main"
 }
 ```

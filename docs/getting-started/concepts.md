@@ -42,15 +42,15 @@ Key principles:
 
 ```bash
 # Create and switch to a new branch
-cinch branch create feature/add-users
-cinch branch switch feature/add-users
+cinch branch create feature.add-users
+cinch branch switch feature.add-users
 
 # Make changes
 cinch table create users name:TEXT
 
 # Merge back to main
 cinch branch switch main
-cinch branch merge feature/add-users
+cinch branch merge feature.add-users
 ```
 
 ## Tables and Columns

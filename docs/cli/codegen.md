@@ -178,7 +178,7 @@ Generate from different branches:
 
 ```bash
 # Generate from feature branch
-cinch branch switch feature/new-schema
+cinch branch switch feature.new-schema
 cinch codegen generate python --output ./src/models/feature
 
 # Generate from main

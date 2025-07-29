@@ -71,7 +71,7 @@ cinch query "SELECT * FROM users"
 ### Feature Development
 ```bash
 # Create feature branch
-cinch branch create feature/comments
+cinch branch create feature.comments
 
 # Make changes
 cinch table create comments post_id:TEXT content:TEXT
@@ -81,7 +81,7 @@ cinch query "INSERT INTO comments (post_id, content) VALUES ('123', 'Great post!
 
 # Merge to main
 cinch branch switch main
-cinch branch merge feature/comments
+cinch branch merge feature.comments
 ```
 
 ### Multi-Tenant Setup

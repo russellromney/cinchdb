@@ -46,7 +46,7 @@ When you create a branch:
 4. Schema matches source exactly
 
 ```bash
-cinch branch create feature/new-schema
+cinch branch create feature.new-schema
 ```
 
 This creates an exact copy, allowing independent development.
@@ -137,7 +137,7 @@ cinch table create products name:TEXT price:REAL
 cinch branch switch main
 
 # Merge feature
-cinch branch merge feature/products main
+cinch branch merge feature.products main
 ```
 
 ## Conflict Prevention
@@ -175,7 +175,7 @@ Before merge, CinchDB validates:
 
 1. **Create Feature Branch**
    ```bash
-   cinch branch create feature/user-profiles
+   cinch branch create feature.user-profiles
    ```
 
 2. **Make Changes**
@@ -191,7 +191,7 @@ Before merge, CinchDB validates:
 
 4. **Merge When Ready**
    ```bash
-   cinch branch merge feature/user-profiles main
+   cinch branch merge feature.user-profiles main
    ```
 
 ### Parallel Development
@@ -199,8 +199,8 @@ Before merge, CinchDB validates:
 Multiple developers can work simultaneously:
 
 ```
-Developer A: main → feature/auth → implements auth tables
-Developer B: main → feature/billing → implements billing tables
+Developer A: main → feature.auth → implements auth tables
+Developer B: main → feature.billing → implements billing tables
 
 Both can merge to main independently (no conflicts)
 ```
@@ -211,16 +211,16 @@ For major features:
 
 ```bash
 # Create long-running branch
-cinch branch create release/v2
+cinch branch create release.v2
 
 # Periodically sync with main
-cinch branch merge main release/v2
+cinch branch merge main release.v2
 
 # Continue development
 cinch table create v2_features ...
 
 # Eventually merge back
-cinch branch merge release/v2 main
+cinch branch merge release.v2 main
 ```
 
 ## Best Practices
@@ -228,23 +228,23 @@ cinch branch merge release/v2 main
 ### 1. Branch Naming
 
 Use descriptive, consistent names:
-- `feature/` - New functionality
-- `bugfix/` - Fixing issues
-- `refactor/` - Schema improvements
-- `experiment/` - Trying ideas
-- `release/` - Version preparation
+- `feature.` - New functionality
+- `bugfix.` - Fixing issues
+- `refactor.` - Schema improvements
+- `experiment.` - Trying ideas
+- `release.` - Version preparation
 
 ### 2. Small, Focused Changes
 
 Keep branches focused:
 ```bash
 # Good - single purpose
-feature/add-user-avatars
-feature/optimize-indexes
+feature.add-user-avatars
+feature.optimize-indexes
 
 # Bad - too broad
-feature/big-update
-feature/everything
+feature.big-update
+feature.everything
 ```
 
 ### 3. Regular Merging
@@ -279,7 +279,7 @@ def test_branch_schema(branch_name):
 Each branch tracks:
 ```json
 {
-  "name": "feature/new-schema",
+  "name": "feature.new-schema",
   "created_at": "2024-01-15T10:00:00Z",
   "created_from": "main",
   "last_change": "2024-01-15T11:00:00Z",

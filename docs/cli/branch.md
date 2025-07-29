@@ -14,9 +14,9 @@ cinch branch list
 ```
 Branches in database 'main':
 • main (active)
-• feature/add-users
-• feature/update-schema
-• hotfix/fix-indexes
+• feature.add-users
+• feature.update-schema
+• hotfix.fix-indexes
 ```
 
 ## create
@@ -36,15 +36,15 @@ cinch branch create BRANCH_NAME
 ### Examples
 ```bash
 # Create from current branch
-cinch branch create feature/add-comments
+cinch branch create feature.add-comments
 
 # Create from specific branch
-cinch branch create hotfix/fix-bug --from main
+cinch branch create hotfix.fix-bug --from main
 ```
 
 ### Notes
 - Copies all schema and tenants from source branch
-- Branch names can include slashes for organization
+- Branch names can include periods and dashes for organization
 - Cannot create duplicate branch names
 
 ## switch
@@ -60,7 +60,7 @@ cinch branch switch BRANCH_NAME
 
 ### Example
 ```bash
-cinch branch switch feature/add-users
+cinch branch switch feature.add-users
 ```
 
 ### Notes
@@ -85,10 +85,10 @@ cinch branch delete BRANCH_NAME
 ### Example
 ```bash
 # With confirmation
-cinch branch delete feature/old-feature
+cinch branch delete feature.old-feature
 
 # Without confirmation  
-cinch branch delete feature/old-feature --force
+cinch branch delete feature.old-feature --force
 ```
 
 ### Notes
@@ -111,11 +111,11 @@ cinch branch merge SOURCE_BRANCH TARGET_BRANCH
 ### Examples
 ```bash
 # Merge feature into main
-cinch branch merge feature/add-users main
+cinch branch merge feature.add-users main
 
 # Merge while on target branch
 cinch branch switch main
-cinch branch merge feature/add-users .
+cinch branch merge feature.add-users .
 ```
 
 ### Notes
@@ -134,14 +134,14 @@ cinch branch merge-into-main
 ### Example
 ```bash
 # On feature branch
-cinch branch switch feature/add-users
+cinch branch switch feature.add-users
 # Make changes...
 cinch branch merge-into-main
 ```
 
 ### Equivalent to:
 ```bash
-cinch branch merge feature/add-users main
+cinch branch merge feature.add-users main
 ```
 
 ## changes
@@ -157,7 +157,7 @@ cinch branch changes [BRANCH_NAME]
 
 ### Example Output
 ```
-Changes in branch 'feature/add-users':
+Changes in branch 'feature.add-users':
 1. CREATE TABLE users (name TEXT, email TEXT)
 2. CREATE VIEW active_users AS SELECT * FROM users WHERE active = true
 3. ADD COLUMN avatar_url TEXT TO users
@@ -168,7 +168,7 @@ Changes in branch 'feature/add-users':
 ### Feature Development
 ```bash
 # Create feature branch
-cinch branch create feature/shopping-cart
+cinch branch create feature.shopping-cart
 
 # Make changes
 cinch table create cart_items product_id:TEXT quantity:INTEGER
@@ -184,37 +184,37 @@ cinch branch merge-into-main
 ### Hotfix Workflow
 ```bash
 # Create hotfix from main
-cinch branch create hotfix/fix-index --from main
+cinch branch create hotfix.fix-index --from main
 
 # Make fix
 cinch column add users last_login:TEXT
 
 # Merge back quickly
-cinch branch merge hotfix/fix-index main
+cinch branch merge hotfix.fix-index main
 ```
 
 ### Parallel Development
 ```bash
 # Multiple features in parallel
-cinch branch create feature/users
-cinch branch create feature/products
-cinch branch create feature/orders
+cinch branch create feature.users
+cinch branch create feature.products
+cinch branch create feature.orders
 
 # Work independently
-cinch branch switch feature/users
+cinch branch switch feature.users
 cinch table create users name:TEXT
 
-cinch branch switch feature/products  
+cinch branch switch feature.products  
 cinch table create products name:TEXT price:REAL
 
 # Merge when ready
-cinch branch merge feature/users main
-cinch branch merge feature/products main
+cinch branch merge feature.users main
+cinch branch merge feature.products main
 ```
 
 ## Best Practices
 
-1. **Branch Naming** - Use descriptive names like `feature/`, `bugfix/`, `hotfix/`
+1. **Branch Naming** - Use descriptive names like `feature.`, `bugfix.`, `hotfix.`
 2. **Small Changes** - Keep branches focused on single features
 3. **Regular Merges** - Merge completed features promptly
 4. **Review Changes** - Always review before merging to main
@@ -235,7 +235,7 @@ Branch commands work with remote connections:
 cinch branch list --remote production
 
 # Create branch on remote
-cinch branch create feature/new --remote production
+cinch branch create feature.new --remote production
 ```
 
 ## Next Steps

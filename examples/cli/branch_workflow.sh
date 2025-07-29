@@ -36,8 +36,8 @@ pause
 
 # Feature 1: Add user authentication
 echo -e "\n2. Feature 1: Adding user authentication..."
-cinch branch create feature/user-auth
-cinch branch switch feature/user-auth
+cinch branch create feature.user-auth
+cinch branch switch feature.user-auth
 
 echo "Creating auth tables..."
 cinch table create sessions \
@@ -63,8 +63,8 @@ pause
 # Feature 2: Add product reviews (parallel development)
 echo -e "\n3. Feature 2: Adding product reviews (parallel to auth)..."
 cinch branch switch main
-cinch branch create feature/product-reviews
-cinch branch switch feature/product-reviews
+cinch branch create feature.product-reviews
+cinch branch switch feature.product-reviews
 
 echo "Creating reviews table..."
 cinch table create reviews \
@@ -86,7 +86,7 @@ cinch view create product_review_summary \
    LEFT JOIN reviews r ON p.id = r.product_id \
    GROUP BY p.id"
 
-echo -e "\nChanges in feature/product-reviews:"
+echo -e "\nChanges in feature.product-reviews:"
 cinch branch changes
 
 pause
@@ -106,7 +106,7 @@ pause
 
 # Merge first feature
 echo -e "\n5. Merging user authentication feature..."
-cinch branch merge feature/user-auth main
+cinch branch merge feature.user-auth main
 
 echo "Tables on main after first merge:"
 cinch table list
@@ -115,7 +115,7 @@ pause
 
 # Merge second feature
 echo -e "\n6. Merging product reviews feature..."
-cinch branch merge feature/product-reviews main
+cinch branch merge feature.product-reviews main
 
 echo "Tables on main after second merge:"
 cinch table list
@@ -127,8 +127,8 @@ pause
 
 # Hotfix example
 echo -e "\n7. Hotfix example..."
-cinch branch create hotfix/security-patch
-cinch branch switch hotfix/security-patch
+cinch branch create hotfix.security-patch
+cinch branch switch hotfix.security-patch
 
 echo "Adding security fields..."
 cinch column add users failed_login_attempts:INTEGER?
@@ -147,16 +147,16 @@ cinch branch changes
 
 echo -e "\nMerging hotfix..."
 cinch branch switch main
-cinch branch merge hotfix/security-patch main
+cinch branch merge hotfix.security-patch main
 
 pause
 
 # Clean up merged branches
 echo -e "\n8. Cleaning up merged branches..."
 echo "Deleting completed feature branches..."
-cinch branch delete feature/user-auth --force
-cinch branch delete feature/product-reviews --force
-cinch branch delete hotfix/security-patch --force
+cinch branch delete feature.user-auth --force
+cinch branch delete feature.product-reviews --force
+cinch branch delete hotfix.security-patch --force
 
 echo -e "\nRemaining branches:"
 cinch branch list

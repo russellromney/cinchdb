@@ -62,10 +62,10 @@ def main():
     # Create a branch for new features
     print("\nCreating feature branch...")
     if db.is_local:
-        db.branches.create_branch("feature/add-profiles")
+        db.branches.create_branch("feature.add-profiles")
     
     # Switch to feature branch
-    feature_db = db.switch_branch("feature/add-profiles")
+    feature_db = db.switch_branch("feature.add-profiles")
     
     # Add profiles table on feature branch
     print("Adding profiles table on feature branch...")

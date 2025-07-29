@@ -534,5 +534,5 @@ auth.set_debug_mode(True)
 ## Next Steps
 
 - [API Endpoints](endpoints.md)
-- [Rate Limiting](../monitoring/rate-limiting.md)
-- [Security Best Practices](../security/index.md)
+- [API Endpoints](endpoints.md)
+- [Deployment Guide](deployment.md)

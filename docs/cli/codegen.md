@@ -296,5 +296,5 @@ cinch codegen generate typescript --local
 ## Next Steps
 
 - [Python SDK](../python-sdk/index.md) - Use generated models
-- [TypeScript SDK](../typescript-sdk/index.md) - Client integration
-- [Schema Design](../concepts/schema-design.md) - Best practices
+- [API Reference](../api/endpoints.md) - Remote API integration
+- [Branching](../concepts/branching.md) - Multi-branch development

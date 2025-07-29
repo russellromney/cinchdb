@@ -273,4 +273,4 @@ cinch view list --remote production
 
 - [Query Command](query.md) - Query views and tables
 - [Table Commands](table.md) - Manage underlying tables
-- [SQL Guide](../concepts/sql-guide.md) - Writing effective queries
+- [Branching Concepts](../concepts/branching.md) - Views in branches

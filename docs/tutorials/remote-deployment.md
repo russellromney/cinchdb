@@ -566,4 +566,4 @@ cinch remote use prod
 
 - Review [API Documentation](../api/endpoints.md)
 - Set up [Authentication](../api/authentication.md)
-- Configure [Monitoring](../monitoring/index.md)
+- Learn about [Multi-tenancy](../concepts/multi-tenancy.md)

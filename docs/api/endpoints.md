@@ -697,5 +697,5 @@ const users = await db.query('SELECT * FROM users');
 ## Next Steps
 
 - [Authentication Guide](authentication.md)
-- [Rate Limiting](../monitoring/rate-limiting.md)
-- [Error Handling](../guides/error-handling.md)
+- [Authentication Guide](authentication.md)
+- [Deployment Guide](deployment.md)

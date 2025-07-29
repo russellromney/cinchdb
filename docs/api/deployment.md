@@ -564,4 +564,4 @@ systemctl start cinchdb
 
 - [Authentication Setup](authentication.md)
 - [API Endpoints Reference](endpoints.md)
-- [Monitoring Guide](../monitoring/index.md)
+- [API Reference](endpoints.md)

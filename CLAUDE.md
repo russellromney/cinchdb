@@ -26,6 +26,10 @@ This project uses a structured memory bank system with specialized context files
 
 When asked to backup Memory Bank System files, copy the core context files above and @.claude settings directory to a standard directory that you will ask me for just once and then store in a context file. If files already exist in the backup directory, you will overwrite them.
 
+## Subagents
+
+You have a number of subagents defined. Please use them frequently and simultaneously. They will help you write effective software and tests. 
+
 ## Design Principles
 
 ### Start Simple

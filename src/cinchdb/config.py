@@ -6,6 +6,13 @@ import toml
 from pydantic import BaseModel, Field, ConfigDict
 
 
+class RemoteConfig(BaseModel):
+    """Configuration for a remote CinchDB instance."""
+    
+    url: str = Field(description="Base URL of the remote CinchDB API")
+    key: str = Field(description="API key for authentication")
+
+
 class ProjectConfig(BaseModel):
     """Configuration for a CinchDB project stored in .cinchdb/config.toml."""
 
@@ -17,8 +24,14 @@ class ProjectConfig(BaseModel):
         default="main", description="Currently active database"
     )
     active_branch: str = Field(default="main", description="Currently active branch")
+    active_remote: Optional[str] = Field(
+        default=None, description="Currently active remote alias"
+    )
+    remotes: Dict[str, RemoteConfig] = Field(
+        default_factory=dict, description="Remote configurations by alias"
+    )
     api_keys: Dict[str, Dict[str, Any]] = Field(
-        default_factory=dict, description="API key configurations"
+        default_factory=dict, description="API key configurations (deprecated)"
     )
 
 
@@ -49,6 +62,12 @@ class Config:
         with open(self.config_path, "r") as f:
             data = toml.load(f)
 
+        # Convert remote dicts to RemoteConfig objects
+        if "remotes" in data:
+            for alias, remote_data in data["remotes"].items():
+                if isinstance(remote_data, dict):
+                    data["remotes"][alias] = RemoteConfig(**remote_data)
+
         self._config = ProjectConfig(**data)
         return self._config
 
@@ -67,9 +86,16 @@ class Config:
         # Ensure config directory exists
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save to TOML
+        # Save to TOML - need to properly serialize RemoteConfig objects
+        config_dict = self._config.model_dump()
+        # Convert RemoteConfig objects to dicts for TOML serialization
+        if "remotes" in config_dict:
+            for alias, remote in config_dict["remotes"].items():
+                if isinstance(remote, dict):
+                    config_dict["remotes"][alias] = remote
+        
         with open(self.config_path, "w") as f:
-            toml.dump(self._config.model_dump(), f)
+            toml.dump(config_dict, f)
 
     def init_project(self) -> ProjectConfig:
         """Initialize a new CinchDB project with default configuration."""

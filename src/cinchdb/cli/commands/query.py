@@ -5,26 +5,22 @@ from typing import Optional
 from rich.console import Console
 from rich.table import Table as RichTable
 
-from cinchdb.cli.utils import get_config_with_data
+from cinchdb.cli.utils import get_config_with_data, get_cinchdb_instance
 from cinchdb.managers.query import QueryManager
 
 app = typer.Typer(help="Execute SQL queries", invoke_without_command=True)
 console = Console()
 
 
-def execute_query(sql: str, tenant: str, format: str, limit: Optional[int]):
+def execute_query(sql: str, tenant: str, format: str, limit: Optional[int], force_local: bool = False, remote_alias: Optional[str] = None):
     """Execute a SQL query."""
-    config, config_data = get_config_with_data()
-    db_name = config_data.active_database
-    branch_name = config_data.active_branch
-
     # Add LIMIT if specified
     query_sql = sql
     if limit and "LIMIT" not in sql.upper():
         query_sql = f"{sql} LIMIT {limit}"
 
-    # Create QueryManager
-    query_manager = QueryManager(config.project_dir, db_name, branch_name, tenant)
+    # Get CinchDB instance (handles local/remote automatically)
+    db = get_cinchdb_instance(tenant=tenant, force_local=force_local, remote_alias=remote_alias)
 
     try:
         # Check if this is a SELECT query
@@ -32,7 +28,7 @@ def execute_query(sql: str, tenant: str, format: str, limit: Optional[int]):
 
         if is_select:
             # Execute SELECT query
-            rows = query_manager.execute(query_sql)
+            rows = db.query(query_sql)
 
             if not rows:
                 console.print("[yellow]No results[/yellow]")
@@ -74,10 +70,11 @@ def execute_query(sql: str, tenant: str, format: str, limit: Optional[int]):
 
                 console.print(table)
         else:
-            # For INSERT/UPDATE/DELETE, use execute_non_query
-            affected = query_manager.execute_non_query(query_sql)
+            # For INSERT/UPDATE/DELETE, use direct query
+            # Note: CinchDB.query() works for all SQL statements
+            result = db.query(query_sql)
             console.print(
-                f"[green]✅ Query executed successfully. Rows affected: {affected}[/green]"
+                f"[green]✅ Query executed successfully[/green]"
             )
 
     except Exception as e:
@@ -96,6 +93,12 @@ def main(
     limit: Optional[int] = typer.Option(
         None, "--limit", "-l", help="Limit number of rows"
     ),
+    local: bool = typer.Option(
+        False, "--local", "-L", help="Force local connection"
+    ),
+    remote: Optional[str] = typer.Option(
+        None, "--remote", "-r", help="Use specific remote alias"
+    ),
 ):
     """Execute a SQL query.
 
@@ -103,10 +106,12 @@ def main(
         cinch query "SELECT * FROM users"
         cinch query "SELECT * FROM users WHERE active = 1" --format json
         cinch query "SELECT COUNT(*) FROM posts" --tenant tenant1
+        cinch query "SELECT * FROM users" --remote production
+        cinch query "SELECT * FROM users" --local
     """
     # If no subcommand is invoked and we have SQL, execute it
     if ctx.invoked_subcommand is None:
         if not sql:
             console.print(ctx.get_help())
             raise typer.Exit(0)
-        execute_query(sql, tenant, format, limit)
+        execute_query(sql, tenant, format, limit, force_local=local, remote_alias=remote)

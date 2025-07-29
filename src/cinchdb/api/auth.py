@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Literal
 from pathlib import Path
 
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security, Depends, Query
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
@@ -197,13 +197,15 @@ async def get_current_project(project_dir: Optional[str] = None) -> Path:
 
 
 async def verify_api_key(
-    api_key: Optional[str] = Security(api_key_header),
+    api_key_header: Optional[str] = Security(api_key_header),
+    api_key_query: Optional[str] = Query(None, alias="api_key"),
     project_dir: Path = Depends(get_current_project),
 ) -> AuthContext:
     """Verify API key and return auth context.
 
     Args:
-        api_key: API key from header
+        api_key_header: API key from header
+        api_key_query: API key from query parameter
         project_dir: Project directory
 
     Returns:
@@ -212,6 +214,9 @@ async def verify_api_key(
     Raises:
         HTTPException: If authentication fails
     """
+    # Check header first, then query parameter
+    api_key = api_key_header or api_key_query
+    
     if not api_key:
         raise HTTPException(
             status_code=401,

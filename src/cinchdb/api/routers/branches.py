@@ -102,8 +102,8 @@ async def list_branches(
             result.append(
                 BranchInfo(
                     name=branch.name,
-                    parent=branch.parent,
-                    created_at=branch.created_at,
+                    parent=branch.parent_branch,
+                    created_at=branch.metadata.get("created_at", "Unknown"),
                     is_active=branch.name == config_data.active_branch
                     and db_name == config_data.active_database,
                     tenant_count=tenant_count,
@@ -148,8 +148,8 @@ async def create_branch(
             "message": f"Created branch '{request.name}' from '{request.source}'",
             "branch": {
                 "name": branch.name,
-                "parent": branch.parent,
-                "created_at": branch.created_at.isoformat(),
+                "parent": branch.parent_branch,
+                "created_at": branch.metadata.get("created_at","Unknown"),
             },
         }
 

@@ -4,4 +4,6 @@ base command:
 
 okay. read claude claude.md and the design and implementation files, check over the files in .claude-memory, and carefully consider claude.md as you move forward. make sure to focus on testing, and use the temp file for noodling if you need (refer to claude.md for how to clean this up). your role is a senior engineer at a startup, but don't pre-optimize. consider how things already work and if your implementations match the designs. if told to do something silly, please just let me know and stop before implementing the task. your task is: 
 
-the CLI current cannot insert or update data. should it be able to? please provide feedback without touching any code
+let's move forward with the implemetnation. please implement the typescript sdk. then create a build plan for the frontend, sticking to the basics of displaying project state and doing interactive querying, in a way that is pleasing to the eye. finally use the typescript SDK to implement the frontend according to the plan. make sure to use .claude-memory when necessary, and keep the active context updated. test early and often
+
+7c3dc99d-19a9-4498-b338-822833f6f1f3

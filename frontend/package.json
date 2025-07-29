@@ -10,9 +10,18 @@
   },
   "dependencies": {
     "@cinchdb/client": "file:../sdk/typescript",
+    "@codemirror/lang-sql": "^6.9.0",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/postcss": "^4.1.11",
+    "@uiw/react-codemirror": "^4.24.1",
+    "autoprefixer": "^10.4.21",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.525.0",
     "next": "14.2.0",
+    "postcss": "^8.5.6",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
     "@types/node": "^20",

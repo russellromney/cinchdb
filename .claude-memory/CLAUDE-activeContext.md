@@ -1,9 +1,9 @@
 # Active Context - CinchDB Development
 
 ## Current Session State
-- **Date**: 2025-07-24
-- **Phase**: Complete core functionality achieved ✅
-- **Current Focus**: All phases (1-6) complete, CLI and API fully functional, all tests passing
+- **Date**: 2025-07-29
+- **Phase**: TypeScript SDK and Frontend Implementation ✅
+- **Current Focus**: Completed TypeScript SDK, Frontend, and API enhancements
 
 ## Completed Tasks
 1. ✅ Initialized Python project with uv
@@ -344,16 +344,56 @@ Phase 6 (API Development) completed:
 - **Remote support**: Same interface works with `connect_api()`
 - **Type safety**: Full type hints and IDE support
 
+### Latest Session (2025-07-29) - TypeScript SDK and Frontend ✅
+
+**TypeScript SDK Implementation:**
+- Created complete TypeScript client at `/sdk/typescript/`
+- Implemented all API endpoints matching Python SDK functionality
+- Added comprehensive type definitions for all operations
+- Created test suite with 10 tests (all passing)
+- Published as `@cinchdb/client` package
+- Features include:
+  - Full API client with axios interceptors
+  - Type-safe query execution
+  - Database/branch/tenant management
+  - Table/column/view operations
+  - Data CRUD operations
+  - Proper error handling
+
+**Frontend Implementation:**
+- Built NextJS 14 app with App Router at `/frontend/`
+- Created authentication flow with API key support
+- Implemented schema explorer with tree view
+- Built interactive SQL query editor with CodeMirror
+- Added results table with CSV export functionality
+- Used React Context for state management
+- Integrated TypeScript SDK for all operations
+- Fixed all TypeScript and build errors
+- Features include:
+  - Real-time database/branch/tenant switching
+  - Schema tree navigation
+  - SQL syntax highlighting
+  - Query result display and export
+  - Responsive Tailwind CSS design
+
+**API Enhancement:**
+- Updated Python API auth to accept API key as query parameter
+- Maintains backward compatibility with header authentication
+- Makes API easier to test in browsers and simple tools
+- Authentication methods:
+  - Header: `X-API-Key: <key>` (preferred)
+  - Query: `?api_key=<key>` (convenience)
+
 ### Next Development Phases (Future)
-- **Phase 7**: Frontend development (NextJS app)
-- **Phase 8**: TypeScript SDK (enhanced by codegen)
 - **Phase 9**: Documentation site
 - **Phase 10**: Production deployment tools
 - **Future Enhancements**:
   - Async support for remote connections
   - Connection pooling for remote API
   - Retry logic for API calls
-  - Additional convenience methods
+  - Visual query builder in frontend
+  - Branch merging UI
+  - Schema diff visualization
 
 ## Key Technical Decisions
 - WAL mode with autocheckpoint disabled for better concurrency

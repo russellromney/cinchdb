@@ -76,12 +76,12 @@ async def list_tenants(
                 / "branches"
                 / branch_name
                 / "tenants"
-                / f"{tenant}.db"
+                / f"{tenant.name}.db"
             )
             size = db_path.stat().st_size if db_path.exists() else 0
 
             result.append(
-                TenantInfo(name=tenant, size_bytes=size, is_protected=tenant == "main")
+                TenantInfo(name=tenant.name, size_bytes=size, is_protected=tenant.is_main)
             )
 
         return result

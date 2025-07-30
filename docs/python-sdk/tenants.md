@@ -13,13 +13,13 @@ tenant_db = cinchdb.connect("myapp", tenant="customer_a")
 users = tenant_db.query("SELECT * FROM users")
 ```
 
-### Switch Tenants
+### Switching Between Tenants
 ```python
 # Start with default tenant
 db = cinchdb.connect("myapp")
 
-# Switch to specific tenant
-customer_db = db.switch_tenant("customer_a")
+# Connect to specific tenant
+customer_db = cinchdb.connect("myapp", tenant="customer_a")
 
 # Work with tenant data
 customer_db.insert("users", {"name": "Alice", "email": "alice@customer-a.com"})
@@ -45,7 +45,7 @@ if db.is_local:
     db.tenants.create_tenant("customer_b")
     
     # Verify creation
-    customer_db = db.switch_tenant("customer_b")
+    customer_db = cinchdb.connect(db.database, tenant="customer_b")
     tables = customer_db.query("SELECT name FROM sqlite_master WHERE type='table'")
 ```
 
@@ -70,9 +70,11 @@ if db.is_local:
 
 ### Tenant Isolation
 ```python
+import cinchdb
+
 # Each tenant has completely isolated data
-tenant_a = db.switch_tenant("customer_a")
-tenant_b = db.switch_tenant("customer_b")
+tenant_a = cinchdb.connect(db.database, tenant="customer_a")
+tenant_b = cinchdb.connect(db.database, tenant="customer_b")
 
 # Insert into tenant A
 tenant_a.insert("users", {"name": "Alice", "email": "alice@a.com"})
@@ -84,12 +86,14 @@ assert len(b_users) == 0  # No data from tenant A
 
 ### Cross-Tenant Operations
 ```python
+import cinchdb
+
 def count_all_tenant_users(db, tenant_names):
     """Count users across all tenants."""
     total_users = 0
     
     for tenant_name in tenant_names:
-        tenant_db = db.switch_tenant(tenant_name)
+        tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
         result = tenant_db.query("SELECT COUNT(*) as count FROM users")
         total_users += result[0]["count"]
     
@@ -103,9 +107,11 @@ print(f"Total users across all tenants: {total}")
 
 ### Tenant Templates
 ```python
+import cinchdb
+
 def setup_tenant_template(db):
     """Create a template tenant with default data."""
-    template_db = db.switch_tenant("_template")
+    template_db = cinchdb.connect(db.database, tenant="_template")
     
     # Add default settings
     template_db.create_table("settings", [
@@ -132,7 +138,7 @@ def create_tenant_from_template(db, tenant_name):
         db.tenants.copy_tenant("_template", tenant_name)
         
         # Customize for tenant
-        tenant_db = db.switch_tenant(tenant_name)
+        tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
         tenant_db.update("settings", 
             {"key": "company_name"}, 
             {"value": tenant_name}
@@ -155,8 +161,8 @@ class TenantManager:
         if self.db.is_local:
             self.db.tenants.create_tenant(customer_name)
         
-        # Switch to tenant
-        tenant_db = self.db.switch_tenant(customer_name)
+        # Connect to tenant
+        tenant_db = cinchdb.connect(self.db.database, tenant=customer_name)
         
         # Create admin user
         admin = tenant_db.insert("users", {
@@ -177,7 +183,7 @@ class TenantManager:
     
     def get_tenant_stats(self, tenant_name):
         """Get usage statistics for a tenant."""
-        tenant_db = self.db.switch_tenant(tenant_name)
+        tenant_db = cinchdb.connect(self.db.database, tenant=tenant_name)
         
         stats = {}
         
@@ -197,6 +203,8 @@ class TenantManager:
 
 ### Multi-Region Setup
 ```python
+import cinchdb
+
 REGIONS = {
     "us-east": ["customer_1", "customer_2"],
     "eu-west": ["customer_3", "customer_4"],
@@ -214,7 +222,7 @@ def query_by_region(base_db, region, query, params=None):
     region_db = get_region_db(base_db, region)
     
     for tenant in REGIONS[region]:
-        tenant_db = region_db.switch_tenant(tenant)
+        tenant_db = cinchdb.connect(region_db.database, tenant=tenant)
         results[tenant] = tenant_db.query(query, params)
     
     return results
@@ -222,6 +230,9 @@ def query_by_region(base_db, region, query, params=None):
 
 ### Development and Testing
 ```python
+import cinchdb
+import time
+
 def create_test_tenant(db, test_name):
     """Create isolated tenant for testing."""
     tenant_name = f"test_{test_name}_{int(time.time())}"
@@ -229,7 +240,7 @@ def create_test_tenant(db, test_name):
     if db.is_local:
         db.tenants.create_tenant(tenant_name)
     
-    return db.switch_tenant(tenant_name), tenant_name
+    return cinchdb.connect(db.database, tenant=tenant_name), tenant_name
 
 def cleanup_test_tenant(db, tenant_name):
     """Remove test tenant after tests."""
@@ -257,8 +268,11 @@ def test_user_creation():
 Schema changes automatically apply to all tenants:
 
 ```python
+import cinchdb
+from cinchdb import Column
+
 # Add column on main tenant
-main_db = db.switch_tenant("main")
+main_db = cinchdb.connect(db.database, tenant="main")
 if main_db.is_local:
     main_db.columns.add_column("users", 
         Column(name="phone", type="TEXT", nullable=True)
@@ -266,7 +280,7 @@ if main_db.is_local:
 
 # Verify on other tenants
 for tenant in ["customer_a", "customer_b"]:
-    tenant_db = db.switch_tenant(tenant)
+    tenant_db = cinchdb.connect(db.database, tenant=tenant)
     columns = tenant_db.query("PRAGMA table_info(users)")
     column_names = [col["name"] for col in columns]
     assert "phone" in column_names
@@ -276,15 +290,16 @@ for tenant in ["customer_a", "customer_b"]:
 
 ### Tenant Isolation Benefits
 ```python
+import cinchdb
+from concurrent.futures import ThreadPoolExecutor
+
 # Each tenant query is independent
 # No cross-tenant performance impact
 
 def parallel_tenant_queries(db, tenant_list):
     """Query multiple tenants in parallel."""
-    from concurrent.futures import ThreadPoolExecutor
-    
     def query_tenant(tenant_name):
-        tenant_db = db.switch_tenant(tenant_name)
+        tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
         return tenant_db.query("SELECT COUNT(*) FROM users")[0]["count"]
     
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -295,6 +310,8 @@ def parallel_tenant_queries(db, tenant_list):
 
 ### Connection Pooling
 ```python
+import cinchdb
+
 # Connections are pooled per tenant
 # Reuse connections for better performance
 
@@ -305,7 +322,7 @@ class TenantConnectionPool:
     
     def get_connection(self, tenant_name):
         if tenant_name not in self.connections:
-            self.connections[tenant_name] = self.base_db.switch_tenant(tenant_name)
+            self.connections[tenant_name] = cinchdb.connect(self.base_db.database, tenant=tenant_name)
         return self.connections[tenant_name]
     
     def close_all(self):
@@ -329,6 +346,10 @@ class TenantConnectionPool:
 
 ### 2. Tenant Lifecycle
 ```python
+import cinchdb
+from datetime import datetime
+import json
+
 class TenantLifecycle:
     @staticmethod
     def create(db, tenant_name):
@@ -336,7 +357,7 @@ class TenantLifecycle:
         if db.is_local:
             db.tenants.create_tenant(tenant_name)
         
-        tenant_db = db.switch_tenant(tenant_name)
+        tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
         # Add audit entry
         tenant_db.insert("audit_log", {
             "event": "tenant_created",
@@ -349,7 +370,7 @@ class TenantLifecycle:
     def archive(db, tenant_name):
         """Archive tenant data before deletion."""
         # Export data first
-        tenant_db = db.switch_tenant(tenant_name)
+        tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
         users = tenant_db.query("SELECT * FROM users")
         
         # Save to archive
@@ -371,7 +392,7 @@ def validate_tenant_access(user_tenant, requested_tenant):
 # In your application
 def get_user_data(db, user_id, user_tenant):
     validate_tenant_access(user_tenant, user_tenant)
-    tenant_db = db.switch_tenant(user_tenant)
+    tenant_db = cinchdb.connect(db.database, tenant=user_tenant)
     return tenant_db.query("SELECT * FROM users WHERE id = ?", [user_id])
 ```
 

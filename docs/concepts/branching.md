@@ -305,26 +305,6 @@ def apply_change(db, change):
         db.execute(sql)
 ```
 
-### Branch Comparison
-
-Compare branches programmatically:
-```python
-def compare_branches(db, branch1, branch2):
-    db1 = db.switch_branch(branch1)
-    db2 = db.switch_branch(branch2)
-    
-    # Get schemas
-    schema1 = get_schema(db1)
-    schema2 = get_schema(db2)
-    
-    # Find differences
-    return {
-        "tables_only_in_1": set(schema1.tables) - set(schema2.tables),
-        "tables_only_in_2": set(schema2.tables) - set(schema1.tables),
-        "common_tables": set(schema1.tables) & set(schema2.tables)
-    }
-```
-
 ## Limitations
 
 ### 1. No Concurrent Merges

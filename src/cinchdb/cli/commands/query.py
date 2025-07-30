@@ -70,12 +70,31 @@ def execute_query(sql: str, tenant: str, format: str, limit: Optional[int], forc
 
                 console.print(table)
         else:
-            # For INSERT/UPDATE/DELETE, use direct query
-            # Note: CinchDB.query() works for all SQL statements
-            result = db.query(query_sql)
-            console.print(
-                f"[green]✅ Query executed successfully[/green]"
-            )
+            # For INSERT/UPDATE/DELETE, we need to handle local vs remote differently
+            if db.is_local:
+                # For local connections, use the query manager directly
+                from cinchdb.managers.query import QueryManager
+                query_mgr = QueryManager(db.project_dir, db.database, db.branch, tenant)
+                affected_rows = query_mgr.execute_non_query(query_sql)
+                console.print(
+                    f"[green]✅ Query executed successfully[/green]\n"
+                    f"[cyan]Rows affected: {affected_rows}[/cyan]"
+                )
+            else:
+                # For remote connections, the API should handle all SQL types
+                # This might need API support - for now, try using query
+                try:
+                    result = db.query(query_sql)
+                    console.print(
+                        f"[green]✅ Query executed successfully[/green]"
+                    )
+                except Exception as e:
+                    # If remote doesn't support non-SELECT via query, show helpful message
+                    console.print(
+                        f"[red]❌ Remote execution of non-SELECT queries may require API support[/red]\n"
+                        f"[yellow]Error: {e}[/yellow]"
+                    )
+                    raise
 
     except Exception as e:
         console.print(f"[red]❌ Query error: {e}[/red]")

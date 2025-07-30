@@ -313,46 +313,6 @@ delete(table: str, id: str) -> None
 db.delete("users", "user-id-123")
 ```
 
-### Branch and Tenant Methods
-
-#### switch_branch()
-
-Switch to a different branch.
-
-```python
-switch_branch(branch: str) -> CinchDB
-```
-
-**Parameters:**
-- `branch` (str): Branch name to switch to
-
-**Returns:**
-- `CinchDB`: New CinchDB instance for the specified branch
-
-**Example:**
-```python
-dev_db = db.switch_branch("development")
-```
-
-#### switch_tenant()
-
-Switch to a different tenant.
-
-```python
-switch_tenant(tenant: str) -> CinchDB
-```
-
-**Parameters:**
-- `tenant` (str): Tenant name to switch to
-
-**Returns:**
-- `CinchDB`: New CinchDB instance for the specified tenant
-
-**Example:**
-```python
-tenant_db = db.switch_tenant("customer-123")
-```
-
 ### Context Manager
 
 #### close()

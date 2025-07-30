@@ -99,7 +99,7 @@ for post in posts:
     print(f"{post['title']}: {post['content']}")
 
 # Work with branches
-dev_db = db.switch_branch("development")
+dev_db = cinchdb.connect("myblog", branch="development")
 dev_db.create_table("comments", [
     Column(name="post_id", type="TEXT"),
     Column(name="content", type="TEXT")

@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional, TYPE_CHECKING
 
 from cinchdb.config import Config
 from cinchdb.models import Column
+from cinchdb.core.path_utils import get_project_root
 
 if TYPE_CHECKING:
     from cinchdb.managers.table import TableManager
@@ -403,55 +404,6 @@ class CinchDB:
             # Remote delete
             self._make_request("DELETE", f"/tables/{table}/data/{id}")
 
-    def switch_branch(self, branch: str) -> "CinchDB":
-        """Switch to a different branch.
-
-        Args:
-            branch: Branch name to switch to
-
-        Returns:
-            New CinchDB instance for the branch
-        """
-        if self.is_local:
-            return CinchDB(
-                database=self.database,
-                branch=branch,
-                tenant=self.tenant,
-                project_dir=self.project_dir,
-            )
-        else:
-            return CinchDB(
-                database=self.database,
-                branch=branch,
-                tenant=self.tenant,
-                api_url=self.api_url,
-                api_key=self.api_key,
-            )
-
-    def switch_tenant(self, tenant: str) -> "CinchDB":
-        """Switch to a different tenant.
-
-        Args:
-            tenant: Tenant name to switch to
-
-        Returns:
-            New CinchDB instance for the tenant
-        """
-        if self.is_local:
-            return CinchDB(
-                database=self.database,
-                branch=self.branch,
-                tenant=tenant,
-                project_dir=self.project_dir,
-            )
-        else:
-            return CinchDB(
-                database=self.database,
-                branch=self.branch,
-                tenant=tenant,
-                api_url=self.api_url,
-                api_key=self.api_key,
-            )
 
     def close(self):
         """Close any open connections."""
@@ -496,10 +448,10 @@ def connect(
         db = connect("mydb", project_dir=Path("/path/to/project"))
     """
     if project_dir is None:
-        config = Config.find_project_root()
-        if config is None:
+        try:
+            project_dir = get_project_root(Path.cwd())
+        except FileNotFoundError:
             raise ValueError("No .cinchdb directory found. Run 'cinchdb init' first.")
-        project_dir = config.project_dir
 
     return CinchDB(
         database=database, branch=branch, tenant=tenant, project_dir=project_dir

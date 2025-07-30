@@ -60,8 +60,8 @@ class SaaSApplication:
         if self.db.is_local:
             self.db.tenants.create_tenant(tenant_name)
         
-        # Switch to tenant
-        tenant_db = self.db.switch_tenant(tenant_name)
+        # Create instance for tenant
+        tenant_db = cinchdb.connect(self.db.database, tenant=tenant_name)
         
         # Create account
         account = tenant_db.insert("accounts", {
@@ -120,7 +120,7 @@ class SaaSApplication:
     
     def get_tenant_stats(self, tenant_name: str) -> dict:
         """Get statistics for a tenant."""
-        tenant_db = self.db.switch_tenant(tenant_name)
+        tenant_db = cinchdb.connect(self.db.database, tenant=tenant_name)
         
         # Count entities
         projects = tenant_db.query("SELECT COUNT(*) as count FROM projects")[0]["count"]
@@ -166,7 +166,7 @@ class SaaSApplication:
     
     def simulate_activity(self, tenant_name: str):
         """Simulate some activity for a tenant."""
-        tenant_db = self.db.switch_tenant(tenant_name)
+        tenant_db = cinchdb.connect(self.db.database, tenant=tenant_name)
         
         print(f"\nSimulating activity for {tenant_name}...")
         
@@ -240,7 +240,7 @@ def main():
     
     # Query each tenant
     for tenant in tenant_names:
-        tenant_db = app.db.switch_tenant(tenant)
+        tenant_db = cinchdb.connect(app.db.database, tenant=tenant)
         account = tenant_db.query("SELECT name FROM accounts LIMIT 1")[0]
         print(f"{tenant}: {account['name']}")
     

@@ -492,7 +492,8 @@ def get_tenant_metadata(tenant_id: str) -> dict:
 ```python
 # Add indexes for common queries
 def optimize_tenant_queries(db, tenant):
-    tenant_db = db.switch_tenant(tenant)
+    import cinchdb
+    tenant_db = cinchdb.connect(db.database, tenant=tenant)
     
     # Add indexes
     tenant_db.query("CREATE INDEX idx_users_email ON users(email)")

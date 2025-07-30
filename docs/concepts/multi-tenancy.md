@@ -14,7 +14,7 @@ Each tenant has:
 - Separate SQLite database file
 - Complete data isolation
 - Shared schema across tenants
-- Independent query execution
+- Independent query execution per-tenant
 
 ```
 .cinchdb/databases/myapp/branches/main/tenants/
@@ -62,9 +62,8 @@ db = cinchdb.connect("myapp", tenant="acme_corp")
 # All operations are tenant-scoped
 users = db.query("SELECT * FROM users")  # Only acme_corp's users
 
-# Switch tenants
-wayne_db = db.switch_tenant("wayne_ent")
-wayne_users = wayne_db.query("SELECT * FROM users")  # Only wayne_ent's users
+# use different tenants for specific queries
+wayne_users = db.query("SELECT * FROM users",tenant="wayne_ent")  # Only wayne_ent's users
 ```
 
 ## Use Cases
@@ -74,18 +73,18 @@ wayne_users = wayne_db.query("SELECT * FROM users")  # Only wayne_ent's users
 Perfect for B2B SaaS where each customer needs isolated data:
 
 ```python
+import cinchdb
+
 class SaaSApp:
     def __init__(self):
         self.db = cinchdb.connect("saas_app")
     
     def get_customer_data(self, customer_id: str, user_id: str):
-        # Each customer has their own tenant
-        customer_db = self.db.switch_tenant(customer_id)
-        
-        # Query only sees customer's data
-        return customer_db.query(
+        # Each customer has their own tenant, e.g.
+        return self.db.query(
             "SELECT * FROM records WHERE user_id = ?",
-            [user_id]
+            [user_id],
+            tenant=customer_id
         )
 ```
 
@@ -94,6 +93,8 @@ class SaaSApp:
 Separate data by geography:
 
 ```python
+import cinchdb
+
 REGIONS = {
     "us-east": ["customer_1", "customer_2"],
     "eu-west": ["customer_3", "customer_4"],
@@ -103,7 +104,7 @@ REGIONS = {
 def get_region_stats(region: str):
     stats = {}
     for tenant in REGIONS[region]:
-        tenant_db = db.switch_tenant(tenant)
+        tenant_db = cinchdb.connect(db.database, tenant=tenant)
         count = tenant_db.query("SELECT COUNT(*) FROM users")[0]["count"]
         stats[tenant] = count
     return stats
@@ -114,6 +115,9 @@ def get_region_stats(region: str):
 Isolated environments for testing:
 
 ```python
+import cinchdb
+import time
+
 def create_test_environment(feature_name: str):
     test_tenant = f"test_{feature_name}_{int(time.time())}"
     
@@ -121,7 +125,7 @@ def create_test_environment(feature_name: str):
     db.tenants.create_tenant(test_tenant)
     
     # Run tests in isolation
-    test_db = db.switch_tenant(test_tenant)
+    test_db = cinchdb.connect(db.database, tenant=test_tenant)
     run_tests(test_db)
     
     # Clean up
@@ -167,8 +171,10 @@ tenant_db.delete("sessions", session_id)
 ### 3. Maintenance
 
 ```python
+import cinchdb
+
 def maintain_tenant(tenant_name: str):
-    tenant_db = db.switch_tenant(tenant_name)
+    tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
     
     # Vacuum to reclaim space
     tenant_db.query("VACUUM")
@@ -211,6 +217,8 @@ if db.is_local:
 ### Optimization Strategies
 
 ```python
+import cinchdb
+
 # Connection pooling per tenant
 class TenantPool:
     def __init__(self, base_db, max_per_tenant=10):
@@ -229,7 +237,7 @@ class TenantPool:
             return pool.pop()
         
         # Create new connection
-        return self.base_db.switch_tenant(tenant_name)
+        return cinchdb.connect(self.base_db.database, tenant=tenant_name)
     
     def return_connection(self, tenant_name, conn):
         pool = self.pools[tenant_name]
@@ -244,8 +252,10 @@ class TenantPool:
 No SQL injection can access other tenant data:
 
 ```python
+import cinchdb
+
 # Even with injection, only sees current tenant
-tenant_db = db.switch_tenant("customer_a")
+tenant_db = cinchdb.connect(db.database, tenant="customer_a")
 # This query CANNOT access customer_b's data
 results = tenant_db.query(user_provided_sql)
 ```
@@ -255,13 +265,15 @@ results = tenant_db.query(user_provided_sql)
 Implement at application level:
 
 ```python
+import cinchdb
+
 def get_tenant_connection(user_id: str, requested_tenant: str):
     # Verify user has access to tenant
     user_tenant = get_user_tenant(user_id)
     if user_tenant != requested_tenant:
         raise PermissionError("Access denied")
     
-    return db.switch_tenant(requested_tenant)
+    return cinchdb.connect(db.database, tenant=requested_tenant)
 ```
 
 ### 3. Encryption
@@ -311,9 +323,12 @@ def get_tenant_resources(tenant_name: str):
 Move inactive tenants:
 
 ```python
+import cinchdb
+import shutil
+
 def archive_inactive_tenant(tenant_name: str):
     # Check last activity
-    tenant_db = db.switch_tenant(tenant_name)
+    tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
     last_activity = tenant_db.query(
         "SELECT MAX(updated_at) as last FROM users"
     )[0]["last"]
@@ -342,13 +357,16 @@ def archive_inactive_tenant(tenant_name: str):
 ### 2. Template Pattern
 
 ```python
+import cinchdb
+from datetime import datetime
+
 def create_tenant_from_template(tenant_name: str, template: str = "default"):
     # Copy template tenant
     if db.is_local:
         db.tenants.copy_tenant(f"_template_{template}", tenant_name)
     
     # Customize
-    tenant_db = db.switch_tenant(tenant_name)
+    tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
     tenant_db.insert("settings", {
         "tenant_name": tenant_name,
         "created_from": template,
@@ -359,11 +377,13 @@ def create_tenant_from_template(tenant_name: str, template: str = "default"):
 ### 3. Monitoring
 
 ```python
+import cinchdb
+
 def get_tenant_metrics():
     metrics = []
     
     for tenant in db.tenants.list_tenants():
-        tenant_db = db.switch_tenant(tenant.name)
+        tenant_db = cinchdb.connect(db.database, tenant=tenant.name)
         
         metrics.append({
             "tenant": tenant.name,
@@ -392,6 +412,8 @@ users = db.query("SELECT * FROM users")  # Correct tenant
 ### 2. Cross-Tenant Queries
 
 ```python
+import cinchdb
+
 # Cannot do cross-tenant joins
 # Must query each tenant separately
 
@@ -399,7 +421,7 @@ def get_all_tenant_totals():
     totals = {}
     
     for tenant in tenants:
-        tenant_db = db.switch_tenant(tenant)
+        tenant_db = cinchdb.connect(db.database, tenant=tenant)
         total = tenant_db.query("SELECT SUM(amount) FROM orders")[0]
         totals[tenant] = total
     

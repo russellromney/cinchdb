@@ -56,9 +56,9 @@ def feature_add_reviews(db):
     except:
         print("Branch already exists")
     
-    # Switch to feature branch
-    feature_db = db.switch_branch(feature_branch)
-    print(f"Switched to: {feature_branch}")
+    # Create new instance for feature branch
+    feature_db = cinchdb.connect(db.database, branch=feature_branch)
+    print(f"Connected to branch: {feature_branch}")
     
     # Add reviews table
     print("Adding reviews table...")
@@ -155,9 +155,9 @@ def feature_add_inventory(db):
     except:
         print("Branch already exists")
     
-    # Switch to feature branch
-    feature_db = db.switch_branch(feature_branch)
-    print(f"Switched to: {feature_branch}")
+    # Create new instance for feature branch
+    feature_db = cinchdb.connect(db.database, branch=feature_branch)
+    print(f"Connected to branch: {feature_branch}")
     
     # Add inventory movements table
     print("Adding inventory_movements table...")
@@ -245,7 +245,7 @@ def merge_features(db):
         return
     
     # Show current main schema
-    main_db = db.switch_branch("main")
+    main_db = cinchdb.connect(db.database, branch="main")
     tables = main_db.query("SELECT name FROM sqlite_master WHERE type='table'")
     print(f"Tables on main: {[t['name'] for t in tables]}")
     

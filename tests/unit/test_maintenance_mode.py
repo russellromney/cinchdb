@@ -26,8 +26,7 @@ class TestTable(BaseModel):
     created_at: datetime = None
     updated_at: datetime = None
 
-    class Config:
-        json_schema_extra = {"table_name": "test_table"}
+    model_config = {"json_schema_extra": {"table_name": "test_table"}}
 
 
 class TestMaintenanceMode:

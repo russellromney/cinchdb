@@ -142,33 +142,6 @@ changes = [
 # Cannot add column before table exists!
 ```
 
-### Tenant Synchronization
-
-When a change is made:
-
-1. **Record Change** - Save to `changes.json`
-2. **Apply to All Tenants** - Update each tenant database
-3. **Track Application** - Mark which tenants updated
-4. **Verify Success** - Ensure consistency
-
-```python
-def apply_change_to_tenants(change, tenant_list):
-    applied = []
-    
-    for tenant in tenant_list:
-        try:
-            tenant_db = db.switch_tenant(tenant)
-            apply_single_change(tenant_db, change)
-            applied.append(tenant)
-        except Exception as e:
-            # Rollback if any tenant fails
-            rollback_change(change, applied)
-            raise
-    
-    change["applied_to"] = applied
-    save_change(change)
-```
-
 ## Viewing Changes
 
 ### CLI Commands
@@ -299,74 +272,6 @@ Stores view definition:
 }
 ```
 
-## Advanced Features
-
-### Change Validation
-
-Before applying changes:
-
-```python
-def validate_change(change, current_schema):
-    if change["type"] == "CREATE_TABLE":
-        if change["details"]["table"] in current_schema.tables:
-            raise ValueError(f"Table {change['details']['table']} already exists")
-    
-    elif change["type"] == "ADD_COLUMN":
-        table = current_schema.get_table(change["details"]["table"])
-        if not table:
-            raise ValueError(f"Table {change['details']['table']} not found")
-        
-        if change["details"]["column"]["name"] in table.columns:
-            raise ValueError(f"Column already exists")
-```
-
-### Change Rollback
-
-For failed operations:
-
-```python
-def rollback_change(change, applied_tenants):
-    """Rollback a partially applied change."""
-    reverse_change = create_reverse_change(change)
-    
-    for tenant in applied_tenants:
-        tenant_db = db.switch_tenant(tenant)
-        apply_single_change(tenant_db, reverse_change)
-
-def create_reverse_change(change):
-    """Create opposite of a change."""
-    if change["type"] == "CREATE_TABLE":
-        return {
-            "type": "DROP_TABLE",
-            "details": {"table": change["details"]["table"]}
-        }
-    elif change["type"] == "ADD_COLUMN":
-        return {
-            "type": "DROP_COLUMN",
-            "details": {
-                "table": change["details"]["table"],
-                "column": change["details"]["column"]["name"]
-            }
-        }
-```
-
-### Change Auditing
-
-Track who made changes:
-
-```python
-def record_change_with_audit(change, user_id):
-    """Add audit information to changes."""
-    change["audit"] = {
-        "user_id": user_id,
-        "ip_address": get_client_ip(),
-        "user_agent": get_user_agent(),
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
-    
-    save_change(change)
-```
-
 ## Best Practices
 
 ### 1. Atomic Changes
@@ -403,22 +308,6 @@ Changes should be self-documenting:
 }
 ```
 
-### 3. Test Before Applying
-
-```python
-def test_change_application(change):
-    """Test change on temporary database."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        test_db = create_test_db(tmpdir)
-        
-        try:
-            apply_single_change(test_db, change)
-            verify_schema(test_db)
-            return True
-        except Exception as e:
-            print(f"Change would fail: {e}")
-            return False
-```
 
 ## Troubleshooting
 

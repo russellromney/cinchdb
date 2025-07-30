@@ -146,24 +146,6 @@ class TestBranchManager:
         with pytest.raises(ValueError, match="Branch 'nonexistent' does not exist"):
             branch_manager.delete_branch("nonexistent")
 
-    def test_switch_branch(self, branch_manager, temp_project):
-        """Test switching active branch."""
-        # Create a branch
-        branch_manager.create_branch("main", "feature")
-
-        # Switch to it
-        branch_manager.switch_branch("feature")
-
-        # Check config was updated
-        config = Config(temp_project)
-        project_config = config.load()
-        assert project_config.active_branch == "feature"
-
-    def test_switch_to_nonexistent_branch_fails(self, branch_manager):
-        """Test switching to non-existent branch fails."""
-        with pytest.raises(ValueError, match="Branch 'nonexistent' does not exist"):
-            branch_manager.switch_branch("nonexistent")
-
     def test_get_branch_metadata(self, branch_manager):
         """Test getting branch metadata."""
         metadata = branch_manager.get_branch_metadata("main")

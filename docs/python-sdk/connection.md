@@ -93,35 +93,35 @@ db2 = cinchdb.connect("myapp", tenant="a")  # Reuses connection
 
 ## Switching Context
 
-### Switch Branch
+### Working with Different Branches
 ```python
-# Original connection
-db = cinchdb.connect("myapp", branch="main")
+# Connect to main branch
+main_db = cinchdb.connect("myapp", branch="main")
 
-# Create new connection for different branch
-dev_db = db.switch_branch("development")
+# Connect to development branch
+dev_db = cinchdb.connect("myapp", branch="development")
 
-# Original unchanged
-assert db.branch == "main"
-assert dev_db.branch == "development"
+# Each connection is independent
+main_data = main_db.query("SELECT * FROM users")
+dev_data = dev_db.query("SELECT * FROM users")
 ```
 
-### Switch Tenant
+### Working with Different Tenants
 ```python
-# Default tenant
-db = cinchdb.connect("myapp")
+# Connect to default tenant
+default_db = cinchdb.connect("myapp")
 
-# Switch to specific tenant
-tenant_db = db.switch_tenant("customer_a")
+# Connect to specific tenant
+tenant_db = cinchdb.connect("myapp", tenant="customer_a")
 
-# Query tenant data
+# Query tenant-specific data
 users = tenant_db.query("SELECT * FROM users")
 ```
 
-### Chaining Switches
+### Specific Branch and Tenant
 ```python
-db = cinchdb.connect("myapp")
-specific_db = db.switch_branch("feature").switch_tenant("customer_b")
+# Connect to specific branch and tenant
+specific_db = cinchdb.connect("myapp", branch="feature", tenant="customer_b")
 ```
 
 ## Connection Properties

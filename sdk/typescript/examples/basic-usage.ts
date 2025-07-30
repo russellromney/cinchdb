@@ -29,11 +29,14 @@ async function main() {
       source: 'main',
     });
 
-    // Switch to the new branch
-    await client.switchBranch('feature-branch');
+    // Create new client instance for the feature branch
+    const featureClient = new CinchDBClient({
+      ...client.config,
+      branch: 'feature-branch',
+    });
 
     // Create a table
-    await client.createTable({
+    await featureClient.createTable({
       name: 'products',
       columns: [
         { name: 'name', type: 'TEXT', nullable: false },
@@ -44,7 +47,7 @@ async function main() {
     });
 
     // Insert some data
-    const product = await client.insert('products', {
+    const product = await featureClient.insert('products', {
       name: 'Widget',
       description: 'A useful widget',
       price: 29.99,
@@ -53,38 +56,41 @@ async function main() {
     console.log('Created product:', product);
 
     // Query data
-    const result = await client.query('SELECT * FROM products WHERE price < ?', [50]);
+    const result = await featureClient.query('SELECT * FROM products WHERE price < ?', [50]);
     console.log('Query results:', result.data);
 
     // Update a record
-    const updated = await client.update('products', product.id!, {
+    const updated = await featureClient.update('products', product.id!, {
       price: 24.99,
     });
     console.log('Updated product:', updated);
 
     // Create a view
-    await client.createView({
+    await featureClient.createView({
       name: 'affordable_products',
       sql: 'SELECT * FROM products WHERE price < 100',
       description: 'Products under $100',
     });
 
     // List views
-    const views = await client.listViews();
+    const views = await featureClient.listViews();
     console.log('Views:', views);
 
     // Check if we can merge back to main
-    const mergeCheck = await client.canMergeBranches('feature-branch', 'main');
+    const mergeCheck = await featureClient.canMergeBranches('feature-branch', 'main');
     console.log('Can merge:', mergeCheck);
 
     if (mergeCheck.can_merge) {
       // Merge changes back to main
-      const mergeResult = await client.mergeIntoMain('feature-branch');
+      const mergeResult = await featureClient.mergeIntoMain('feature-branch');
       console.log('Merge result:', mergeResult);
     }
 
-    // Switch context to different tenant
-    const tenantClient = client.switchTenant('customer_a');
+    // Create new client instance for different tenant
+    const tenantClient = new CinchDBClient({
+      ...client.config,
+      tenant: 'customer_a',
+    });
     const tenantData = await tenantClient.query('SELECT COUNT(*) as count FROM products');
     console.log('Tenant data:', tenantData.data);
 

@@ -30,7 +30,6 @@ class CreateDatabaseRequest(BaseModel):
 
     name: str
     description: str = None
-    switch: bool = False
 
 
 @router.get("/", response_model=List[DatabaseInfo])
@@ -109,13 +108,6 @@ async def create_database(
         # Create empty changes file
         with open(main_branch / "changes.json", "w") as f:
             json.dump([], f)
-
-        # Switch to new database if requested
-        if request.switch:
-            config_data = config.load()
-            config_data.active_database = request.name
-            config_data.active_branch = "main"
-            config.save(config_data)
 
         return {"message": f"Created database '{request.name}'"}
 

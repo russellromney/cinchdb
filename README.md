@@ -88,10 +88,6 @@ results = db.query("SELECT * FROM posts WHERE title LIKE ?", ["%python%"])
 # CRUD operations
 post_id = db.insert("posts", {"title": "Hello World", "content": "First post"})
 db.update("posts", post_id, {"content": "Updated content"})
-
-# Switch contexts
-dev_db = db.switch_branch("development")
-tenant_db = db.switch_tenant("customer_a")
 ```
 
 ### Remote API

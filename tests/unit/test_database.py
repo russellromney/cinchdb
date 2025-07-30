@@ -185,35 +185,6 @@ class TestCinchDB:
                 },
             )
 
-    def test_switch_branch_local(self, tmp_path):
-        """Test switching branches on local connection."""
-        db = CinchDB(database="test_db", branch="main", project_dir=tmp_path)
-
-        new_db = db.switch_branch("dev")
-
-        assert new_db.database == "test_db"
-        assert new_db.branch == "dev"
-        assert new_db.tenant == "main"
-        assert new_db.project_dir == tmp_path
-        assert new_db.is_local is True
-
-    def test_switch_branch_remote(self):
-        """Test switching branches on remote connection."""
-        db = CinchDB(
-            database="test_db",
-            branch="main",
-            api_url="https://api.example.com",
-            api_key="test-key",
-        )
-
-        new_db = db.switch_branch("dev")
-
-        assert new_db.database == "test_db"
-        assert new_db.branch == "dev"
-        assert new_db.tenant == "main"
-        assert new_db.api_url == "https://api.example.com"
-        assert new_db.api_key == "test-key"
-        assert new_db.is_local is False
 
     def test_context_manager(self):
         """Test context manager functionality."""
@@ -256,12 +227,10 @@ class TestFactoryFunctions:
         # Config should not be used
         mock_config.find_project_root.assert_not_called()
 
-    @patch("cinchdb.core.database.Config")
-    def test_connect_find_project_root(self, mock_config, tmp_path):
+    @patch("cinchdb.core.database.get_project_root")
+    def test_connect_find_project_root(self, mock_get_project_root, tmp_path):
         """Test connect function finding project root."""
-        mock_config_instance = Mock()
-        mock_config_instance.project_dir = tmp_path
-        mock_config.find_project_root.return_value = mock_config_instance
+        mock_get_project_root.return_value = tmp_path
 
         db = connect("test_db")
 
@@ -271,12 +240,12 @@ class TestFactoryFunctions:
         assert db.project_dir == tmp_path
         assert db.is_local is True
 
-        mock_config.find_project_root.assert_called_once()
+        mock_get_project_root.assert_called_once()
 
-    @patch("cinchdb.core.database.Config")
-    def test_connect_no_project_found(self, mock_config):
+    @patch("cinchdb.core.database.get_project_root")
+    def test_connect_no_project_found(self, mock_get_project_root):
         """Test connect function when no project found."""
-        mock_config.find_project_root.return_value = None
+        mock_get_project_root.side_effect = FileNotFoundError("No .cinchdb directory found")
 
         with pytest.raises(ValueError, match="No .cinchdb directory found"):
             connect("test_db")

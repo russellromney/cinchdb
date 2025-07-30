@@ -195,36 +195,6 @@ async def delete_branch(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.put("/switch/{name}")
-async def switch_branch(
-    name: str,
-    database: str = Query(..., description="Database name"),
-    auth: AuthContext = Depends(require_write_permission),
-):
-    """Switch to a different branch."""
-    db_name = database
-
-    # Check branch permissions
-    if auth.api_key.branches and name not in auth.api_key.branches:
-        raise HTTPException(
-            status_code=403, detail=f"Access denied for branch '{name}'"
-        )
-
-    try:
-        db = CinchDB(
-            database=db_name, branch="main", tenant="main", project_dir=auth.project_dir
-        )
-        db.branches.switch_branch(name)
-
-        return {
-            "message": f"Switched to branch '{name}'",
-            "active_database": db_name,
-            "active_branch": name,
-        }
-
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
 
 @router.get("/{source}/compare/{target}", response_model=BranchComparisonResult)
 async def compare_branches(

@@ -117,24 +117,6 @@ class BranchManager:
         branch_path = get_branch_path(self.project_root, self.database, branch_name)
         shutil.rmtree(branch_path)
 
-    def switch_branch(self, branch_name: str) -> None:
-        """Switch active branch in config.
-
-        Args:
-            branch_name: Name of branch to switch to
-
-        Raises:
-            ValueError: If branch doesn't exist
-        """
-        # Validate branch exists
-        if branch_name not in list_branches(self.project_root, self.database):
-            raise ValueError(f"Branch '{branch_name}' does not exist")
-
-        # Update config
-        config = Config(self.project_root)
-        project_config = config.load()
-        project_config.active_branch = branch_name
-        config.save(project_config)
 
     def get_branch_metadata(self, branch_name: str) -> Dict[str, Any]:
         """Get metadata for a branch.

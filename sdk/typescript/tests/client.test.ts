@@ -180,25 +180,4 @@ describe('CinchDBClient', () => {
       expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/tables/products/data/123');
     });
   });
-
-  describe('context switching', () => {
-    it('should create new client with different database', () => {
-      const newClient = client.switchDatabase('newdb');
-      expect(newClient).toBeInstanceOf(CinchDBClient);
-      // Should create new instance with updated database
-      expect(mockedAxios.create).toHaveBeenCalledTimes(2);
-    });
-
-    it('should create new client with different branch', () => {
-      const newClient = client.switchBranchContext('feature');
-      expect(newClient).toBeInstanceOf(CinchDBClient);
-      expect(mockedAxios.create).toHaveBeenCalledTimes(2);
-    });
-
-    it('should create new client with different tenant', () => {
-      const newClient = client.switchTenant('customer_a');
-      expect(newClient).toBeInstanceOf(CinchDBClient);
-      expect(mockedAxios.create).toHaveBeenCalledTimes(2);
-    });
-  });
 });

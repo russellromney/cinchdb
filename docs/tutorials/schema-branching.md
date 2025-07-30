@@ -103,7 +103,7 @@ class FeatureBranchManager:
         """Get database connection for feature."""
         if feature_name in self.feature_flags:
             branch = self.feature_flags[feature_name]
-            return self.base_db.switch_branch(branch)
+            return cinchdb.connect(self.base_db.database, branch=branch)
         return self.base_db
     
     def query_with_feature(self, feature_name: str, sql: str, params=None):
@@ -142,13 +142,15 @@ cinch query "CREATE INDEX idx_users_email ON users(email)"
 Require migration strategy:
 
 ```python
+import cinchdb
+
 def migrate_column_type(db, branch_name: str):
     """Example: Change column type safely."""
     # Create branch
     if db.is_local:
         db.branches.create_branch(branch_name)
     
-    branch_db = db.switch_branch(branch_name)
+    branch_db = cinchdb.connect(db.database, branch=branch_name)
     
     # Step 1: Add new column
     branch_db.query("ALTER TABLE products ADD COLUMN price_new REAL")
@@ -233,9 +235,11 @@ def run_branch_tests(branch_name: str):
 ### Manual Testing Checklist
 
 ```python
+import cinchdb
+
 def branch_testing_checklist(db, branch_name: str):
     """Complete testing checklist for branch."""
-    branch_db = db.switch_branch(branch_name)
+    branch_db = cinchdb.connect(db.database, branch=branch_name)
     checklist = {
         "schema_valid": False,
         "queries_work": False,
@@ -283,7 +287,7 @@ def branch_testing_checklist(db, branch_name: str):
     # 5. Backwards compatibility
     try:
         # Check if old queries still work
-        main_db = db.switch_branch("main")
+        main_db = cinchdb.connect(db.database, branch="main")
         main_queries = get_application_queries()
         
         all_work = True
@@ -353,13 +357,15 @@ if review_branch_changes(db, "feature.risky-change"):
 ### 3. Staged Rollout
 
 ```python
+import cinchdb
+
 def staged_branch_rollout(db, branch_name: str, tenant_groups: dict):
     """Roll out branch changes in stages."""
     # Stage 1: Internal testing
     test_tenants = tenant_groups["test"]
     for tenant in test_tenants:
         print(f"Testing on tenant: {tenant}")
-        test_db = db.switch_branch(branch_name).switch_tenant(tenant)
+        test_db = cinchdb.connect(db.database, branch=branch_name, tenant=tenant)
         # Run tests...
     
     # Stage 2: Beta customers
@@ -386,6 +392,9 @@ cinch branch delete feature.bad-idea --force
 ### Post-Merge Rollback
 
 ```python
+import cinchdb
+import time
+
 def create_rollback_branch(db, changes_to_reverse):
     """Create branch to reverse changes."""
     if not db.is_local:
@@ -395,7 +404,7 @@ def create_rollback_branch(db, changes_to_reverse):
     rollback_branch = f"rollback/{int(time.time())}"
     db.branches.create_branch(rollback_branch)
     
-    rollback_db = db.switch_branch(rollback_branch)
+    rollback_db = cinchdb.connect(db.database, branch=rollback_branch)
     
     # Reverse each change
     for change in reversed(changes_to_reverse):
@@ -431,6 +440,9 @@ cinch branch create feature.everything-update
 
 ### 3. Document Changes
 ```python
+import json
+from datetime import datetime
+
 # Create change documentation
 def document_branch(branch_name: str, description: str, changes: list):
     doc = {

@@ -506,9 +506,6 @@ if db.is_local:
     db.columns.rename_column("users", "email", "email_address")
     db.branches.merge("feature", "main")
 
-# Switching contexts
-dev_db = db.switch_branch("dev")
-customer_db = db.switch_tenant("customer1")
 ```
 
 ## CLI Argument Validation Pattern

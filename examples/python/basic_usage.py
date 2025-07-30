@@ -64,8 +64,8 @@ def main():
     if db.is_local:
         db.branches.create_branch("feature.add-profiles")
     
-    # Switch to feature branch
-    feature_db = db.switch_branch("feature.add-profiles")
+    # Create instance for feature branch
+    feature_db = cinchdb.connect("example_app", branch="feature.add-profiles")
     
     # Add profiles table on feature branch
     print("Adding profiles table on feature branch...")

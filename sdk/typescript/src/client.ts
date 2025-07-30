@@ -151,10 +151,6 @@ export class CinchDBClient {
     await this.client.delete(`/branches/${name}`);
   }
 
-  async switchBranch(name: string): Promise<void> {
-    await this.client.put(`/branches/switch/${name}`);
-    this.config.branch = name;
-  }
 
   async compareBranches(source: string, target: string): Promise<BranchComparisonResult> {
     const response = await this.client.get(`/branches/${source}/compare/${target}`);
@@ -362,28 +358,6 @@ export class CinchDBClient {
   async getCodegenInfo(): Promise<any> {
     const response = await this.client.get('/codegen/info');
     return response.data;
-  }
-
-  // Helper methods for context switching
-  switchDatabase(database: string): CinchDBClient {
-    return new CinchDBClient({
-      ...this.config,
-      database,
-    });
-  }
-
-  switchBranchContext(branch: string): CinchDBClient {
-    return new CinchDBClient({
-      ...this.config,
-      branch,
-    });
-  }
-
-  switchTenant(tenant: string): CinchDBClient {
-    return new CinchDBClient({
-      ...this.config,
-      tenant,
-    });
   }
 
   // Convenience methods matching Python SDK

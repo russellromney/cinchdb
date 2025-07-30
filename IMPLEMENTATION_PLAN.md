@@ -105,7 +105,6 @@ cinchdb/
   - `create_branch(source_branch, new_branch_name)`
   - `delete_branch(branch_name)`
   - `list_branches()`
-  - `switch_branch(branch_name)`
 - [ ] Add branch metadata tracking
 - [ ] Implement directory copying for branch creation
 

@@ -2,23 +2,23 @@
 
 Work with database branches using the Python SDK.
 
-## Switching Branches
+## Working with Branches
 
-### Create Branch Connection
+### Connect to Specific Branch
 ```python
 # Connect to specific branch
 dev_db = cinchdb.connect("myapp", branch="development")
 
-# Switch from existing connection
-main_db = cinchdb.connect("myapp")
-dev_db = main_db.switch_branch("development")
+# Connect to multiple branches
+main_db = cinchdb.connect("myapp", branch="main")
+feature_db = cinchdb.connect("myapp", branch="feature.new-schema")
 ```
 
-### Temporary Branch Context
+### Compare Branch Schemas
 ```python
 # Work with multiple branches
 main_db = cinchdb.connect("myapp", branch="main")
-feature_db = main_db.switch_branch("feature.new-schema")
+feature_db = cinchdb.connect("myapp", branch="feature.new-schema")
 
 # Compare schemas
 main_tables = main_db.query("SELECT name FROM sqlite_master WHERE type='table'")
@@ -63,7 +63,7 @@ if db.is_local:
 ### Track Changes
 ```python
 # Make changes on feature branch
-feature_db = db.switch_branch("feature.new-schema")
+feature_db = cinchdb.connect("myapp", branch="feature.new-schema")
 feature_db.create_table("products", [
     Column(name="name", type="TEXT"),
     Column(name="price", type="REAL")
@@ -144,23 +144,27 @@ def safe_merge(db, source_branch: str, target_branch: str = "main"):
 ```python
 # 1. Create feature branch
 db = cinchdb.connect("myapp")
-feature_db = db.switch_branch("main").switch_branch("feature.shopping-cart")
+if db.is_local:
+    db.branches.create_branch("feature.shopping-cart")
 
-# 2. Make changes
+# 2. Connect to feature branch
+feature_db = cinchdb.connect("myapp", branch="feature.shopping-cart")
+
+# 3. Make changes
 feature_db.create_table("cart_items", [
     Column(name="user_id", type="TEXT"),
     Column(name="product_id", type="TEXT"),
     Column(name="quantity", type="INTEGER")
 ])
 
-# 3. Test changes
+# 4. Test changes
 test_data = feature_db.insert("cart_items", {
     "user_id": "test-user",
     "product_id": "test-product",
     "quantity": 2
 })
 
-# 4. Merge when ready
+# 5. Merge when ready
 if db.is_local:
     db.merge.merge_branches("feature.shopping-cart", "main")
 ```
@@ -172,8 +176,8 @@ main_db = cinchdb.connect("myapp", branch="main")
 if main_db.is_local:
     main_db.branches.create_branch("hotfix.critical-bug")
 
-# 2. Switch to hotfix
-hotfix_db = main_db.switch_branch("hotfix.critical-bug")
+# 2. Connect to hotfix branch
+hotfix_db = cinchdb.connect("myapp", branch="hotfix.critical-bug")
 
 # 3. Apply fix
 hotfix_db.query("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT false")
@@ -186,7 +190,12 @@ if main_db.is_local:
 ### Experimental Features
 ```python
 # Create experimental branch
-exp_db = db.switch_branch("experimental.new-feature")
+db = cinchdb.connect("myapp")
+if db.is_local:
+    db.branches.create_branch("experimental.new-feature")
+
+# Connect to experimental branch
+exp_db = cinchdb.connect("myapp", branch="experimental.new-feature")
 
 # Try risky changes
 try:
@@ -215,7 +224,12 @@ Branches apply to all tenants:
 
 ```python
 # Create branch
-feature_db = db.switch_branch("feature.multi-tenant-update")
+db = cinchdb.connect("myapp")
+if db.is_local:
+    db.branches.create_branch("feature.multi-tenant-update")
+
+# Connect to feature branch
+feature_db = cinchdb.connect("myapp", branch="feature.multi-tenant-update")
 
 # Changes apply to all tenants
 feature_db.create_table("tenant_settings", [
@@ -225,7 +239,7 @@ feature_db.create_table("tenant_settings", [
 
 # Verify across tenants
 for tenant in ["main", "customer_a", "customer_b"]:
-    tenant_db = feature_db.switch_tenant(tenant)
+    tenant_db = cinchdb.connect("myapp", branch="feature.multi-tenant-update", tenant=tenant)
     tables = tenant_db.query(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='tenant_settings'"
     )
@@ -258,8 +272,8 @@ def feature_lifecycle(db, feature_name: str, implement_func):
     if db.is_local:
         db.branches.create_branch(branch_name)
     
-    # Switch to branch
-    feature_db = db.switch_branch(branch_name)
+    # Connect to branch
+    feature_db = cinchdb.connect(db.database, branch=branch_name)
     
     try:
         # Implement feature
@@ -286,7 +300,7 @@ def feature_lifecycle(db, feature_name: str, implement_func):
 branches = ["feature.auth", "feature.payments", "feature.shipping"]
 
 for branch in branches:
-    branch_db = db.switch_branch(branch)
+    branch_db = cinchdb.connect("myapp", branch=branch)
     # Each developer works independently
     # Merge when ready without conflicts
 ```
@@ -296,10 +310,10 @@ for branch in branches:
 With remote connections, use CLI or API:
 
 ```python
-# Remote connections can switch branches
-remote_db = cinchdb.connect_api(...)
-prod_db = remote_db.switch_branch("production")
-staging_db = remote_db.switch_branch("staging")
+# Remote connections can connect to different branches
+remote_db = cinchdb.connect_api("myapp", branch="main", api_url="...", api_key="...")
+prod_db = cinchdb.connect_api("myapp", branch="production", api_url="...", api_key="...")
+staging_db = cinchdb.connect_api("myapp", branch="staging", api_url="...", api_key="...")
 
 # But cannot create/merge branches
 # Use CLI for remote branch management:

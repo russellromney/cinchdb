@@ -76,8 +76,8 @@ class CustomerOnboarding:
         if self.db.is_local:
             self.db.tenants.create_tenant(tenant_name)
         
-        # Switch to tenant
-        tenant_db = self.db.switch_tenant(tenant_name)
+        # Create new connection for tenant
+        tenant_db = cinchdb.connect(self.db.database, tenant=tenant_name)
         
         # Create admin user
         admin = tenant_db.insert("users", {
@@ -157,7 +157,7 @@ def list_projects(
         raise HTTPException(403, "Access denied")
     
     # Query tenant data
-    tenant_db = db.switch_tenant(tenant)
+    tenant_db = cinchdb.connect(db.database, tenant=tenant)
     projects = tenant_db.query(
         "SELECT * FROM projects WHERE owner_id = ?",
         [user["id"]]
@@ -172,7 +172,7 @@ def create_project(
     user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
-    tenant_db = db.switch_tenant(tenant)
+    tenant_db = cinchdb.connect(db.database, tenant=tenant)
     
     new_project = tenant_db.insert("projects", {
         **project,
@@ -189,7 +189,7 @@ def list_tasks(
     user: dict = Depends(get_current_user),
     db = Depends(get_db)
 ):
-    tenant_db = db.switch_tenant(tenant)
+    tenant_db = cinchdb.connect(db.database, tenant=tenant)
     
     # Verify project access
     project = tenant_db.query(
@@ -226,7 +226,7 @@ class TenantAdmin:
         stats = []
         
         for tenant in tenants:
-            tenant_db = self.db.switch_tenant(tenant.name)
+            tenant_db = cinchdb.connect(self.db.database, tenant=tenant.name)
             
             # Get counts
             users = tenant_db.query("SELECT COUNT(*) as count FROM users")[0]["count"]
@@ -253,7 +253,7 @@ class TenantAdmin:
     
     def backup_tenant(self, tenant_name: str, backup_path: str):
         """Backup tenant data."""
-        tenant_db = self.db.switch_tenant(tenant_name)
+        tenant_db = cinchdb.connect(self.db.database, tenant=tenant_name)
         
         # Export all tables
         backup_data = {}
@@ -295,7 +295,7 @@ class TenantConnectionPool:
                     del self.connections[oldest[0]]
                 
                 self.connections[tenant_name] = {
-                    "db": self.base_db.switch_tenant(tenant_name),
+                    "db": cinchdb.connect(self.base_db.database, tenant=tenant_name),
                     "last_used": datetime.now()
                 }
             else:
@@ -326,7 +326,7 @@ async def cleanup_old_tasks():
         tenants = db.tenants.list_tenants()
         
         for tenant in tenants:
-            tenant_db = db.switch_tenant(tenant.name)
+            tenant_db = cinchdb.connect(db.database, tenant=tenant.name)
             
             # Archive old completed tasks
             old_tasks = tenant_db.query("""
@@ -432,7 +432,7 @@ def test_tenant():
     if db.is_local:
         db.tenants.create_tenant(tenant_name)
     
-    yield db.switch_tenant(tenant_name), tenant_name
+    yield cinchdb.connect(db.database, tenant=tenant_name), tenant_name
     
     # Cleanup
     if db.is_local:
@@ -451,7 +451,7 @@ def test_project_creation(test_tenant):
     assert project["id"] is not None
     
     # Verify isolation
-    main_db = db.switch_tenant("main")
+    main_db = cinchdb.connect("project_manager", tenant="main")
     main_projects = main_db.query("SELECT * FROM projects")
     
     # Should not see test tenant's project

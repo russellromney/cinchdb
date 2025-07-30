@@ -121,6 +121,45 @@ cinch column rename users username user_name
 - Updates any views that reference the column
 - Cannot rename protected columns
 
+## alter-nullable
+
+Change whether a column allows NULL values.
+
+```bash
+cinch column alter-nullable TABLE_NAME COLUMN_NAME [--nullable | --not-nullable]
+```
+
+### Arguments
+- `TABLE_NAME` - Table containing the column
+- `COLUMN_NAME` - Column to modify
+
+### Options
+- `--nullable` - Make column accept NULL values
+- `--not-nullable` - Make column reject NULL values
+- `--fill-value VALUE` - Value to use for NULL values when making NOT NULL
+
+### Examples
+```bash
+# Make column nullable
+cinch column alter-nullable users phone --nullable
+
+# Make column NOT NULL (no existing NULLs)
+cinch column alter-nullable users email --not-nullable
+
+# Make column NOT NULL with fill value for NULLs
+cinch column alter-nullable users phone --not-nullable --fill-value "000-0000"
+
+# Interactive mode for NULL replacement
+cinch column alter-nullable users age --not-nullable
+> Column 'age' has 5 NULL values. Provide a fill value: 0
+```
+
+### Notes
+- Cannot modify protected columns (id, created_at, updated_at)
+- When making NOT NULL, must provide fill_value if NULLs exist
+- Preserves all existing non-NULL data
+- Recreates table internally (SQLite limitation)
+
 ## info
 
 Show detailed information about a column.
@@ -207,8 +246,9 @@ cinch column delete orders legacy_status
 ## Constraints
 
 - Cannot modify column types after creation
-- Cannot add NOT NULL columns to tables with data
+- Cannot add NOT NULL columns to tables with data (use nullable then alter-nullable)
 - Cannot use reserved names (id, created_at, updated_at)
+- Cannot modify nullable constraint on primary key columns
 
 ## Remote Operations
 

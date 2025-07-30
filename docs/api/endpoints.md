@@ -171,6 +171,29 @@ Request:
 DELETE /tables/{table_name}/columns/{column_name}?database=myapp&branch=main&tenant=main
 ```
 
+### Alter Column Nullable
+
+```http
+PUT /columns/{table_name}/{column_name}/nullable
+```
+
+Request:
+```json
+{
+  "database": "myapp",
+  "branch": "main",
+  "nullable": false,
+  "fill_value": "default_value"
+}
+```
+
+Response:
+```json
+{
+  "message": "Made column 'phone' NOT NULL in table 'users'"
+}
+```
+
 ## Data Operations
 
 ### Query

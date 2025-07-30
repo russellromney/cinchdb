@@ -9,6 +9,7 @@ from cinchdb.config import Config
 from cinchdb.core.database import CinchDB
 from cinchdb.managers.merge_manager import MergeError
 from cinchdb.managers.change_comparator import ChangeComparator
+from cinchdb.models import Change
 from cinchdb.api.auth import (
     AuthContext,
     require_write_permission,
@@ -326,3 +327,42 @@ async def merge_into_main_branch(
         raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
+@router.get("/{branch}/changes", response_model=Dict[str, Any])
+async def list_branch_changes(
+    branch: str,
+    database: str = Query(..., description="Database name"),
+    auth: AuthContext = Depends(require_read_permission),
+):
+    """List all changes in a branch."""
+    db_name = database
+
+    # Check branch permissions
+    if auth.api_key.branches and branch not in auth.api_key.branches:
+        raise HTTPException(
+            status_code=403, detail=f"Access denied for branch '{branch}'"
+        )
+
+    try:
+        from cinchdb.managers.change_tracker import ChangeTracker
+        
+        tracker = ChangeTracker(auth.project_dir, db_name, branch)
+        changes = tracker.get_changes()
+        
+        # Convert Change objects to dicts for JSON serialization
+        changes_data = []
+        for change in changes:
+            change_dict = change.model_dump()
+            # Convert datetime to string for JSON serialization
+            if change_dict.get("created_at") and hasattr(change_dict["created_at"], "isoformat"):
+                change_dict["created_at"] = change_dict["created_at"].isoformat()
+            if change_dict.get("updated_at") and hasattr(change_dict.get("updated_at"), "isoformat"):
+                change_dict["updated_at"] = change_dict["updated_at"].isoformat()
+            changes_data.append(change_dict)
+        
+        return {"changes": changes_data}
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

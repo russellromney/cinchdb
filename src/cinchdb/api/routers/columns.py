@@ -1,6 +1,6 @@
 """Columns router for CinchDB API."""
 
-from typing import List, Optional
+from typing import List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -42,6 +42,13 @@ class RenameColumnRequest(BaseModel):
 
     old_name: str
     new_name: str
+
+
+class AlterNullableRequest(BaseModel):
+    """Request to alter column nullable constraint."""
+
+    nullable: bool
+    fill_value: Optional[Any] = None
 
 
 @router.get("/{table}/columns", response_model=List[ColumnInfo])
@@ -243,3 +250,41 @@ async def get_column_info(
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/{table}/columns/{column}/nullable")
+async def alter_column_nullable(
+    table: str,
+    column: str,
+    request: AlterNullableRequest,
+    database: str = Query(..., description="Database name"),
+    branch: str = Query(..., description="Branch name"),
+    apply: bool = Query(True, description="Apply changes to all tenants"),
+    auth: AuthContext = Depends(require_write_permission),
+):
+    """Change the nullable constraint on a column."""
+    db_name = database
+    branch_name = branch
+
+    # Check branch permissions
+    await require_write_permission(auth, branch_name)
+
+    try:
+        db = CinchDB(
+            database=db_name,
+            branch=branch_name,
+            tenant="main",
+            project_dir=auth.project_dir,
+        )
+        db.columns.alter_column_nullable(table, column, request.nullable, request.fill_value)
+
+        # Apply to all tenants if requested
+        if apply:
+            applier = ChangeApplier(auth.project_dir, db_name, branch_name)
+            applier.apply_all_unapplied()
+
+        action = "nullable" if request.nullable else "NOT NULL"
+        return {"message": f"Made column '{column}' {action} in table '{table}'"}
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

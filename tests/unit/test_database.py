@@ -209,6 +209,105 @@ class TestCinchDB:
             # Session should be closed
             mock_session.close.assert_called_once()
 
+    def test_local_list_changes(self, tmp_path):
+        """Test list_changes on local connection."""
+        db = CinchDB(database="test_db", project_dir=tmp_path)
+        
+        with patch("cinchdb.managers.change_tracker.ChangeTracker") as mock_tracker:
+            from cinchdb.models import Change, ChangeType
+            from datetime import datetime, timezone
+            
+            # Mock changes
+            mock_changes = [
+                Change(
+                    id="change-1",
+                    type=ChangeType.CREATE_TABLE,
+                    entity_type="table",
+                    entity_name="users",
+                    branch="main",
+                    applied=True,
+                    created_at=datetime.now(timezone.utc)
+                ),
+                Change(
+                    id="change-2",
+                    type=ChangeType.ADD_COLUMN,
+                    entity_type="table",
+                    entity_name="users",
+                    branch="main",
+                    applied=False,
+                    created_at=datetime.now(timezone.utc)
+                )
+            ]
+            
+            mock_instance = Mock()
+            mock_instance.get_changes.return_value = mock_changes
+            mock_tracker.return_value = mock_instance
+            
+            result = db.list_changes()
+            
+            mock_tracker.assert_called_once_with(tmp_path, "test_db", "main")
+            mock_instance.get_changes.assert_called_once()
+            assert len(result) == 2
+            assert result[0].id == "change-1"
+            assert result[0].type == ChangeType.CREATE_TABLE
+            assert result[1].id == "change-2"
+            assert result[1].applied is False
+
+    def test_remote_list_changes(self):
+        """Test list_changes on remote connection."""
+        db = CinchDB(
+            database="test_db", 
+            branch="dev",
+            api_url="https://api.example.com", 
+            api_key="test-key"
+        )
+        
+        with patch.object(db, "_make_request") as mock_request:
+            from datetime import datetime
+            
+            # Mock API response
+            mock_request.return_value = {
+                "changes": [
+                    {
+                        "id": "change-1",
+                        "type": "create_table",
+                        "entity_type": "table",
+                        "entity_name": "users",
+                        "branch": "dev",
+                        "applied": True,
+                        "created_at": "2024-01-01T12:00:00",
+                        "updated_at": None,
+                        "details": {},
+                        "sql": "CREATE TABLE users (...)"
+                    },
+                    {
+                        "id": "change-2",
+                        "type": "add_column",
+                        "entity_type": "table",
+                        "entity_name": "users",
+                        "branch": "dev",
+                        "applied": False,
+                        "created_at": "2024-01-02T12:00:00",
+                        "updated_at": "2024-01-02T13:00:00",
+                        "details": {"column_name": "email"},
+                        "sql": "ALTER TABLE users ADD COLUMN email TEXT"
+                    }
+                ]
+            }
+            
+            result = db.list_changes()
+            
+            mock_request.assert_called_once_with("GET", "/branches/dev/changes")
+            assert len(result) == 2
+            assert result[0].id == "change-1"
+            assert result[0].type == "create_table"
+            assert result[0].applied is True
+            assert isinstance(result[0].created_at, datetime)
+            assert result[1].id == "change-2"
+            assert result[1].type == "add_column"
+            assert result[1].applied is False
+            assert isinstance(result[1].updated_at, datetime)
+
 
 class TestFactoryFunctions:
     """Test the factory functions."""

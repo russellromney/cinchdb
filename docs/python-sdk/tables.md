@@ -109,6 +109,21 @@ if db.is_local:
 db.query("ALTER TABLE users ADD COLUMN phone TEXT")
 ```
 
+### Alter Column Nullable
+
+```python
+# Make column nullable
+if db.is_local:
+    db.columns.alter_column_nullable("users", "phone", nullable=True)
+
+# Make column NOT NULL (with fill value for existing NULLs)
+if db.is_local:
+    db.columns.alter_column_nullable("users", "phone", 
+        nullable=False, 
+        fill_value="000-0000"
+    )
+```
+
 ### Copy Table
 ```python
 # Schema only

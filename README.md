@@ -2,8 +2,17 @@
 
 **Git-like SQLite database management with branching and multi-tenancy**
 
+NOTE: CinchDB is in early alpha. This is project to test out an idea. Do not use this in production.
+
+CinchDB is for projects that need to isolate data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database-b74445f4) and/or want to test out changes to structure safely in branchces. Plus, queries can be super, super fast because data is separated per tenant so it's <data_size>/<n_tenants> instead of <data_size>
+
+On a meta level, I made this because I wanted a database structure that I felt comfortable letting AI agents take full control over, safely, and I didn't want to run my own Postgres instance somewhere or pay for it on e.g. Neon - I don't need hyperscaling, I just need super fast queries.
+
+Because it's so lightweight and its only dependencies are FastAPI, pydantic, requests, and Typer, it is super cheap to run on a small VM like from [Fly.io](https://fly.io) and I don't need to SSH into it to connect - I can just store an API key in my local projects. 
+
+
 ```bash
-pip install cinchdb
+uv pip install cinchdb
 
 # Initialize project
 cinch init 
@@ -23,7 +32,11 @@ cinch tenant create customer_a
 cinch query "SELECT * FROM users" --tenant customer_a
 
 # API server
+uv pip install cinchdb[server]
 cinch-server serve
+
+# Autogenerate Python SDK from database
+cinch codegen generate python cinchdb_models/
 ```
 
 ## What is CinchDB?
@@ -33,8 +46,11 @@ CinchDB combines SQLite with Git-like workflows for database schema management:
 - **Branch schemas** like code - create feature branches, make changes, merge back
 - **Multi-tenant isolation** - shared schema, isolated data per tenant
 - **Automatic change tracking** - all schema changes tracked and mergeable
+- **Safe structure changes** - change merges happen atomically with zero rollback risk (seriously)
 - **Remote deployment** - FastAPI server with UUID authentication
 - **Type-safe SDK** - Python and TypeScript SDKs with full type safety
+- **API server for remote hosting** - Useful for running many web projects
+- **SDK generation from database schema** - Generate a typesafe SDK from your database models for CRUD operations
 
 ## Installation
 
@@ -78,8 +94,8 @@ db = cinchdb.connect("myapp")
 
 # Create schema
 db.create_table("posts", [
-    Column(name="title", type="TEXT"),
-    Column(name="content", type="TEXT", nullable=True)
+    Column(name="title", type="TEXT",nullable=False),
+    Column(name="content", type="TEXT")
 ])
 
 # Query data
@@ -107,7 +123,7 @@ Start the server:
 
 ```bash
 cinch-server serve --create-key
-# Creates API key and starts server on http://localhost:8000
+# Creates API key (works after shutdown as well) and starts server on http://localhost:8000
 ```
 
 Interactive docs at `/docs`, health check at `/health`.
@@ -127,6 +143,18 @@ cd cinchdb
 make install-all
 make test
 ```
+
+## Future
+
+Though probably not, perhaps I'll evolve it into something bigger and more full-featured, with things like
+- data backups
+- replication to S3
+- audit access
+- SaaS-like dynamics
+- multi-project hosting
+- auth proxying
+- leader-follower abilities for edge deployment
+
 
 ## License
 

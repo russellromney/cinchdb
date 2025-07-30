@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 
 from cinchdb.config import Config
-from cinchdb.models import Column
+from cinchdb.models import Column, Change
 from cinchdb.core.path_utils import get_project_root
 
 if TYPE_CHECKING:
@@ -404,6 +404,37 @@ class CinchDB:
             # Remote delete
             self._make_request("DELETE", f"/tables/{table}/data/{id}")
 
+    def list_changes(self) -> List["Change"]:
+        """List all changes for the current branch.
+
+        Returns:
+            List of Change objects containing change history
+
+        Examples:
+            # List all changes
+            changes = db.list_changes()
+            for change in changes:
+                print(f"{change.type}: {change.entity_name} (applied: {change.applied})")
+        """
+        if self.is_local:
+            from cinchdb.managers.change_tracker import ChangeTracker
+            tracker = ChangeTracker(self.project_dir, self.database, self.branch)
+            return tracker.get_changes()
+        else:
+            # Remote API call
+            result = self._make_request("GET", f"/branches/{self.branch}/changes")
+            # Convert API response to Change objects
+            from cinchdb.models import Change
+            from datetime import datetime
+            changes = []
+            for data in result.get("changes", []):
+                # Convert string dates back to datetime if present
+                if data.get("created_at"):
+                    data["created_at"] = datetime.fromisoformat(data["created_at"])
+                if data.get("updated_at"):
+                    data["updated_at"] = datetime.fromisoformat(data["updated_at"])
+                changes.append(Change(**data))
+            return changes
 
     def close(self):
         """Close any open connections."""

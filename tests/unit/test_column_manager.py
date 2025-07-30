@@ -224,3 +224,146 @@ class TestColumnManager:
             columns = cursor.fetchall()
             status_col = next(col for col in columns if col["name"] == "status")
             assert status_col["dflt_value"] == "'active'"
+
+    def test_alter_column_nullable_to_nullable(self, managers, temp_project):
+        """Test making a NOT NULL column nullable."""
+        # Initially 'name' is NOT NULL
+        managers["column"].alter_column_nullable("users", "name", nullable=True)
+
+        # Verify column is now nullable
+        db_path = get_tenant_db_path(temp_project, "main", "main", "main")
+        with DatabaseConnection(db_path) as conn:
+            cursor = conn.execute("PRAGMA table_info(users)")
+            columns = cursor.fetchall()
+            name_col = next(col for col in columns if col["name"] == "name")
+            assert name_col["notnull"] == 0  # nullable
+
+        # Verify change was tracked
+        tracker = ChangeTracker(temp_project, "main", "main")
+        changes = tracker.get_changes()
+        alter_change = next(c for c in changes if c.type == ChangeType.ALTER_COLUMN_NULLABLE)
+        assert alter_change.entity_name == "name"
+        assert alter_change.details["nullable"] is True
+        assert alter_change.details["old_nullable"] is False
+
+    def test_alter_column_nullable_to_not_null(self, managers, temp_project):
+        """Test making a nullable column NOT NULL."""
+        # Initially 'email' is nullable, add some data
+        db_path = get_tenant_db_path(temp_project, "main", "main", "main")
+        with DatabaseConnection(db_path) as conn:
+            import uuid
+            from datetime import datetime
+            now = datetime.utcnow().isoformat()
+            conn.execute(
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', 'john@example.com', ?, ?)", 
+                (str(uuid.uuid4()), now, now)
+            )
+            conn.commit()
+
+        # Make it NOT NULL
+        managers["column"].alter_column_nullable("users", "email", nullable=False)
+
+        # Verify column is now NOT NULL
+        with DatabaseConnection(db_path) as conn:
+            cursor = conn.execute("PRAGMA table_info(users)")
+            columns = cursor.fetchall()
+            email_col = next(col for col in columns if col["name"] == "email")
+            assert email_col["notnull"] == 1  # NOT NULL
+
+    def test_alter_column_nullable_with_null_values(self, managers, temp_project):
+        """Test making nullable column NOT NULL with NULL values."""
+        # Add data with NULL email
+        db_path = get_tenant_db_path(temp_project, "main", "main", "main")
+        with DatabaseConnection(db_path) as conn:
+            import uuid
+            from datetime import datetime
+            now = datetime.utcnow().isoformat()
+            conn.execute(
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', NULL, ?, ?)", 
+                (str(uuid.uuid4()), now, now)
+            )
+            conn.execute(
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'Jane', 'jane@example.com', ?, ?)", 
+                (str(uuid.uuid4()), now, now)
+            )
+            conn.commit()
+
+        # Try to make NOT NULL without fill_value should fail
+        with pytest.raises(ValueError) as exc:
+            managers["column"].alter_column_nullable("users", "email", nullable=False)
+        assert "NULL values" in str(exc.value)
+
+        # Now with fill_value should succeed
+        managers["column"].alter_column_nullable("users", "email", nullable=False, fill_value="default@example.com")
+
+        # Verify NULLs were replaced
+        with DatabaseConnection(db_path) as conn:
+            cursor = conn.execute("SELECT email FROM users WHERE name = 'John'")
+            email = cursor.fetchone()["email"]
+            assert email == "default@example.com"
+
+            # And NOT NULL is enforced
+            cursor = conn.execute("PRAGMA table_info(users)")
+            columns = cursor.fetchall()
+            email_col = next(col for col in columns if col["name"] == "email")
+            assert email_col["notnull"] == 1
+
+    def test_alter_column_nullable_already_nullable(self, managers):
+        """Test making an already nullable column nullable."""
+        # 'email' is already nullable
+        with pytest.raises(ValueError) as exc:
+            managers["column"].alter_column_nullable("users", "email", nullable=True)
+        assert "already nullable" in str(exc.value)
+
+    def test_alter_column_nullable_already_not_null(self, managers):
+        """Test making an already NOT NULL column NOT NULL."""
+        # 'name' is already NOT NULL
+        with pytest.raises(ValueError) as exc:
+            managers["column"].alter_column_nullable("users", "name", nullable=False)
+        assert "already NOT NULL" in str(exc.value)
+
+    def test_alter_column_nullable_protected(self, managers):
+        """Test altering nullable on protected column."""
+        with pytest.raises(ValueError) as exc:
+            managers["column"].alter_column_nullable("users", "id", nullable=True)
+        assert "protected" in str(exc.value).lower()
+
+    def test_alter_column_nullable_not_exists(self, managers):
+        """Test altering nullable on non-existent column."""
+        with pytest.raises(ValueError) as exc:
+            managers["column"].alter_column_nullable("users", "non_existent", nullable=True)
+        assert "does not exist" in str(exc.value)
+
+    def test_alter_column_nullable_preserves_data(self, managers, temp_project):
+        """Test that altering nullable preserves existing data."""
+        # Add some data
+        db_path = get_tenant_db_path(temp_project, "main", "main", "main")
+        with DatabaseConnection(db_path) as conn:
+            import uuid
+            from datetime import datetime
+            now = datetime.utcnow().isoformat()
+            conn.execute(
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', 'john@example.com', ?, ?)", 
+                (str(uuid.uuid4()), now, now)
+            )
+            conn.execute(
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'Jane', 'jane@example.com', ?, ?)", 
+                (str(uuid.uuid4()), now, now)
+            )
+            conn.commit()
+
+        # Make 'name' nullable
+        managers["column"].alter_column_nullable("users", "name", nullable=True)
+
+        # Verify data is preserved
+        with DatabaseConnection(db_path) as conn:
+            cursor = conn.execute("SELECT COUNT(*) FROM users")
+            count = cursor.fetchone()[0]
+            assert count == 2
+
+            cursor = conn.execute("SELECT name, email FROM users ORDER BY name")
+            rows = cursor.fetchall()
+            assert rows[0]["name"] == "Jane"
+            assert rows[0]["email"] == "jane@example.com"
+            assert rows[1]["name"] == "John"
+            assert rows[1]["email"] == "john@example.com"

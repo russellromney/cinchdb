@@ -1,7 +1,7 @@
 """Column management for CinchDB."""
 
 from pathlib import Path
-from typing import List
+from typing import List, Any, Optional
 
 from cinchdb.models import Column, Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
@@ -437,3 +437,143 @@ class ColumnManager:
             conn.execute(f"ALTER TABLE {temp_table} RENAME TO {table_name}")
 
             conn.commit()
+
+    def alter_column_nullable(
+        self, table_name: str, column_name: str, nullable: bool, fill_value: Optional[Any] = None
+    ) -> None:
+        """Change the nullable constraint on a column.
+        
+        Args:
+            table_name: Name of the table
+            column_name: Name of the column to modify
+            nullable: Whether the column should allow NULL values
+            fill_value: Value to use for existing NULL values when making column NOT NULL
+        
+        Raises:
+            ValueError: If table/column doesn't exist or column is protected
+            ValueError: If making NOT NULL and column has NULL values without fill_value
+            MaintenanceError: If branch is in maintenance mode
+        """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+
+        # Validate table exists
+        if not self.table_manager._table_exists(table_name):
+            raise ValueError(f"Table '{table_name}' does not exist")
+
+        # Check if column is protected
+        if column_name in self.PROTECTED_COLUMNS:
+            raise ValueError(f"Cannot modify protected column '{column_name}'")
+
+        # Get existing columns
+        existing_columns = self.list_columns(table_name)
+        column_found = False
+        old_column = None
+        
+        for col in existing_columns:
+            if col.name == column_name:
+                column_found = True
+                old_column = col
+                break
+                
+        if not column_found:
+            raise ValueError(
+                f"Column '{column_name}' does not exist in table '{table_name}'"
+            )
+
+        # Check if already has the desired nullable state
+        if old_column.nullable == nullable:
+            raise ValueError(
+                f"Column '{column_name}' is already {'nullable' if nullable else 'NOT NULL'}"
+            )
+
+        # If making NOT NULL, check for NULL values
+        if not nullable:
+            with DatabaseConnection(self.db_path) as conn:
+                cursor = conn.execute(
+                    f"SELECT COUNT(*) FROM {table_name} WHERE {column_name} IS NULL"
+                )
+                null_count = cursor.fetchone()[0]
+                
+                if null_count > 0 and fill_value is None:
+                    raise ValueError(
+                        f"Column '{column_name}' has {null_count} NULL values. "
+                        "Provide a fill_value to replace them."
+                    )
+
+        # Build SQL statements for table recreation
+        temp_table = f"{table_name}_temp"
+        
+        # Create new table with modified column
+        col_defs = []
+        for col in existing_columns:
+            col_def = f"{col.name} {col.type}"
+            if col.primary_key:
+                col_def += " PRIMARY KEY"
+            # Apply nullable change to target column
+            if col.name == column_name:
+                if not nullable:
+                    col_def += " NOT NULL"
+            else:
+                # Keep original nullable state for other columns
+                if not col.nullable:
+                    col_def += " NOT NULL"
+            if col.default is not None:
+                col_def += f" DEFAULT {col.default}"
+            col_defs.append(col_def)
+
+        create_sql = f"CREATE TABLE {temp_table} ({', '.join(col_defs)})"
+
+        # Column names for copying
+        col_names = [col.name for col in existing_columns]
+        col_list = ", ".join(col_names)
+        
+        # Build copy SQL with COALESCE if needed
+        if not nullable and fill_value is not None:
+            # Build select list with COALESCE for the target column
+            select_cols = []
+            for col_name in col_names:
+                if col_name == column_name:
+                    # Properly quote string values
+                    if isinstance(fill_value, str):
+                        select_cols.append(f"COALESCE({col_name}, '{fill_value}')")
+                    else:
+                        select_cols.append(f"COALESCE({col_name}, {fill_value})")
+                else:
+                    select_cols.append(col_name)
+            select_list = ", ".join(select_cols)
+            copy_sql = f"INSERT INTO {temp_table} ({col_list}) SELECT {select_list} FROM {table_name}"
+        else:
+            copy_sql = f"INSERT INTO {temp_table} ({col_list}) SELECT {col_list} FROM {table_name}"
+            
+        drop_sql = f"DROP TABLE {table_name}"
+        rename_sql = f"ALTER TABLE {temp_table} RENAME TO {table_name}"
+
+        # Track the change with individual SQL statements
+        change = Change(
+            type=ChangeType.ALTER_COLUMN_NULLABLE,
+            entity_type="column",
+            entity_name=column_name,
+            branch=self.branch,
+            details={
+                "table": table_name,
+                "nullable": nullable,
+                "fill_value": fill_value,
+                "old_nullable": old_column.nullable,
+                "temp_table": temp_table,
+                "statements": [
+                    ("CREATE", create_sql),
+                    ("COPY", copy_sql),
+                    ("DROP", drop_sql),
+                    ("RENAME", rename_sql),
+                ],
+            },
+            sql=f"-- ALTER COLUMN {column_name} {'NULL' if nullable else 'NOT NULL'}",
+        )
+        self.change_tracker.add_change(change)
+
+        # Apply to all tenants in the branch
+        from cinchdb.managers.change_applier import ChangeApplier
+
+        applier = ChangeApplier(self.project_root, self.database, self.branch)
+        applier.apply_change(change.id)

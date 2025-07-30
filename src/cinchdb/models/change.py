@@ -19,6 +19,7 @@ class ChangeType(str, Enum):
     DROP_COLUMN = "drop_column"
     RENAME_COLUMN = "rename_column"
     MODIFY_COLUMN = "modify_column"
+    ALTER_COLUMN_NULLABLE = "alter_column_nullable"
 
     # View changes
     CREATE_VIEW = "create_view"

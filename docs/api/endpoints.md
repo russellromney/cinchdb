@@ -720,5 +720,3 @@ const users = await db.query('SELECT * FROM users');
 ## Next Steps
 
 - [Authentication Guide](authentication.md)
-- [Authentication Guide](authentication.md)
-- [Deployment Guide](deployment.md)

@@ -1,13 +1,40 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { Key, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Key, Loader2, Sparkles, Database, Server, Shield, Zap, ChevronRight } from 'lucide-react';
 import { useCinchDB } from '@/app/lib/cinchdb-context';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.5 }
+};
+
+const stagger = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const features = [
+  { icon: Database, title: 'Git-like Database', desc: 'Version control for your data' },
+  { icon: Shield, title: 'Secure Access', desc: 'API key authentication' },
+  { icon: Zap, title: 'Fast & Reliable', desc: 'Lightning-fast queries' },
+];
 
 export function ApiKeyForm() {
   const { connect, connecting, error } = useCinchDB();
   const [apiKey, setApiKey] = useState('');
   const [apiUrl, setApiUrl] = useState('http://localhost:8000');
+  const [showFeatures, setShowFeatures] = useState(true);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -17,87 +44,200 @@ export function ApiKeyForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="flex justify-center">
-            <div className="bg-primary p-3 rounded-lg">
-              <Key className="h-12 w-12 text-primary-foreground" />
-            </div>
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Connect to CinchDB
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Enter your API key to access your databases
-          </p>
-        </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="api-url" className="block text-sm font-medium text-gray-700">
-                API URL
-              </label>
-              <input
-                id="api-url"
-                name="api-url"
-                type="url"
-                value={apiUrl}
-                onChange={(e) => setApiUrl(e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
-                placeholder="http://localhost:8000"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="api-key" className="block text-sm font-medium text-gray-700">
-                API Key
-              </label>
-              <input
-                id="api-key"
-                name="api-key"
-                type="password"
-                required
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm"
-                placeholder="Enter your API key"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">Connection failed</h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>{error}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              disabled={connecting || !apiKey.trim()}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {connecting ? (
-                <>
-                  <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                  Connecting...
-                </>
-              ) : (
-                'Connect'
-              )}
-            </button>
-          </div>
-        </form>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-100 via-pink-50 to-blue-100 dark:from-purple-950/20 dark:via-pink-950/20 dark:to-blue-950/20">
+        <div className="absolute inset-0 bg-grid-slate-900/[0.04] dark:bg-grid-slate-100/[0.02]" />
       </div>
+      
+      {/* Floating orbs */}
+      <motion.div 
+        className="absolute top-20 left-20 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl"
+        animate={{ 
+          x: [0, 100, 0],
+          y: [0, -100, 0],
+        }}
+        transition={{ 
+          duration: 20,
+          repeat: Infinity,
+          ease: "linear"
+        }}
+      />
+      <motion.div 
+        className="absolute bottom-20 right-20 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl"
+        animate={{ 
+          x: [0, -100, 0],
+          y: [0, 100, 0],
+        }}
+        transition={{ 
+          duration: 25,
+          repeat: Infinity,
+          ease: "linear"
+        }}
+      />
+
+      <motion.div 
+        className="relative z-10 w-full max-w-6xl px-4"
+        initial="initial"
+        animate="animate"
+        variants={stagger}
+      >
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          {/* Left side - Branding and features */}
+          <motion.div 
+            className={`space-y-8 ${showFeatures ? 'block' : 'hidden lg:block'}`}
+            variants={fadeInUp}
+          >
+            <div className="text-center lg:text-left">
+              <motion.div 
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-6"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="text-sm font-medium">Welcome to CinchDB</span>
+              </motion.div>
+              
+              <h1 className="text-5xl lg:text-6xl font-bold mb-4">
+                <span className="text-gradient gradient-primary">Modern Database</span>
+                <br />
+                <span className="text-foreground">Management</span>
+              </h1>
+              
+              <p className="text-xl text-muted-foreground">
+                Experience the power of Git-like version control for your SQLite databases.
+              </p>
+            </div>
+
+            <motion.div className="space-y-4" variants={stagger}>
+              {features.map((feature, index) => (
+                <motion.div
+                  key={index}
+                  className="flex items-start gap-4 p-4 rounded-xl glass glass-hover"
+                  variants={fadeInUp}
+                  whileHover={{ x: 10 }}
+                >
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg gradient-primary flex items-center justify-center">
+                    <feature.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">{feature.title}</h3>
+                    <p className="text-sm text-muted-foreground">{feature.desc}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.div>
+
+          {/* Right side - Auth form */}
+          <motion.div variants={fadeInUp}>
+            <Card className="glass border-0 shadow-2xl">
+              <CardHeader className="space-y-1 text-center pb-8">
+                <motion.div 
+                  className="mx-auto mb-4 w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center shadow-glow"
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Key className="h-10 w-10 text-white" />
+                </motion.div>
+                <CardTitle className="text-3xl font-bold">Connect to CinchDB</CardTitle>
+                <CardDescription className="text-base">
+                  Enter your credentials to access your databases
+                </CardDescription>
+              </CardHeader>
+              
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <motion.div 
+                    className="space-y-2"
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                  >
+                    <Label htmlFor="api-url" className="text-sm font-medium flex items-center gap-2">
+                      <Server className="w-4 h-4 text-muted-foreground" />
+                      API URL
+                    </Label>
+                    <Input
+                      id="api-url"
+                      type="url"
+                      value={apiUrl}
+                      onChange={(e) => setApiUrl(e.target.value)}
+                      placeholder="http://localhost:8000"
+                      className="h-12 px-4 glass border-0 focus:ring-2 focus:ring-primary/50"
+                    />
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="space-y-2"
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                  >
+                    <Label htmlFor="api-key" className="text-sm font-medium flex items-center gap-2">
+                      <Key className="w-4 h-4 text-muted-foreground" />
+                      API Key
+                    </Label>
+                    <Input
+                      id="api-key"
+                      type="password"
+                      required
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Enter your API key"
+                      className="h-12 px-4 glass border-0 focus:ring-2 focus:ring-primary/50"
+                    />
+                  </motion.div>
+
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Alert variant="destructive" className="glass border-red-500/20">
+                        <AlertTitle>Connection failed</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  )}
+
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button
+                      type="submit"
+                      disabled={connecting || !apiKey.trim()}
+                      className="w-full h-12 text-base font-medium gradient-primary text-white border-0 shadow-glow-lg hover:shadow-glow transition-all duration-300"
+                    >
+                      {connecting ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          Connect to Database
+                          <ChevronRight className="ml-2 h-5 w-5" />
+                        </>
+                      )}
+                    </Button>
+                  </motion.div>
+
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowFeatures(!showFeatures)}
+                      className="lg:hidden text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      {showFeatures ? 'Hide features' : 'Show features'}
+                    </button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </motion.div>
     </div>
   );
 }

@@ -257,6 +257,6 @@ cinch db list --remote production
 
 ## Next Steps
 
-- [API Deployment](../api/deployment.md) - Set up remote server
+- [Remote Deployment Tutorial](../tutorials/remote-deployment.md) - Set up remote server
 - [Authentication](../api/authentication.md) - API key management
 - [Query Command](query.md) - Execute remote queries

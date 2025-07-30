@@ -24,18 +24,20 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 h-full flex flex-col">
-      <div className="flex-shrink-0">
-        <QueryEditor 
-          onResults={setResults} 
-          onError={setError}
-        />
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <ResultsTable 
-          results={results} 
-          error={error}
-        />
+    <div className="h-full flex flex-col">
+      <div className="flex-1 flex flex-col gap-6 p-6 overflow-hidden">
+        <div className="flex-shrink-0">
+          <QueryEditor 
+            onResults={setResults} 
+            onError={setError}
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
+          <ResultsTable 
+            results={results} 
+            error={error}
+          />
+        </div>
       </div>
     </div>
   );

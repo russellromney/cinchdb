@@ -13,7 +13,6 @@ This document provides a comprehensive reference for all classes, methods, and f
   - [Query Methods](#query-methods)
   - [Table Methods](#table-methods)
   - [Data Methods](#data-methods)
-  - [Branch and Tenant Methods](#branch-and-tenant-methods)
   - [Context Manager](#context-manager)
 - [Column Model](#column-model)
 - [Manager Classes (Local Only)](#manager-classes-local-only)

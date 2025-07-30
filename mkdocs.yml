@@ -93,7 +93,6 @@ nav:
     - Change Tracking: concepts/change-tracking.md
     - Remote Access: concepts/remote-access.md
   - API Server:
-    - Deployment: api/deployment.md
     - Authentication: api/authentication.md
     - Endpoints: api/endpoints.md
 

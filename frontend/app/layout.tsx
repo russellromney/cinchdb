@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { CinchDBProvider } from './lib/cinchdb-context';
+import { ThemeProvider } from './lib/theme-provider';
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -16,11 +18,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <CinchDBProvider>
-          {children}
-        </CinchDBProvider>
+        <ThemeProvider
+          defaultTheme="system"
+        >
+          <CinchDBProvider>
+            {children}
+            <Toaster 
+              position="bottom-right" 
+              toastOptions={{
+                className: 'glass',
+              }}
+            />
+          </CinchDBProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -21,6 +21,8 @@ Each branch maintains:
 - All tenant databases
 - Independent data
 
+A key benefit: schema merges happen atomically with **zero rollback risk**. Either all changes apply successfully to all tenants, or none do.
+
 ```
 .cinchdb/databases/myapp/branches/
 ├── main/

@@ -6,6 +6,8 @@ Understanding CinchDB's approach to multi-tenant data isolation.
 
 Multi-tenancy allows a single application instance to serve multiple customers (tenants) while keeping their data completely isolated. CinchDB implements this through separate SQLite databases per tenant.
 
+This approach is perfect for projects that need to isolate data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database). Because data is separated per tenant, queries can be super fast - you're querying `<data_size>/<n_tenants>` instead of `<data_size>`.
+
 ## Architecture
 
 ### Tenant Isolation

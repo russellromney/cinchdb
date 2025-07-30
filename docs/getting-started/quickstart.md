@@ -2,6 +2,8 @@
 
 Get up and running with CinchDB in 5 minutes.
 
+> ⚠️ **NOTE**: CinchDB is in early alpha. This is a project to test out an idea. Do not use this in production.
+
 ## Initialize Your First Project
 
 ```bash
@@ -106,6 +108,28 @@ dev_db.create_table("comments", [
 ])
 ```
 
+## Generate SDK from Your Schema
+
+```bash
+# After creating tables, generate a type-safe SDK
+cinch codegen generate python models/
+
+# Use the generated SDK
+```
+
+```python
+from models import cinch_models
+
+# Connect and use your models
+db = cinchdb.connect("myapp")
+models = cinch_models(db)
+
+# Type-safe CRUD operations
+user = models.User.create(name="Alice", email="alice@example.com", age=30)
+all_users = models.User.get_all()
+models.User.update(user["id"], age=31)
+```
+
 ## Remote API Access
 
 ```bash
@@ -126,3 +150,4 @@ cinch query "SELECT * FROM users"
 - [Core Concepts](concepts.md) - Understand CinchDB's architecture
 - [CLI Reference](../cli/index.md) - Complete command documentation
 - [Python SDK](../python-sdk/index.md) - Full SDK documentation
+- [Code Generation](../cli/codegen.md) - Generate SDKs from your schema

@@ -19,7 +19,7 @@ Supported languages:
 
 ## generate
 
-Generate model code for tables and views.
+Generate model code for tables and views. For Python, this creates a complete SDK with type-safe CRUD operations.
 
 ```bash
 cinch codegen generate LANGUAGE [OPTIONS]
@@ -108,7 +108,41 @@ export type UserInput = Omit<User, 'id' | 'created_at' | 'updated_at'>;
 
 ## Using Generated Code
 
-### Python Usage
+### Python SDK with CRUD Operations
+
+The Python code generation creates a complete SDK with type-safe CRUD operations:
+
+```python
+# generated/__init__.py provides everything you need
+from generated import cinch_models
+
+# Connect to your database
+db = cinchdb.connect("myapp")
+models = cinch_models(db)
+
+# Access your models with full CRUD operations
+User = models.User
+
+# Create
+new_user = User.create(name="Alice", email="alice@example.com", active=True)
+
+# Read
+user = User.get(new_user["id"])
+all_users = User.get_all()
+active_users = User.filter(active=True)
+
+# Update
+User.update(user["id"], email="newemail@example.com")
+
+# Delete
+User.delete(user["id"])
+
+# Advanced queries
+users_named_alice = User.filter(name="Alice")
+users_with_email = User.filter(email__like="%@example.com")
+```
+
+### Traditional Python Usage
 ```python
 from generated.models import User
 import cinchdb

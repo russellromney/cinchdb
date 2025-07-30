@@ -46,11 +46,11 @@ cinch query "SELECT username, email FROM users WHERE is_active = true"
 
 # Create a branch for new features
 echo -e "\n9. Creating feature branch..."
-cinch branch create feature/add-profiles
+cinch branch create feature.add-profiles
 
 # Switch to feature branch
 echo -e "\n10. Switching to feature branch..."
-cinch branch switch feature/add-profiles
+cinch branch switch feature.add-profiles
 
 # Add profiles table on branch
 echo -e "\n11. Creating profiles table on feature branch..."
@@ -79,7 +79,7 @@ cinch table list
 
 # Merge feature branch
 echo -e "\n16. Merging feature branch..."
-cinch branch merge feature/add-profiles main
+cinch branch merge feature.add-profiles main
 
 # Verify tables after merge
 echo -e "\n17. Tables on main after merge:"

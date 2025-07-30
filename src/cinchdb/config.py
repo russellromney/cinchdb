@@ -1,5 +1,6 @@
 """Configuration management for CinchDB projects."""
 
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 import toml
@@ -42,8 +43,14 @@ class Config:
         """Initialize config manager.
 
         Args:
-            project_dir: Path to project directory. If None, uses current directory.
+            project_dir: Path to project directory. If None, uses CINCHDB_PROJECT_DIR env var or current directory.
         """
+        # Check environment variable first
+        if project_dir is None:
+            env_dir = os.environ.get("CINCHDB_PROJECT_DIR")
+            if env_dir:
+                project_dir = Path(env_dir)
+        
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.config_dir = self.project_dir / ".cinchdb"
         self.config_path = self.config_dir / "config.toml"
@@ -55,12 +62,15 @@ class Config:
         return self.config_path.exists()
 
     def load(self) -> ProjectConfig:
-        """Load configuration from disk."""
+        """Load configuration from disk, with environment variable overrides."""
         if not self.exists:
             raise FileNotFoundError(f"Config file not found at {self.config_path}")
 
         with open(self.config_path, "r") as f:
             data = toml.load(f)
+
+        # Apply environment variable overrides
+        self._apply_env_overrides(data)
 
         # Convert remote dicts to RemoteConfig objects
         if "remotes" in data:
@@ -70,6 +80,33 @@ class Config:
 
         self._config = ProjectConfig(**data)
         return self._config
+
+    def _apply_env_overrides(self, data: Dict[str, Any]) -> None:
+        """Apply environment variable overrides to configuration data."""
+        # Override database and branch
+        if env_db := os.environ.get("CINCHDB_DATABASE"):
+            data["active_database"] = env_db
+        
+        if env_branch := os.environ.get("CINCHDB_BRANCH"):
+            data["active_branch"] = env_branch
+        
+        # Override or create remote configuration
+        env_url = os.environ.get("CINCHDB_REMOTE_URL")
+        env_key = os.environ.get("CINCHDB_API_KEY")
+        
+        if env_url and env_key:
+            # Create or update "env" remote
+            if "remotes" not in data:
+                data["remotes"] = {}
+            
+            data["remotes"]["env"] = {
+                "url": env_url.rstrip("/"),  # Remove trailing slash
+                "key": env_key
+            }
+            
+            # Make it active if no other remote is set
+            if not data.get("active_remote"):
+                data["active_remote"] = "env"
 
     def save(self, config: Optional[ProjectConfig] = None) -> None:
         """Save configuration to disk.

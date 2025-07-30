@@ -1,5 +1,6 @@
 """Utility functions for CLI commands."""
 
+import os
 import typer
 from pathlib import Path
 from typing import Optional
@@ -160,3 +161,22 @@ def get_cinchdb_instance(
             tenant=tenant,
             project_dir=config.project_dir,
         )
+
+
+def show_env_config():
+    """Display active environment variable configuration."""
+    env_vars = {
+        "CINCHDB_PROJECT_DIR": os.environ.get("CINCHDB_PROJECT_DIR"),
+        "CINCHDB_DATABASE": os.environ.get("CINCHDB_DATABASE"),
+        "CINCHDB_BRANCH": os.environ.get("CINCHDB_BRANCH"),
+        "CINCHDB_REMOTE_URL": os.environ.get("CINCHDB_REMOTE_URL"),
+        "CINCHDB_API_KEY": "***" if "CINCHDB_API_KEY" in os.environ else None,
+    }
+    
+    active = {k: v for k, v in env_vars.items() if v}
+    if active:
+        console.print("\n[yellow]Active environment variables:[/yellow]")
+        for key, value in active.items():
+            console.print(f"  {key}={value}")
+    else:
+        console.print("\n[dim]No CinchDB environment variables set[/dim]")

@@ -178,7 +178,7 @@ def apply_change_to_tenants(change, tenant_list):
 cinch branch changes
 
 # Output:
-# Changes in branch 'feature/new-schema':
+# Changes in branch 'feature.new-schema':
 # 1. CREATE TABLE products (name TEXT, price REAL)
 # 2. ADD COLUMN description TEXT TO products  
 # 3. CREATE VIEW expensive_products AS SELECT * FROM products WHERE price > 100
@@ -201,7 +201,7 @@ def get_branch_changes(db, branch_name):
         return json.load(f)
 
 # Analyze changes
-changes = get_branch_changes(db, "feature/updates")
+changes = get_branch_changes(db, "feature.updates")
 table_changes = [c for c in changes if "TABLE" in c["type"]]
 column_changes = [c for c in changes if "COLUMN" in c["type"]]
 ```

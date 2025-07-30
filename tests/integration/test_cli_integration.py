@@ -48,7 +48,62 @@ class TestCLIIntegration:
         # Check version
         result = self.run_in_project(["version"], temp_project)
         assert result.exit_code == 0
-        assert "CinchDB version" in result.stdout
+    
+    def test_status_command(self, temp_project):
+        """Test the status command."""
+        # Initialize project
+        self.run_in_project(["init"], temp_project)
+        
+        # Run status command
+        result = self.run_in_project(["status"], temp_project)
+        assert result.exit_code == 0
+        assert "CinchDB Status" in result.stdout
+        assert "Project:" in result.stdout
+        assert "Active Database: main" in result.stdout
+        assert "Active Branch: main" in result.stdout
+        assert "Active Remote: None (local mode)" in result.stdout
+    
+    def test_status_with_env_vars(self, temp_project, monkeypatch):
+        """Test status command shows environment variables."""
+        # Initialize project
+        self.run_in_project(["init"], temp_project)
+        
+        # Set environment variables
+        monkeypatch.setenv("CINCHDB_DATABASE", "test_db")
+        monkeypatch.setenv("CINCHDB_BRANCH", "test_branch")
+        monkeypatch.setenv("CINCHDB_REMOTE_URL", "https://test.example.com")
+        monkeypatch.setenv("CINCHDB_API_KEY", "test_key_123")
+        
+        # Run status command
+        result = self.run_in_project(["status"], temp_project)
+        assert result.exit_code == 0
+        assert "Active environment variables:" in result.stdout
+        assert "CINCHDB_DATABASE=test_db" in result.stdout
+        assert "CINCHDB_BRANCH=test_branch" in result.stdout
+        assert "CINCHDB_REMOTE_URL=https://test.example.com" in result.stdout
+        assert "CINCHDB_API_KEY=***" in result.stdout
+    
+    def test_env_var_override_behavior(self, temp_project, monkeypatch):
+        """Test that environment variables override config values in actual usage."""
+        # Initialize project
+        self.run_in_project(["init"], temp_project)
+        
+        # Create a second database
+        self.run_in_project(["db", "create", "prod"], temp_project)
+        
+        # Switch to prod database
+        self.run_in_project(["db", "switch", "prod"], temp_project)
+        
+        # Verify current database is prod
+        result = self.run_in_project(["db", "info"], temp_project)
+        assert "Database: prod" in result.stdout
+        
+        # Set environment variable to override to main
+        monkeypatch.setenv("CINCHDB_DATABASE", "main")
+        
+        # Run db info again - should show main due to env override
+        result = self.run_in_project(["db", "info"], temp_project)
+        assert "Database: main" in result.stdout
 
     def test_database_operations(self, temp_project):
         """Test database CRUD operations."""

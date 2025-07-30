@@ -55,7 +55,7 @@ cinch table create password_resets \
 cinch column add users password_hash:TEXT
 cinch column add users email_verified:BOOLEAN
 
-echo -e "\nTables on feature/user-auth branch:"
+echo -e "\nTables on feature.user-auth branch:"
 cinch table list
 
 pause

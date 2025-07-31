@@ -1,8 +1,9 @@
 """Database model for CinchDB."""
 
 from typing import List, Optional
-from pydantic import Field
+from pydantic import Field, field_validator
 from .base import CinchDBBaseModel
+from ..utils.name_validator import validate_name
 
 
 class Database(CinchDBBaseModel):
@@ -14,6 +15,13 @@ class Database(CinchDBBaseModel):
     )
     active_branch: str = Field(default="main", description="Currently active branch")
     description: Optional[str] = Field(default=None, description="Database description")
+
+    @field_validator('name')
+    @classmethod
+    def validate_name_field(cls, v: str) -> str:
+        """Validate database name meets naming requirements."""
+        validate_name(v, "database")
+        return v
 
     def can_delete(self) -> bool:
         """Check if this database can be deleted."""

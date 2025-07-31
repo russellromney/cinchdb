@@ -2,6 +2,8 @@ notes
 
 base command: 
 
-okay. read claude claude.md and the design and implementation files, check over the files in .claude-memory, and carefully consider claude.md as you move forward. make sure to focus on testing, and use the temp file for noodling if you need (refer to claude.md for how to clean this up). your role is a senior engineer at a startup, but don't pre-optimize. consider how things already work and if your implementations match the designs. if told to do something silly, please just let me know and stop before implementing the task. use specialized subagents where relevant. your task is: 
+okay. read claude claude.md and the design file, check over the files in .claude-memory, and carefully consider claude.md as you move forward. make sure to focus on testing, and use the temp file for noodling if you need (refer to claude.md for how to clean this up). your role is a senior engineer at a startup, but don't pre-optimize. consider how things already work and if your implementations match the designs. if told to do something silly, please just let me know and stop before implementing the task. use specialized subagents where relevant. your task is: 
+
+we need to add foreign key support. please create a proposal for an interface that allows creating columns as foreign keys. note that this has to be done during table creation, and cannot be updated afterwards. Sqlite does not support adding constraints after table creation
 
 let's think about next steps for this project. we need to add the ability to back up databases to S3 using litefs

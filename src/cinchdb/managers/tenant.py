@@ -12,6 +12,7 @@ from cinchdb.core.path_utils import (
 )
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.maintenance import check_maintenance_mode
+from cinchdb.utils.name_validator import validate_name
 
 
 class TenantManager:
@@ -64,8 +65,12 @@ class TenantManager:
 
         Raises:
             ValueError: If tenant already exists
+            InvalidNameError: If tenant name is invalid
             MaintenanceError: If branch is in maintenance mode
         """
+        # Validate tenant name
+        validate_name(tenant_name, "tenant")
+        
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
@@ -158,8 +163,12 @@ class TenantManager:
 
         Raises:
             ValueError: If source doesn't exist or target already exists
+            InvalidNameError: If target tenant name is invalid
             MaintenanceError: If branch is in maintenance mode
         """
+        # Validate target tenant name
+        validate_name(target_tenant, "tenant")
+        
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
@@ -200,7 +209,11 @@ class TenantManager:
 
         Raises:
             ValueError: If old doesn't exist, new already exists, or trying to rename main
+            InvalidNameError: If new tenant name is invalid
         """
+        # Validate new tenant name
+        validate_name(new_name, "tenant")
+        
         # Can't rename main tenant
         if old_name == "main":
             raise ValueError("Cannot rename the main tenant")

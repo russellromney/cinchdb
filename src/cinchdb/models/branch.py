@@ -1,8 +1,9 @@
 """Branch model for CinchDB."""
 
 from typing import List, Optional, Dict, Any
-from pydantic import Field
+from pydantic import Field, field_validator
 from .base import CinchDBBaseModel
+from ..utils.name_validator import validate_name
 
 
 class Branch(CinchDBBaseModel):
@@ -20,6 +21,13 @@ class Branch(CinchDBBaseModel):
         default_factory=dict, description="Branch metadata"
     )
     is_main: bool = Field(default=False, description="Whether this is the main branch")
+
+    @field_validator('name')
+    @classmethod
+    def validate_name_field(cls, v: str) -> str:
+        """Validate branch name meets naming requirements."""
+        validate_name(v, "branch")
+        return v
 
     def can_delete(self) -> bool:
         """Check if this branch can be deleted."""

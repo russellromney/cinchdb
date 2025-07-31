@@ -11,6 +11,7 @@ from cinchdb.api.auth import (
     require_write_permission,
     require_read_permission,
 )
+from cinchdb.utils.name_validator import validate_name, InvalidNameError
 
 
 router = APIRouter()
@@ -68,6 +69,12 @@ async def create_database(
     auth: AuthContext = Depends(require_write_permission),
 ):
     """Create a new database."""
+    # Validate database name
+    try:
+        validate_name(request.name, "database")
+    except InvalidNameError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
     config = Config(auth.project_dir)
 
     # Create database directory structure

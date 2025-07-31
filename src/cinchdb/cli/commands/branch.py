@@ -14,6 +14,7 @@ from cinchdb.cli.utils import (
     set_active_branch,
     validate_required_arg,
 )
+from cinchdb.utils.name_validator import validate_name, InvalidNameError
 
 app = typer.Typer(help="Branch management commands", invoke_without_command=True)
 console = Console()
@@ -80,6 +81,14 @@ def create(
 ):
     """Create a new branch."""
     name = validate_required_arg(name, "name", ctx)
+    
+    # Validate branch name
+    try:
+        validate_name(name, "branch")
+    except InvalidNameError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+        
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     source_branch = source or config_data.active_branch

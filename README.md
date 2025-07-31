@@ -4,11 +4,11 @@
 
 NOTE: CinchDB is in early alpha. This is project to test out an idea. Do not use this in production.
 
-CinchDB is for projects that need to isolate data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database-b74445f4) and/or want to test out changes to structure safely in branchces. Plus, queries can be super, super fast because data is separated per tenant so it's <data_size>/<n_tenants> instead of <data_size>
+CinchDB is for projects that need fast queries, data isolated data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database-b74445f4), and a branchable database.
 
 On a meta level, I made this because I wanted a database structure that I felt comfortable letting AI agents take full control over, safely, and I didn't want to run my own Postgres instance somewhere or pay for it on e.g. Neon - I don't need hyperscaling, I just need super fast queries.
 
-Because it's so lightweight and its only dependencies are FastAPI, pydantic, requests, and Typer, it is super cheap to run on a small VM like from [Fly.io](https://fly.io) and I don't need to SSH into it to connect - I can just store an API key in my local projects. 
+Because it's so lightweight and its only dependencies are FastAPI, pydantic, requests, and Typer, it is super cheap to run on a small VM like from [Fly.io](https://fly.io) and I don't need to SSH into it to make changes - I can just store an API key in my local projects and hit the remote instance.
 
 
 ```bash

@@ -10,6 +10,7 @@ from cinchdb.config import Config
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.cli.utils import get_config_with_data, validate_required_arg
+from cinchdb.utils.name_validator import validate_name, InvalidNameError
 
 app = typer.Typer(help="Tenant management commands", invoke_without_command=True)
 console = Console()
@@ -70,6 +71,14 @@ def create(
 ):
     """Create a new tenant."""
     name = validate_required_arg(name, "name", ctx)
+    
+    # Validate tenant name
+    try:
+        validate_name(name, "tenant")
+    except InvalidNameError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+        
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -155,6 +164,14 @@ def rename(
     """Rename a tenant."""
     old_name = validate_required_arg(old_name, "old_name", ctx)
     new_name = validate_required_arg(new_name, "new_name", ctx)
+    
+    # Validate new tenant name
+    try:
+        validate_name(new_name, "tenant")
+    except InvalidNameError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+        
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch

@@ -13,6 +13,7 @@ from cinchdb.core.path_utils import (
     get_branch_path,
     list_branches,
 )
+from cinchdb.utils.name_validator import validate_name
 
 
 class BranchManager:
@@ -63,7 +64,11 @@ class BranchManager:
 
         Raises:
             ValueError: If source doesn't exist or new branch already exists
+            InvalidNameError: If new branch name is invalid
         """
+        # Validate new branch name
+        validate_name(new_branch_name, "branch")
+        
         # Validate source branch exists
         if source_branch not in list_branches(self.project_root, self.database):
             raise ValueError(f"Source branch '{source_branch}' does not exist")

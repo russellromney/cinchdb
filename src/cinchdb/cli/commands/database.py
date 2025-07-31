@@ -12,6 +12,7 @@ from cinchdb.cli.utils import (
     set_active_branch,
     validate_required_arg,
 )
+from cinchdb.utils.name_validator import validate_name, InvalidNameError
 
 app = typer.Typer(help="Database management commands", invoke_without_command=True)
 console = Console()
@@ -64,6 +65,14 @@ def create(
 ):
     """Create a new database."""
     name = validate_required_arg(name, "name", ctx)
+    
+    # Validate database name
+    try:
+        validate_name(name, "database")
+    except InvalidNameError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+    
     config, config_data = get_config_with_data()
 
     # Create database directory structure

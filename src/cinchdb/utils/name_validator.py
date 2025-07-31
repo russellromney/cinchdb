@@ -9,7 +9,7 @@ from typing import Optional
 
 
 # Regex pattern for valid names: lowercase letters, numbers, dash, underscore, period
-VALID_NAME_PATTERN = re.compile(r'^[a-z0-9][a-z0-9\-._]*[a-z0-9]$|^[a-z0-9]$')
+VALID_NAME_PATTERN = re.compile(r'^[a-z0-9][a-z0-9\-_\.]*[a-z0-9]$|^[a-z0-9]$')
 
 # Reserved names that cannot be used
 RESERVED_NAMES = {'con', 'prn', 'aux', 'nul', 'com1', 'com2', 'com3', 'com4',
@@ -26,7 +26,7 @@ def validate_name(name: str, entity_type: str = "entity") -> None:
     """Validate that a name meets CinchDB naming requirements.
     
     Valid names must:
-    - Contain only lowercase letters (a-z), numbers (0-9), dash (-), underscore (_), and period (.)
+    - Contain only lowercase letters (a-z), numbers (0-9), dash (-), and underscore (_)
     - Start and end with alphanumeric characters
     - Be at least 1 character long
     - Not exceed 255 characters (filesystem limit)
@@ -64,7 +64,7 @@ def validate_name(name: str, entity_type: str = "entity") -> None:
         )
     
     # Check for consecutive special characters
-    if '..' in name or '--' in name or '__' in name or '.-' in name or '-.' in name:
+    if '--' in name or '__' in name or '-_' in name or '_-' in name or '..' in name or '.-' in name or '-.' in name or '._' in name or '_.' in name:
         raise InvalidNameError(
             f"Invalid {entity_type} name '{name}'. "
             f"Names cannot contain consecutive special characters."
@@ -102,13 +102,13 @@ def clean_name(name: str) -> str:
     cleaned = cleaned.replace(' ', '-')
     
     # Remove invalid characters
-    cleaned = re.sub(r'[^a-z0-9\-._]', '', cleaned)
+    cleaned = re.sub(r'[^a-z0-9\-_\.]', '', cleaned)
     
     # Remove consecutive special characters
-    cleaned = re.sub(r'[-._]{2,}', '-', cleaned)
+    cleaned = re.sub(r'[-_\.]{2,}', '-', cleaned)
     
     # Remove leading/trailing special characters
-    cleaned = cleaned.strip('-._')
+    cleaned = cleaned.strip('-_.')
     
     return cleaned
 

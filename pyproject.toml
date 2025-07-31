@@ -1,6 +1,6 @@
 [project]
 name = "cinchdb"
-version = "0.1.2"
+version = "0.1.3"
 description = "A Git-like SQLite database management system with branching and multi-tenancy"
 readme = "README.md"
 requires-python = ">=3.10"

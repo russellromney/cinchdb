@@ -39,7 +39,7 @@ def setup_remote_connection():
     except Exception as e:
         print(f"✗ Failed to connect: {e}")
         print("\nTo run this example:")
-        print("1. Start the API server: cinch-server serve --create-key")
+        print("1. Get your Cinch API Key and Database URL")
         print("2. Set environment variables:")
         print("   export CINCHDB_API_URL=http://localhost:8000")
         print("   export CINCHDB_API_KEY=<your-api-key>")

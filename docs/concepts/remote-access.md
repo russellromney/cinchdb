@@ -1,6 +1,6 @@
 # Remote Access
 
-Understanding how CinchDB works with remote API servers.
+Understanding how CinchDB works with remote instances.
 
 ## Overview
 
@@ -20,15 +20,15 @@ Remote access enables:
 
 ```
 ┌─────────────┐     HTTPS      ┌──────────────┐     Files      ┌─────────────┐
-│   Client    │ ─────────────> │  API Server  │ ─────────────> │  Databases  │
-│  (CLI/SDK)  │ <───────────── │  (FastAPI)   │ <───────────── │  (SQLite)   │
+│   Client    │ ─────────────> │ CinchDB      │ ─────────────> │  Databases  │
+│  (CLI/SDK)  │ <───────────── │   Server     │ <───────────── │  (SQLite)   │
 └─────────────┘     JSON       └──────────────┘     SQLite     └─────────────┘
 ```
 
 ### Connection Flow
 
 1. **Client** sends authenticated request
-2. **API Server** validates credentials
+2. **Server** validates credentials
 3. **Server** executes operation locally
 4. **Results** returned as JSON
 5. **Client** processes response
@@ -493,7 +493,3 @@ http.client.HTTPConnection.debuglevel = 1
 8. **Handle Errors** - Graceful degradation
 
 ## Next Steps
-
-- [Remote Deployment Tutorial](../tutorials/remote-deployment.md)
-- [Authentication](../api/authentication.md)
-- [API Endpoints](../api/endpoints.md)

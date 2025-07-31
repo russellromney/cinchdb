@@ -12,7 +12,7 @@ CinchDB brings version control workflows to database schema management. Create f
 - **Multi-Tenant Architecture** - Shared schema with isolated tenant data
 - **Automatic Change Tracking** - Every schema modification is tracked
 - **Safe Structure Changes** - Schema merges happen atomically with zero rollback risk
-- **Remote API Access** - Deploy with FastAPI server and UUID authentication
+- **Remote Access** - Connect to hosted CinchDB instances
 - **Type-Safe SDKs** - Python and TypeScript clients with full type safety
 - **SDK Generation** - Auto-generate type-safe Python or Typescript SDK from your database schema
 
@@ -63,9 +63,9 @@ Then check out our [Quick Start Guide](getting-started/quickstart.md) to build y
 
 I built CinchDB for a specific need: a database structure that AI agents could safely control without risk. It's designed to be:
 
-- **Lightweight** - Only depends on FastAPI, Pydantic, Requests, and Typer
+- **Lightweight** - Only depends on Pydantic, Requests, and Typer
 - **Cheap to Deploy** - Runs great on small VMs like [Fly.io](https://fly.io)
-- **Remote-First** - No SSH needed, just store an API key in your projects
+- **Remote-Capable** - Connect to remote instances with API keys
 - **Fast** - Queries are super fast due to per-tenant data isolation
 
 ## Architecture Overview
@@ -74,8 +74,7 @@ CinchDB consists of:
 
 - **Python SDK** - Core functionality for local and remote operations
 - **CLI** - Command-line interface for all operations
-- **API Server** - FastAPI server for remote access
-- **TypeScript SDK** - Client library for JavaScript applications
+- **Remote Connectivity** - Connect to hosted CinchDB instances
 
 ## Next Steps
 

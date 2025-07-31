@@ -130,19 +130,18 @@ all_users = models.User.get_all()
 models.User.update(user["id"], age=31)
 ```
 
-## Remote API Access
+## Remote Access
 
 ```bash
-# Start the API server
-cinch-server serve --create-key
-# Note the API key that's generated
-
-# Configure remote access
-cinch remote add production --url http://localhost:8000 --key YOUR_API_KEY
+# Connect to a remote CinchDB instance
+cinch remote add production --url https://your-cinchdb-server.com --key YOUR_API_KEY
 cinch remote use production
 
 # Now all commands work remotely
 cinch query "SELECT * FROM users"
+
+# Switch back to local
+cinch remote clear
 ```
 
 ## Next Steps

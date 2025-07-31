@@ -49,7 +49,6 @@ Configured Remotes
 ┡━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
 │ production │ https://api.example.com │ ✓      │
 │ staging    │ https://staging.api.com │        │
-│ dev        │ http://localhost:8000   │        │
 └────────────┴─────────────────────────┴────────┘
 ```
 
@@ -191,7 +190,7 @@ key = "ck_test_x9y8z7w6v5u4"
 cinch remote clear
 
 # Connect to dev server
-cinch remote add dev --url http://localhost:8000 --key dev_key
+cinch remote add dev --url http://your.server.com --key dev_key
 cinch remote use dev
 ```
 
@@ -212,7 +211,7 @@ cinch db list
 ### Multi-Environment Testing
 ```bash
 # Add all environments
-cinch remote add dev --url http://localhost:8000 --key dev_key
+cinch remote add dev --url http://your.dev.server --key dev_key
 cinch remote add staging --url https://staging.api.com --key stage_key  
 cinch remote add prod --url https://api.com --key prod_key
 
@@ -238,12 +237,7 @@ cinch db list --remote production
 ### URL Format
 - Include protocol: `https://` or `http://`
 - No trailing slashes
-- Include port if needed: `http://localhost:8000`
 
-### API Key Issues
-- Ensure key has required permissions
-- Check key hasn't expired
-- Verify key matches environment
 
 ## Remote vs Local
 
@@ -257,6 +251,4 @@ cinch db list --remote production
 
 ## Next Steps
 
-- [Remote Deployment Tutorial](../tutorials/remote-deployment.md) - Set up remote server
-- [Authentication](../api/authentication.md) - API key management
 - [Query Command](query.md) - Execute remote queries

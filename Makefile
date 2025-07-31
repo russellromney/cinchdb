@@ -1,6 +1,6 @@
 .PHONY: help install install-dev install-all dev test coverage lint format typecheck clean \
         build-python build-ts build-frontend build-docs \
-        dev-api dev-frontend dev-docs \
+        dev-frontend dev-docs \
         test-python test-ts test-integration test-unit test-python-integration \
         all
 
@@ -14,8 +14,7 @@ help:
 	@echo "  make install-all      - Install everything (dependencies + CLI + TypeScript + Frontend + Docs)"
 	@echo ""
 	@echo "Development:"
-	@echo "  make dev              - Run development mode (API + Frontend)"
-	@echo "  make dev-api          - Run API server in development mode"
+	@echo "  make dev              - Run development mode (Frontend only)"
 	@echo "  make dev-frontend     - Run frontend in development mode"
 	@echo "  make dev-docs         - Run documentation site in development mode"
 	@echo ""
@@ -55,11 +54,8 @@ install-all: install install-dev
 	cd docs && npm install
 
 # Development targets
-dev: dev-api dev-frontend
+dev: dev-frontend
 	@echo "Starting CinchDB development environment..."
-
-dev-api:
-	uv run cinch-server serve --create-key
 
 dev-frontend:
 	cd frontend && npm run dev

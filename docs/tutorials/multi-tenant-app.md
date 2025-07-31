@@ -273,6 +273,5 @@ class TenantAdmin:
 
 ## Next Steps
 
-- Deploy with [Remote Access](remote-deployment.md)
 - Add [Schema Branching](schema-branching.md) for updates
 - Review [Multi-Tenancy Concepts](../concepts/multi-tenancy.md)

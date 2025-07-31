@@ -57,69 +57,6 @@ cinch branch changes
 cinch branch merge-into-main
 ```
 
-## Advanced Patterns
-
-### Parallel Development
-
-Multiple developers can work on different features simultaneously:
-
-```python
-import cinchdb
-
-# Developer A: Working on user features
-dev_a_db = cinchdb.connect("myapp", branch="feature.user-enhancements")
-dev_a_db.create_table("user_preferences", [
-    Column(name="user_id", type="TEXT"),
-    Column(name="theme", type="TEXT"),
-    Column(name="notifications", type="BOOLEAN")
-])
-
-# Developer B: Working on product features
-dev_b_db = cinchdb.connect("myapp", branch="feature.product-catalog")
-dev_b_db.create_table("product_categories", [
-    Column(name="name", type="TEXT"),
-    Column(name="parent_id", type="TEXT", nullable=True),
-    Column(name="active", type="BOOLEAN")
-])
-
-# Both can merge independently when ready
-```
-
-### Feature Flags with Branches
-
-Test new schemas with feature flags:
-
-```python
-class FeatureBranchManager:
-    def __init__(self, base_db):
-        self.base_db = base_db
-        self.feature_flags = {}
-    
-    def enable_feature(self, feature_name: str, branch_name: str):
-        """Enable a feature branch for testing."""
-        self.feature_flags[feature_name] = branch_name
-    
-    def get_db_for_feature(self, feature_name: str):
-        """Get database connection for feature."""
-        if feature_name in self.feature_flags:
-            branch = self.feature_flags[feature_name]
-            return cinchdb.connect(self.base_db.database, branch=branch)
-        return self.base_db
-    
-    def query_with_feature(self, feature_name: str, sql: str, params=None):
-        """Execute query on appropriate branch."""
-        db = self.get_db_for_feature(feature_name)
-        return db.query(sql, params)
-
-# Usage
-manager = FeatureBranchManager(cinchdb.connect("myapp"))
-manager.enable_feature("new_analytics", "feature.analytics-v2")
-
-# Queries use feature branch if enabled
-data = manager.query_with_feature("new_analytics", 
-    "SELECT * FROM analytics_events")
-```
-
 ## Schema Migration Patterns
 
 ### 1. Additive Changes (Safe)
@@ -135,38 +72,6 @@ cinch column add users last_seen:TEXT?
 
 # Add indexes
 cinch query "CREATE INDEX idx_users_email ON users(email)"
-```
-
-### 2. Breaking Changes (Careful Planning)
-
-Require migration strategy:
-
-```python
-import cinchdb
-
-def migrate_column_type(db, branch_name: str):
-    """Example: Change column type safely."""
-    # Create branch
-    if db.is_local:
-        db.branches.create_branch(branch_name)
-    
-    branch_db = cinchdb.connect(db.database, branch=branch_name)
-    
-    # Step 1: Add new column
-    branch_db.query("ALTER TABLE products ADD COLUMN price_new REAL")
-    
-    # Step 2: Migrate data
-    branch_db.query("""
-        UPDATE products 
-        SET price_new = CAST(price AS REAL)
-    """)
-    
-    # Step 3: Drop old column (if possible)
-    # Note: SQLite doesn't support DROP COLUMN directly
-    
-    # Step 4: Test thoroughly before merge
-    test_results = branch_db.query("SELECT * FROM products LIMIT 10")
-    validate_migration(test_results)
 ```
 
 ### 3. Renaming Strategy
@@ -470,5 +375,4 @@ cinch branch list | grep feature.
 ## Next Steps
 
 - Build a [Multi-Tenant App](multi-tenant-app.md)
-- Set up [Remote Deployment](remote-deployment.md)
 - Learn about [Branching Concepts](../concepts/branching.md)

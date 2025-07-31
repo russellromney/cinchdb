@@ -44,10 +44,6 @@ Working with remote CinchDB API:
 - Error handling
 - Performance considerations
 
-```bash
-# First start the API server
-cinch-server serve --create-key
-
 # Then run the example
 export CINCHDB_API_KEY=<your-api-key>
 python examples/python/remote_api.py
@@ -147,5 +143,4 @@ bash examples/cli/multi_tenant.sh
 
 - Read the [full documentation](https://cinchdb.com/docs)
 - Explore the [Python SDK API Reference](https://cinchdb.com/docs/python-sdk/api-reference)
-- Learn about [deployment options](https://cinchdb.com/docs/tutorials/remote-deployment)
 - Join the [community discussions](https://github.com/russellromney/cinchdb/discussions)

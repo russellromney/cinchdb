@@ -4,6 +4,20 @@ base command:
 
 okay. read claude claude.md and the design file, check over the files in .claude-memory, and carefully consider claude.md as you move forward. make sure to focus on testing, and use the temp file for noodling if you need (refer to claude.md for how to clean this up). your role is a senior engineer at a startup, but don't pre-optimize. consider how things already work and if your implementations match the designs. if told to do something silly, please just let me know and stop before implementing the task. use specialized subagents where relevant. your task is: 
 
+i've created a new folder called saas. we are going to build a SaaS application that lets users create, manage, and use the CinchDB ("cinchdb" on PyPi) database in a very simple way. My main competitor is Turso, but i want it to be a very simple version of Turso. We've already done a little research into Turso and other managed database systems, and created an implementation plan to build 1) the simplest possible version of this saas including backend, frontend, architecture, etc., and 2) extra features that users could want in this kind of saas. we will be using a direct connection architecture on the backend where there is a "control plane" that manages auth and high-level SaaS stuff (users, tracking databases, etc.) and then cinchdb servers that run the cinchdb api; users do auth etc. via the control plane but then connect directly to the database servers. please read through the saas/.plans directory to understand this plan. then, think about how to build the absolute bare minimum of the idea, starting with the backend. write a basic proposal for how to move forward with the backend, and discuss places where the implementation plan should change.
+
+
+go ahead and start the implementation of the backend. make it the simplest possible poc of the idea. make tests and a super simple deployment script for fly.io
+
+the database manger still uses query for creating tables. read the docs for cinchdb at https://russellromney.github.io/cinchdb to understand how to use the sdk correctly. use the built in CinchDB instance methods to do everything. 
+
+go ahead and start the implementation of the backend. make it the simplest possible poc of the idea. make tests and a super simple deployment script for fly.io
+
+let's think a little deeper about architecture tradeoffs. in the current setup, essentially every request including database queries will be routed through supabase auth. this is bad because it slows things down quite a bit. is this correct? think about various ways that we could make this a very performant system. for example we could deploy several cinchdb servers, then each user would get connection details separately for each database, connection details are an API URL and a token. then they could send API requests directly to the given server. think about other possible ways to make it extremely performant. put your findings into a proposal
+
+I'd like to build a SaaS application that lets users create, manage, and use the CinchDB (cinchdb on PyPi) database package in a very simple way. My main competitor is Turso, but i want it to be a very simple version of Turso. Please do a little research into Turso and other managed database systems, and create an implementation plan to build 1) the simplest possible version of this saas including backend, frontend, architecture, etc., and 2) extra features that users could want in this kind of saas.
+
+
 we need to add foreign key support. please create a proposal for an interface that allows creating columns as foreign keys. note that this has to be done during table creation, and cannot be updated afterwards. Sqlite does not support adding constraints after table creation
 
 let's think about next steps for this project. we need to add the ability to back up databases to S3 using litefs

@@ -8,7 +8,7 @@ CinchDB is for projects that need fast queries, data isolated data per-tenant [o
 
 On a meta level, I made this because I wanted a database structure that I felt comfortable letting AI agents take full control over, safely, and I didn't want to run my own Postgres instance somewhere or pay for it on e.g. Neon - I don't need hyperscaling, I just need super fast queries.
 
-Because it's so lightweight and its only dependencies are FastAPI, pydantic, requests, and Typer, it is super cheap to run on a small VM like from [Fly.io](https://fly.io) and I don't need to SSH into it to make changes - I can just store an API key in my local projects and hit the remote instance.
+Because it's so lightweight and its only dependencies are pydantic, requests, and Typer, it makes for a perfect local development database that can be controlled programmatically.
 
 
 ```bash
@@ -31,9 +31,9 @@ cinch branch merge-into-main feature
 cinch tenant create customer_a
 cinch query "SELECT * FROM users" --tenant customer_a
 
-# API server
-uv pip install cinchdb[server]
-cinch-server serve
+# Connect to remote CinchDB instance
+cinch remote add production https://your-cinchdb-server.com your-api-key
+cinch remote use production
 
 # Autogenerate Python SDK from database
 cinch codegen generate python cinchdb_models/
@@ -47,9 +47,9 @@ CinchDB combines SQLite with Git-like workflows for database schema management:
 - **Multi-tenant isolation** - shared schema, isolated data per tenant
 - **Automatic change tracking** - all schema changes tracked and mergeable
 - **Safe structure changes** - change merges happen atomically with zero rollback risk (seriously)
-- **Remote deployment** - FastAPI server with UUID authentication
+- **Remote connectivity** - Connect to hosted CinchDB instances
 - **Type-safe SDK** - Python and TypeScript SDKs with full type safety
-- **API server for remote hosting** - Useful for running many web projects
+- **Remote-capable** - CLI and SDK can connect to remote instances
 - **SDK generation from database schema** - Generate a typesafe SDK from your database models for CRUD operations
 
 ## Installation
@@ -106,24 +106,25 @@ post_id = db.insert("posts", {"title": "Hello World", "content": "First post"})
 db.update("posts", post_id, {"content": "Updated content"})
 ```
 
-### Remote API
+### Remote Connection
 
 ```python
-# Connect to remote API
-db = cinchdb.connect_api("https://api.example.com", "your-api-key", "myapp")
+# Connect to remote instance
+db = cinchdb.connect("myapp", url="https://your-cinchdb-server.com", api_key="your-api-key")
 
 # Same interface as local
 results = db.query("SELECT * FROM users")
 user_id = db.insert("users", {"username": "alice", "email": "alice@example.com"})
 ```
 
-## API Server
+## Remote Access
 
-Start the server:
+Connect to a remote CinchDB instance:
 
 ```bash
-cinch-server serve --create-key
-# Creates API key (works after shutdown as well) and starts server on http://localhost:8000
+cinch remote add production https://your-cinchdb-server.com your-api-key
+cinch remote use production
+# Now all commands will use the remote instance
 ```
 
 Interactive docs at `/docs`, health check at `/health`.
@@ -132,7 +133,7 @@ Interactive docs at `/docs`, health check at `/health`.
 
 - **Python SDK**: Core functionality (local + remote)
 - **CLI**: Full-featured command-line interface  
-- **FastAPI Server**: REST API with authentication
+- **Remote Access**: Connect to hosted CinchDB instances
 - **TypeScript SDK**: Browser and Node.js client
 
 ## Development

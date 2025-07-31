@@ -30,13 +30,6 @@ cinch version
 
 ## Optional Dependencies
 
-### API Server
-
-To run the CinchDB API server, install with server extras:
-
-```bash
-pip install cinchdb[server]
-```
 
 ### Development
 

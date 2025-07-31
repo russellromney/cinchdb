@@ -86,15 +86,11 @@ nav:
   - Tutorials:
     - Building a Multi-Tenant App: tutorials/multi-tenant-app.md
     - Schema Branching Workflow: tutorials/schema-branching.md
-    - Remote Deployment: tutorials/remote-deployment.md
   - Concepts:
     - Branching: concepts/branching.md
     - Multi-Tenancy: concepts/multi-tenancy.md
     - Change Tracking: concepts/change-tracking.md
     - Remote Access: concepts/remote-access.md
-  - API Server:
-    - Authentication: api/authentication.md
-    - Endpoints: api/endpoints.md
 
 extra:
   social:

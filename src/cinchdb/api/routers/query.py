@@ -11,6 +11,7 @@ from cinchdb.api.auth import (
     require_read_permission,
     require_write_permission,
 )
+from cinchdb.utils import validate_sql_query, SQLValidationError, SQLOperation
 
 
 router = APIRouter()
@@ -48,12 +49,17 @@ async def execute_query(
     db_name = database
     branch_name = branch
 
-    # Check if this is a write operation
+    # Validate the SQL query first
+    try:
+        is_valid, error_msg, operation = validate_sql_query(request.sql)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error_msg)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    # Check if this is a write operation based on validated operation
     sql_upper = request.sql.strip().upper()
-    is_write = any(
-        sql_upper.startswith(cmd)
-        for cmd in ["INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER"]
-    )
+    is_write = operation in (SQLOperation.INSERT, SQLOperation.UPDATE, SQLOperation.DELETE)
 
     if is_write:
         # Require write permission for write operations

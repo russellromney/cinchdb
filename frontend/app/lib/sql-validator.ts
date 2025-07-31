@@ -4,7 +4,7 @@
  */
 
 // List of allowed SQL operations (case-insensitive)
-const ALLOWED_OPERATIONS = ['SELECT', 'UPDATE', 'DELETE'];
+const ALLOWED_OPERATIONS = ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
 
 // List of restricted DDL operations and keywords
 const RESTRICTED_OPERATIONS = [
@@ -96,7 +96,7 @@ export function validateSQLQuery(query: string): ValidationResult {
     if (normalizedQuery.startsWith(restricted)) {
       return { 
         isValid: false, 
-        error: `${restricted} operations are not allowed in the query interface. Only SELECT, UPDATE, and DELETE queries are permitted.` 
+        error: `${restricted} operations are not allowed in the query interface. Only SELECT, INSERT, UPDATE, and DELETE queries are permitted.` 
       };
     }
   }
@@ -106,7 +106,7 @@ export function validateSQLQuery(query: string): ValidationResult {
     if (normalizedQuery.includes(keyword)) {
       return { 
         isValid: false, 
-        error: `Query contains restricted operation: ${keyword}. Only SELECT, UPDATE, and DELETE queries are permitted.` 
+        error: `Query contains restricted operation: ${keyword}. Only SELECT, INSERT, UPDATE, and DELETE queries are permitted.` 
       };
     }
   }
@@ -123,7 +123,7 @@ export function validateSQLQuery(query: string): ValidationResult {
   // If we get here, it's an unrecognized operation
   return { 
     isValid: false, 
-    error: `Unrecognized or restricted SQL operation. Only SELECT, UPDATE, and DELETE queries are permitted.` 
+    error: `Unrecognized or restricted SQL operation. Only SELECT, INSERT, UPDATE, and DELETE queries are permitted.` 
   };
 }
 

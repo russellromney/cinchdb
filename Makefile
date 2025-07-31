@@ -59,7 +59,7 @@ dev: dev-api dev-frontend
 	@echo "Starting CinchDB development environment..."
 
 dev-api:
-	uv run cinch-server
+	uv run cinch-server serve --create-key
 
 dev-frontend:
 	cd frontend && npm run dev

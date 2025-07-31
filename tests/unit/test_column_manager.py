@@ -252,8 +252,8 @@ class TestColumnManager:
         db_path = get_tenant_db_path(temp_project, "main", "main", "main")
         with DatabaseConnection(db_path) as conn:
             import uuid
-            from datetime import datetime
-            now = datetime.utcnow().isoformat()
+            import datetime
+            now = datetime.datetime.now(datetime.UTC).isoformat()
             conn.execute(
                 "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', 'john@example.com', ?, ?)", 
                 (str(uuid.uuid4()), now, now)
@@ -276,8 +276,8 @@ class TestColumnManager:
         db_path = get_tenant_db_path(temp_project, "main", "main", "main")
         with DatabaseConnection(db_path) as conn:
             import uuid
-            from datetime import datetime
-            now = datetime.utcnow().isoformat()
+            import datetime
+            now = datetime.datetime.now(datetime.UTC).isoformat()
             conn.execute(
                 "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', NULL, ?, ?)", 
                 (str(uuid.uuid4()), now, now)
@@ -340,8 +340,8 @@ class TestColumnManager:
         db_path = get_tenant_db_path(temp_project, "main", "main", "main")
         with DatabaseConnection(db_path) as conn:
             import uuid
-            from datetime import datetime
-            now = datetime.utcnow().isoformat()
+            import datetime
+            now = datetime.datetime.now(datetime.UTC).isoformat()
             conn.execute(
                 "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', 'john@example.com', ?, ?)", 
                 (str(uuid.uuid4()), now, now)

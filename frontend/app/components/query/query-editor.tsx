@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import CodeMirror from '@uiw/react-codemirror';
 import { sql } from '@codemirror/lang-sql';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { EditorView } from '@codemirror/view';
 import { 
   Play, 
   Trash2, 
@@ -21,7 +22,9 @@ import {
   Terminal,
   Timer,
   Database,
-  GitBranch
+  GitBranch,
+  AlertTriangle,
+  Shield
 } from 'lucide-react';
 import { useCinchDB } from '@/app/lib/cinchdb-context';
 import { useTheme } from '@/app/lib/theme-provider';
@@ -37,6 +40,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { validateSQLQuery, getValidationErrorMessage } from '@/app/lib/sql-validator';
 
 interface QueryTab {
   id: string;
@@ -58,12 +62,44 @@ FROM sqlite_master
 WHERE type = 'table'
 ORDER BY name;`;
 
+// Light theme for CodeMirror
+const lightTheme = EditorView.theme({
+  '&': {
+    color: 'hsl(var(--foreground))',
+    backgroundColor: 'hsl(var(--background))'
+  },
+  '.cm-content': {
+    caretColor: 'hsl(var(--foreground))'
+  },
+  '.cm-cursor, .cm-dropCursor': {
+    borderLeftColor: 'hsl(var(--foreground))'
+  },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+    backgroundColor: 'hsl(var(--primary) / 0.2)'
+  },
+  '.cm-gutters': {
+    backgroundColor: 'hsl(var(--muted))',
+    color: 'hsl(var(--muted-foreground))',
+    border: 'none'
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: 'hsl(var(--muted))'
+  },
+  '.cm-foldGutter': {
+    color: 'hsl(var(--muted-foreground))'
+  },
+  '.cm-line': {
+    color: 'hsl(var(--foreground))'
+  }
+});
+
 export function QueryEditor({ onResults, onError }: QueryEditorProps) {
   const { client, currentDatabase, currentBranch, currentTenant } = useCinchDB();
   const { theme } = useTheme();
   const [executing, setExecuting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [executionTime, setExecutionTime] = useState<number | null>(null);
+  const [queryValidation, setQueryValidation] = useState<{ isValid: boolean; error?: string } | null>(null);
   
   // Tab management
   const [tabs, setTabs] = useState<QueryTab[]>([
@@ -107,10 +143,27 @@ export function QueryEditor({ onResults, onError }: QueryEditorProps) {
         ? { ...tab, query: value, isDirty: true }
         : tab
     ));
+    
+    // Validate query in real-time for user feedback
+    if (value.trim()) {
+      const validation = validateSQLQuery(value);
+      setQueryValidation(validation);
+    } else {
+      setQueryValidation(null);
+    }
   };
 
   const executeQuery = async () => {
     if (!client || !activeQuery?.query.trim()) return;
+
+    // Validate the query before execution
+    const validation = validateSQLQuery(activeQuery.query);
+    if (!validation.isValid) {
+      const errorMessage = getValidationErrorMessage(validation);
+      onError(errorMessage);
+      toast.error(errorMessage);
+      return;
+    }
 
     setExecuting(true);
     onError('');
@@ -180,7 +233,7 @@ export function QueryEditor({ onResults, onError }: QueryEditorProps) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
               >
-                <div className="p-2 rounded-lg gradient-primary">
+                <div className="p-2 rounded-lg" style={{ background: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))' }}>
                   <Terminal className="h-5 w-5 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold">Query Editor</h3>
@@ -203,6 +256,35 @@ export function QueryEditor({ onResults, onError }: QueryEditorProps) {
                     <Badge variant="secondary" className="text-xs">
                       <Timer className="h-3 w-3 mr-1" />
                       {executionTime}ms
+                    </Badge>
+                  </motion.div>
+                )}
+                {queryValidation && !queryValidation.isValid && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                  >
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge variant="destructive" className="text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Restricted Query
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p>{queryValidation.error}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </motion.div>
+                )}
+                {queryValidation && queryValidation.isValid && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                  >
+                    <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                      <Shield className="h-3 w-3 mr-1" />
+                      Safe Query
                     </Badge>
                   </motion.div>
                 )}
@@ -266,7 +348,8 @@ export function QueryEditor({ onResults, onError }: QueryEditorProps) {
                     size="sm"
                     onClick={executeQuery}
                     disabled={executing || !activeQuery?.query.trim()}
-                    className="gradient-primary text-white border-0 shadow-glow"
+                    className="text-white border-0 shadow-glow"
+                    style={{ background: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))' }}
                   >
                     {executing ? (
                       <>
@@ -353,7 +436,7 @@ export function QueryEditor({ onResults, onError }: QueryEditorProps) {
               extensions={[sql()]}
               onChange={updateQuery}
               onKeyDown={handleKeyDown}
-              theme={theme === 'dark' ? oneDark : undefined}
+              theme={theme === 'dark' ? oneDark : lightTheme}
               className="h-full"
               placeholder="Write your SQL query here..."
             />

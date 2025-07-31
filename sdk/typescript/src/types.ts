@@ -3,6 +3,13 @@
  */
 
 // Base types
+export interface ForeignKeyRef {
+  table: string;
+  column?: string;
+  on_delete?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+  on_update?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+}
+
 export interface Column {
   name: string;
   type: 'TEXT' | 'INTEGER' | 'REAL' | 'BLOB' | 'NUMERIC';
@@ -10,6 +17,7 @@ export interface Column {
   default?: string;
   primary_key?: boolean;
   unique?: boolean;
+  foreign_key?: ForeignKeyRef;
 }
 
 export interface Table {

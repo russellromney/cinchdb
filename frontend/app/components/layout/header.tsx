@@ -95,7 +95,7 @@ export function Header() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-glow" style={{ background: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))' }}>
                   <Database className="h-6 w-6 text-white" />
                 </div>
                 <AnimatePresence>
@@ -113,7 +113,7 @@ export function Header() {
               </motion.div>
               <div>
                 <h1 className="text-xl font-bold">
-                  <span className="text-gradient gradient-primary">CinchDB</span>
+                  <span style={{ backgroundImage: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))', backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent' }}>CinchDB</span>
                 </h1>
                 <p className="text-xs text-muted-foreground">
                   {isConnected ? 'Connected' : 'Connecting...'}
@@ -297,7 +297,7 @@ export function Header() {
                   className="relative h-9 px-3 glass-hover"
                 >
                   <Avatar className="h-7 w-7 mr-2">
-                    <AvatarFallback className="gradient-primary text-white text-xs">
+                    <AvatarFallback className="text-white text-xs" style={{ background: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))' }}>
                       U
                     </AvatarFallback>
                   </Avatar>

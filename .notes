@@ -4,8 +4,4 @@ base command:
 
 okay. read claude claude.md and the design and implementation files, check over the files in .claude-memory, and carefully consider claude.md as you move forward. make sure to focus on testing, and use the temp file for noodling if you need (refer to claude.md for how to clean this up). your role is a senior engineer at a startup, but don't pre-optimize. consider how things already work and if your implementations match the designs. if told to do something silly, please just let me know and stop before implementing the task. use specialized subagents where relevant. your task is: 
 
-
-
-let's build beautiful documentation using mkdocs-material and sphinx. the documentation should be complete for the core python package (including the API and CLI). please also create simple examples of how to use CinchDB, following the style of those listed in the README. Create any relevant tutorials and guides that explain the core concepts. please be concise and utilitarian in your language. 
-
 let's think about next steps for this project. we need to add the ability to back up databases to S3 using litefs

@@ -62,7 +62,7 @@ class TableManager:
         return tables
 
     def create_table(self, table_name: str, columns: List[Column]) -> Table:
-        """Create a new table.
+        """Create a new table with optional foreign key constraints.
 
         Args:
             table_name: Name of the table
@@ -72,7 +72,8 @@ class TableManager:
             Created Table object
 
         Raises:
-            ValueError: If table already exists or uses protected column names
+            ValueError: If table already exists, uses protected column names,
+                       or has invalid foreign key references
             MaintenanceError: If branch is in maintenance mode
         """
         # Check maintenance mode
@@ -88,6 +89,34 @@ class TableManager:
                 raise ValueError(
                     f"Column name '{column.name}' is protected and cannot be used"
                 )
+
+        # Validate foreign key references
+        foreign_key_constraints = []
+        for column in columns:
+            if column.foreign_key:
+                fk = column.foreign_key
+                
+                # Validate referenced table exists
+                if not self._table_exists(fk.table):
+                    raise ValueError(
+                        f"Foreign key reference to non-existent table: '{fk.table}'"
+                    )
+                
+                # Validate referenced column exists
+                ref_table = self.get_table(fk.table)
+                ref_col_names = [col.name for col in ref_table.columns]
+                if fk.column not in ref_col_names:
+                    raise ValueError(
+                        f"Foreign key reference to non-existent column: '{fk.table}.{fk.column}'"
+                    )
+                
+                # Build foreign key constraint
+                fk_constraint = f"FOREIGN KEY ({column.name}) REFERENCES {fk.table}({fk.column})"
+                if fk.on_delete != "RESTRICT":
+                    fk_constraint += f" ON DELETE {fk.on_delete}"
+                if fk.on_update != "RESTRICT":
+                    fk_constraint += f" ON UPDATE {fk.on_update}"
+                foreign_key_constraints.append(fk_constraint)
 
         # Build automatic columns
         auto_columns = [
@@ -110,8 +139,13 @@ class TableManager:
                 col_def += " NOT NULL"
             if col.default is not None:
                 col_def += f" DEFAULT {col.default}"
+            if col.unique and not col.primary_key:
+                col_def += " UNIQUE"
 
             sql_parts.append(col_def)
+        
+        # Add foreign key constraints
+        sql_parts.extend(foreign_key_constraints)
 
         create_sql = f"CREATE TABLE {table_name} ({', '.join(sql_parts)})"
 
@@ -156,8 +190,27 @@ class TableManager:
             raise ValueError(f"Table '{table_name}' does not exist")
 
         columns = []
+        foreign_keys = {}
 
         with DatabaseConnection(self.db_path) as conn:
+            # Get foreign key information first
+            fk_cursor = conn.execute(f"PRAGMA foreign_key_list({table_name})")
+            for fk_row in fk_cursor.fetchall():
+                from_col = fk_row["from"]
+                to_table = fk_row["table"]
+                to_col = fk_row["to"]
+                on_update = fk_row["on_update"]
+                on_delete = fk_row["on_delete"]
+                
+                # Create ForeignKeyRef
+                from cinchdb.models import ForeignKeyRef
+                foreign_keys[from_col] = ForeignKeyRef(
+                    table=to_table,
+                    column=to_col,
+                    on_update=on_update,
+                    on_delete=on_delete
+                )
+            
             # Get column information
             cursor = conn.execute(f"PRAGMA table_info({table_name})")
 
@@ -179,12 +232,16 @@ class TableManager:
                 else:
                     col_type = "TEXT"
 
+                # Check if this column has a foreign key
+                foreign_key = foreign_keys.get(row["name"])
+
                 column = Column(
                     name=row["name"],
                     type=col_type,
                     nullable=(row["notnull"] == 0),
                     default=row["dflt_value"],
                     primary_key=(row["pk"] == 1),
+                    foreign_key=foreign_key
                 )
                 columns.append(column)
 

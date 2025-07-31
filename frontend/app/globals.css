@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 @layer base {
   :root {
@@ -90,15 +90,16 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   
   html {
-    @apply scroll-smooth;
+    scroll-behavior: smooth;
   }
   
   body {
-    @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -108,7 +109,8 @@
 @layer components {
   /* Glassmorphism effects */
   .glass {
-    @apply relative overflow-hidden;
+    position: relative;
+    overflow: hidden;
     background: rgba(var(--glass-bg), var(--glass-opacity));
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
@@ -116,13 +118,13 @@
   }
   
   .glass-hover {
-    @apply transition-all duration-300;
+    transition: all 300ms;
   }
   
   .glass-hover:hover {
     --glass-opacity: 0.9;
     --glass-blur: 20px;
-    @apply shadow-lg;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
   
   /* Gradient backgrounds */
@@ -144,11 +146,16 @@
   
   /* Text gradients */
   .text-gradient {
-    @apply bg-clip-text text-transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
   }
   
   .text-gradient-primary {
-    @apply text-gradient gradient-primary;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    background-image: linear-gradient(to right, rgb(147 51 234), rgb(219 39 119));
   }
   
   /* Modern shadows */
@@ -162,7 +169,12 @@
   
   /* Loading animations */
   .loading-dots span {
-    @apply inline-block w-2 h-2 mx-0.5 rounded-full bg-current;
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin: 0 0.125rem;
+    border-radius: 9999px;
+    background-color: currentColor;
     animation: loading-dots 1.4s infinite ease-in-out both;
   }
   
@@ -187,7 +199,9 @@
   
   /* Skeleton loading */
   .skeleton {
-    @apply relative overflow-hidden bg-muted;
+    position: relative;
+    overflow: hidden;
+    background-color: hsl(var(--muted));
   }
   
   .skeleton::after {
@@ -245,12 +259,18 @@
   
   /* Smooth transitions */
   .transition-smooth {
-    @apply transition-all duration-300 ease-in-out;
+    transition: all 300ms ease-in-out;
   }
   
   /* Custom focus styles */
   .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+  
+  .focus-ring:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring));
   }
   
   /* Modern input styles */
@@ -267,16 +287,17 @@
   }
   
   .scrollbar-thin::-webkit-scrollbar-track {
-    @apply bg-transparent;
+    background-color: transparent;
   }
   
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/20 rounded-full;
+    background-color: hsl(var(--muted-foreground) / 0.2);
+    border-radius: 9999px;
     transition: background-color 0.2s;
   }
   
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/40;
+    background-color: hsl(var(--muted-foreground) / 0.4);
   }
   
   /* Hide scrollbar but keep functionality */
@@ -291,7 +312,8 @@
   
   /* Text selection */
   ::selection {
-    @apply bg-primary/20 text-primary-foreground;
+    background-color: hsl(var(--primary) / 0.2);
+    color: hsl(var(--primary-foreground));
   }
   
   /* Disable text selection */
@@ -305,7 +327,10 @@
 
 /* CodeMirror modern theme */
 .cm-editor {
-  @apply text-sm font-mono;
+  font-size: 0.875rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 .cm-focused {
@@ -313,44 +338,93 @@
 }
 
 .cm-editor.cm-focused {
-  @apply ring-2 ring-primary/50 ring-offset-2 ring-offset-background rounded-lg;
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--primary) / 0.5);
+  border-radius: var(--radius);
 }
 
 .cm-scroller {
-  @apply scrollbar-thin;
+  /* Custom scrollbar */
 }
 
 .cm-content {
-  @apply py-3;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
 }
 
 .cm-line {
-  @apply px-4;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Light mode specific CodeMirror styles */
+.cm-editor .cm-content {
+  color: hsl(var(--foreground));
+}
+
+.cm-editor .cm-gutters {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  border-right: 1px solid hsl(var(--border));
+}
+
+.cm-editor .cm-activeLineGutter {
+  background-color: hsl(var(--muted));
+}
+
+.cm-editor .cm-cursor {
+  border-left-color: hsl(var(--foreground));
+}
+
+.cm-editor .cm-selectionBackground,
+.cm-editor.cm-focused .cm-selectionBackground {
+  background-color: hsl(var(--primary) / 0.2);
 }
 
 /* Syntax highlighting */
 .cm-editor .cm-keyword {
-  @apply text-purple-600 dark:text-purple-400 font-semibold;
+  color: rgb(147 51 234);
+  font-weight: 600;
+}
+
+.dark .cm-editor .cm-keyword {
+  color: rgb(196 181 253);
 }
 
 .cm-editor .cm-string {
-  @apply text-green-600 dark:text-green-400;
+  color: rgb(22 163 74);
+}
+
+.dark .cm-editor .cm-string {
+  color: rgb(134 239 172);
 }
 
 .cm-editor .cm-number {
-  @apply text-orange-600 dark:text-orange-400;
+  color: rgb(234 88 12);
+}
+
+.dark .cm-editor .cm-number {
+  color: rgb(251 191 36);
 }
 
 .cm-editor .cm-comment {
-  @apply text-muted-foreground italic;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
 }
 
 .cm-editor .cm-operator {
-  @apply text-pink-600 dark:text-pink-400;
+  color: rgb(219 39 119);
+}
+
+.dark .cm-editor .cm-operator {
+  color: rgb(244 114 182);
 }
 
 .cm-editor .cm-variableName {
-  @apply text-blue-600 dark:text-blue-400;
+  color: rgb(37 99 235);
+}
+
+.dark .cm-editor .cm-variableName {
+  color: rgb(96 165 250);
 }
 
 /* Smooth page transitions */
@@ -371,18 +445,32 @@
 
 /* Pulse animation for live indicators */
 .pulse-dot {
-  @apply relative inline-flex h-3 w-3;
+  position: relative;
+  display: inline-flex;
+  height: 0.75rem;
+  width: 0.75rem;
 }
 
 .pulse-dot::before {
   content: "";
-  @apply absolute inline-flex h-full w-full rounded-full bg-current opacity-75;
+  position: absolute;
+  display: inline-flex;
+  height: 100%;
+  width: 100%;
+  border-radius: 9999px;
+  background-color: currentColor;
+  opacity: 0.75;
   animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 .pulse-dot::after {
   content: "";
-  @apply absolute inline-flex h-full w-full rounded-full bg-current;
+  position: absolute;
+  display: inline-flex;
+  height: 100%;
+  width: 100%;
+  border-radius: 9999px;
+  background-color: currentColor;
 }
 
 @keyframes ping {
@@ -390,4 +478,13 @@
     transform: scale(2);
     opacity: 0;
   }
+}
+
+/* Grid background pattern */
+.bg-grid-slate-900\/\[0\.04\] {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(15 23 42 / 0.04)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e");
+}
+
+.dark .bg-grid-slate-100\/\[0\.02\] {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' width='32' height='32' fill='none' stroke='rgb(241 245 249 / 0.02)'%3e%3cpath d='M0 .5H31.5V32'/%3e%3c/svg%3e");
 }

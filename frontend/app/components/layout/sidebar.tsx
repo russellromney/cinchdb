@@ -23,7 +23,7 @@ import {
   Hash,
   Type,
   Calendar,
-  Toggle
+  ToggleLeft
 } from 'lucide-react';
 import { useCinchDB } from '@/app/lib/cinchdb-context';
 import type { TableInfo } from '@cinchdb/client';
@@ -56,9 +56,9 @@ const typeIcons = {
   'TEXT': Type,
   'REAL': BarChart3,
   'BLOB': FileText,
-  'NULL': Toggle,
+  'NULL': ToggleLeft,
   'DATETIME': Calendar,
-  'BOOLEAN': Toggle,
+  'BOOLEAN': ToggleLeft,
 };
 
 function TreeNode({ label, icon, children, defaultOpen = false, badge, level = 0, onClick, isActive }: TreeNodeProps) {
@@ -76,7 +76,7 @@ function TreeNode({ label, icon, children, defaultOpen = false, badge, level = 0
         size="sm"
         className={cn(
           "w-full justify-start h-9 px-2 font-normal group hover:bg-muted/50 transition-all",
-          level > 0 && `pl-${(level * 4 + 2)}`,
+          level > 0 && (level === 1 ? "pl-6" : level === 2 ? "pl-10" : "pl-14"),
           isActive && "bg-primary/10 text-primary hover:bg-primary/20"
         )}
         onClick={() => {
@@ -298,7 +298,7 @@ export function Sidebar() {
                         >
                           {table.columns.map((column) => {
                             const TypeIcon = typeIcons[column.type as keyof typeof typeIcons] || Type;
-                            const isPrimary = column.primaryKey;
+                            const isPrimary = column.primary_key;
                             
                             return (
                               <motion.div
@@ -403,7 +403,8 @@ export function Sidebar() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="w-full text-xs gradient-primary text-white border-0"
+                  className="w-full text-xs text-white border-0"
+                  style={{ background: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))' }}
                 >
                   <Sparkles className="mr-2 h-3 w-3" />
                   Upgrade to Pro

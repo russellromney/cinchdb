@@ -8,6 +8,26 @@ from .base import CinchDBBaseModel
 # SQLite column types
 ColumnType = Literal["TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC"]
 
+# Foreign key actions
+ForeignKeyAction = Literal["CASCADE", "SET NULL", "RESTRICT", "NO ACTION"]
+
+
+class ForeignKeyRef(BaseModel):
+    """Foreign key reference specification."""
+    
+    model_config = ConfigDict(extra="forbid")
+    
+    table: str = Field(description="Referenced table name")
+    column: str = Field(default="id", description="Referenced column name")
+    on_delete: ForeignKeyAction = Field(
+        default="RESTRICT", 
+        description="Action on delete of referenced row"
+    )
+    on_update: ForeignKeyAction = Field(
+        default="RESTRICT",
+        description="Action on update of referenced row"
+    )
+
 
 class Column(BaseModel):
     """Represents a column in a table."""
@@ -26,6 +46,10 @@ class Column(BaseModel):
         default=False, description="Whether this is a primary key"
     )
     unique: bool = Field(default=False, description="Whether values must be unique")
+    foreign_key: Optional[ForeignKeyRef] = Field(
+        default=None, 
+        description="Foreign key constraint specification"
+    )
 
 
 class Table(CinchDBBaseModel):

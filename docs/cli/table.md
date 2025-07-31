@@ -27,33 +27,63 @@ Tables in main/main:
 
 ## create
 
-Create a new table with columns.
+Create a new table with columns and optional foreign key constraints.
 
 ```bash
-cinch table create TABLE_NAME COLUMN:TYPE...
+cinch table create TABLE_NAME COLUMN:TYPE[:nullable][:fk=table[.column][:action]]...
 ```
 
 ### Arguments
 - `TABLE_NAME` - Name of the table
-- `COLUMN:TYPE` - Column definitions (name:type pairs)
+- `COLUMN:TYPE` - Column definitions with optional modifiers
+
+### Column Format
+```
+name:type[:nullable][:fk=table[.column][:action]]
+```
 
 ### Column Types
 - `TEXT` - String data
 - `INTEGER` - Whole numbers
 - `REAL` - Decimal numbers
-- `BOOLEAN` - True/false values
 - `BLOB` - Binary data
+- `NUMERIC` - Numeric values
+
+### Foreign Key Actions
+- `CASCADE` - Delete/update child rows when parent is deleted/updated
+- `SET NULL` - Set foreign key to NULL when parent is deleted/updated
+- `RESTRICT` - Prevent deletion/update of parent (default)
+- `NO ACTION` - Similar to RESTRICT
 
 ### Examples
 ```bash
 # Simple table
 cinch table create users name:TEXT email:TEXT
 
-# With multiple types
-cinch table create products name:TEXT price:REAL stock:INTEGER active:BOOLEAN
+# With nullable columns
+cinch table create posts title:TEXT content:TEXT:nullable author:TEXT:nullable
 
-# With optional columns (nullable)
-cinch table create posts title:TEXT content:TEXT published:BOOLEAN?
+# With foreign key (references id column by default)
+cinch table create posts title:TEXT content:TEXT author_id:TEXT:fk=users
+
+# With foreign key to specific column
+cinch table create posts title:TEXT author_email:TEXT:fk=users.email
+
+# With CASCADE delete
+cinch table create comments content:TEXT post_id:TEXT:fk=posts:cascade
+
+# Full syntax with column and action
+cinch table create order_items \
+  product_id:TEXT:fk=products.id:cascade \
+  order_id:TEXT:fk=orders.id:cascade \
+  quantity:INTEGER
+
+# Multiple foreign keys
+cinch table create reviews \
+  content:TEXT \
+  rating:INTEGER \
+  user_id:TEXT:fk=users \
+  product_id:TEXT:fk=products
 ```
 
 ### Automatic Columns
@@ -160,38 +190,60 @@ cinch table create users \
 
 ### E-commerce
 ```bash
-# Products table
+# Categories table
+cinch table create categories \
+  name:TEXT \
+  description:TEXT:nullable
+
+# Products table with category reference
 cinch table create products \
   name:TEXT \
-  description:TEXT? \
+  description:TEXT:nullable \
   price:REAL \
   stock:INTEGER \
-  category:TEXT
+  category_id:TEXT:fk=categories
 
-# Orders table  
+# Orders table with user reference
 cinch table create orders \
-  user_id:TEXT \
+  user_id:TEXT:fk=users \
   total:REAL \
   status:TEXT \
-  notes:TEXT?
+  notes:TEXT:nullable
+
+# Order items with cascading deletes
+cinch table create order_items \
+  order_id:TEXT:fk=orders:cascade \
+  product_id:TEXT:fk=products \
+  quantity:INTEGER \
+  price:REAL
 ```
 
 ### Content Management
 ```bash
-# Posts table
+# Posts table with author reference
 cinch table create posts \
   title:TEXT \
   slug:TEXT \
   content:TEXT \
-  published:BOOLEAN \
-  author_id:TEXT
+  published:INTEGER \
+  author_id:TEXT:fk=users
 
-# Comments table
+# Comments table with post reference (cascade delete)
 cinch table create comments \
-  post_id:TEXT \
-  author:TEXT \
+  post_id:TEXT:fk=posts:cascade \
+  user_id:TEXT:fk=users \
   content:TEXT \
-  approved:BOOLEAN
+  approved:INTEGER
+
+# Tags table
+cinch table create tags \
+  name:TEXT \
+  slug:TEXT
+
+# Post-tag relationship (many-to-many)
+cinch table create post_tags \
+  post_id:TEXT:fk=posts:cascade \
+  tag_id:TEXT:fk=tags:cascade
 ```
 
 ## Best Practices
@@ -204,12 +256,19 @@ cinch table create comments \
 2. **Column Types**
    - Use TEXT for IDs (stores UUIDs)
    - Use REAL for money/prices
-   - Use BOOLEAN for flags
+   - Use INTEGER for boolean flags (0/1)
 
 3. **Nullable Columns**
-   - Make columns nullable with `?` suffix
+   - Make columns nullable with `:nullable` modifier
    - Required data should not be nullable
-   - Consider defaults for optional data
+   - Foreign keys can be nullable for optional relationships
+
+4. **Foreign Keys**
+   - Always create parent tables before child tables
+   - Use CASCADE for dependent data that should be deleted with parent
+   - Use SET NULL for optional relationships
+   - Default to RESTRICT to prevent accidental data loss
+   - Name foreign key columns clearly: `user_id`, `product_id`
 
 ## Protected Names
 

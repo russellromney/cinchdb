@@ -35,7 +35,15 @@ async function main() {
       branch: 'feature-branch',
     });
 
-    // Create a table
+    // Create tables with foreign keys
+    await featureClient.createTable({
+      name: 'categories',
+      columns: [
+        { name: 'name', type: 'TEXT', nullable: false },
+        { name: 'description', type: 'TEXT', nullable: true },
+      ],
+    });
+
     await featureClient.createTable({
       name: 'products',
       columns: [
@@ -43,6 +51,15 @@ async function main() {
         { name: 'description', type: 'TEXT', nullable: true },
         { name: 'price', type: 'REAL', nullable: false },
         { name: 'in_stock', type: 'INTEGER', nullable: false, default: '1' },
+        { 
+          name: 'category_id', 
+          type: 'TEXT', 
+          nullable: true,
+          foreign_key: {
+            table: 'categories',
+            on_delete: 'SET NULL'
+          }
+        },
       ],
     });
 

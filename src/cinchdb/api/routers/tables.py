@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from cinchdb.core.database import CinchDB
 from cinchdb.managers.change_applier import ChangeApplier
-from cinchdb.models import Column
+from cinchdb.models import Column, ForeignKeyRef
 from cinchdb.api.auth import (
     AuthContext,
     require_write_permission,
@@ -15,6 +15,15 @@ from cinchdb.api.auth import (
 
 
 router = APIRouter()
+
+
+class ForeignKeySchema(BaseModel):
+    """Foreign key schema for requests."""
+    
+    table: str
+    column: str = "id"
+    on_delete: str = "RESTRICT"
+    on_update: str = "RESTRICT"
 
 
 class ColumnSchema(BaseModel):
@@ -26,6 +35,7 @@ class ColumnSchema(BaseModel):
     default: Optional[str] = None
     primary_key: bool = False
     unique: bool = False
+    foreign_key: Optional[ForeignKeySchema] = None
 
 
 class TableInfo(BaseModel):
@@ -78,6 +88,16 @@ async def list_tables(
             # Convert columns
             columns = []
             for col in table.columns:
+                # Convert foreign key if present
+                fk_schema = None
+                if col.foreign_key:
+                    fk_schema = ForeignKeySchema(
+                        table=col.foreign_key.table,
+                        column=col.foreign_key.column,
+                        on_delete=col.foreign_key.on_delete,
+                        on_update=col.foreign_key.on_update,
+                    )
+                
                 columns.append(
                     ColumnSchema(
                         name=col.name,
@@ -86,6 +106,7 @@ async def list_tables(
                         default=col.default,
                         primary_key=col.primary_key,
                         unique=col.unique,
+                        foreign_key=fk_schema,
                     )
                 )
 
@@ -138,6 +159,28 @@ async def create_table(
                 status_code=400, detail=f"Invalid column type: {col_schema.type}"
             )
 
+        # Convert foreign key if present
+        fk_ref = None
+        if col_schema.foreign_key:
+            # Validate FK action
+            if col_schema.foreign_key.on_delete not in ["CASCADE", "SET NULL", "RESTRICT", "NO ACTION"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid on_delete action: {col_schema.foreign_key.on_delete}"
+                )
+            if col_schema.foreign_key.on_update not in ["CASCADE", "SET NULL", "RESTRICT", "NO ACTION"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid on_update action: {col_schema.foreign_key.on_update}"
+                )
+            
+            fk_ref = ForeignKeyRef(
+                table=col_schema.foreign_key.table,
+                column=col_schema.foreign_key.column,
+                on_delete=col_schema.foreign_key.on_delete,
+                on_update=col_schema.foreign_key.on_update,
+            )
+        
         columns.append(
             Column(
                 name=col_schema.name,
@@ -146,6 +189,7 @@ async def create_table(
                 default=col_schema.default,
                 primary_key=col_schema.primary_key,
                 unique=col_schema.unique,
+                foreign_key=fk_ref,
             )
         )
 
@@ -270,6 +314,16 @@ async def get_table_info(
         # Convert columns
         columns = []
         for col in table.columns:
+            # Convert foreign key if present
+            fk_schema = None
+            if col.foreign_key:
+                fk_schema = ForeignKeySchema(
+                    table=col.foreign_key.table,
+                    column=col.foreign_key.column,
+                    on_delete=col.foreign_key.on_delete,
+                    on_update=col.foreign_key.on_update,
+                )
+            
             columns.append(
                 ColumnSchema(
                     name=col.name,
@@ -278,6 +332,7 @@ async def get_table_info(
                     default=col.default,
                     primary_key=col.primary_key,
                     unique=col.unique,
+                    foreign_key=fk_schema,
                 )
             )
 

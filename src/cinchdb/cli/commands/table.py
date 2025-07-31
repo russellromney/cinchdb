@@ -7,7 +7,7 @@ from rich.table import Table as RichTable
 
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.change_applier import ChangeApplier
-from cinchdb.models import Column
+from cinchdb.models import Column, ForeignKeyRef
 from cinchdb.cli.utils import get_config_with_data, validate_required_arg
 
 app = typer.Typer(help="Table management commands", invoke_without_command=True)
@@ -60,7 +60,7 @@ def create(
     ctx: typer.Context,
     name: Optional[str] = typer.Argument(None, help="Name of the table"),
     columns: Optional[List[str]] = typer.Argument(
-        None, help="Column definitions (format: name:type[:nullable])"
+        None, help="Column definitions (format: name:type[:nullable][:fk=table[.column][:action]])"
     ),
     apply: bool = typer.Option(
         True, "--apply/--no-apply", help="Apply changes to all tenants"
@@ -68,12 +68,14 @@ def create(
 ):
     """Create a new table.
 
-    Column format: name:type[:nullable]
+    Column format: name:type[:nullable][:fk=table[.column][:action]]
     Types: TEXT, INTEGER, REAL, BLOB, NUMERIC
+    FK Actions: CASCADE, SET NULL, RESTRICT, NO ACTION
 
     Examples:
         cinch table create users name:TEXT email:TEXT:nullable age:INTEGER:nullable
-        cinch table create posts title:TEXT content:TEXT published:INTEGER
+        cinch table create posts title:TEXT content:TEXT author_id:TEXT:fk=users
+        cinch table create comments content:TEXT post_id:TEXT:fk=posts.id:cascade
     """
     name = validate_required_arg(name, "name", ctx)
     if not columns:
@@ -90,12 +92,55 @@ def create(
         parts = col_def.split(":")
         if len(parts) < 2:
             console.print(f"[red]❌ Invalid column definition: '{col_def}'[/red]")
-            console.print("[yellow]Format: name:type[:nullable][/yellow]")
+            console.print("[yellow]Format: name:type[:nullable][:fk=table[.column][:action]][/yellow]")
             raise typer.Exit(1)
 
         col_name = parts[0]
         col_type = parts[1].upper()
-        nullable = len(parts) > 2 and parts[2].lower() == "nullable"
+        nullable = False
+        foreign_key = None
+        
+        # Parse additional parts
+        for i in range(2, len(parts)):
+            part = parts[i]
+            if part.lower() == "nullable":
+                nullable = True
+            elif part.startswith("fk="):
+                # Parse foreign key definition
+                fk_def = part[3:]  # Remove "fk=" prefix
+                
+                # Handle actions with spaces (e.g., "set null", "no action")
+                # Check for known actions at the end
+                fk_action = "RESTRICT"  # Default
+                for action in ["cascade", "set null", "restrict", "no action"]:
+                    if fk_def.lower().endswith("." + action):
+                        fk_action = action.upper()
+                        # Remove the action part from fk_def
+                        fk_def = fk_def[:-len("." + action)]
+                        break
+                
+                # Now split the remaining parts
+                fk_parts = fk_def.split(".")
+                
+                if len(fk_parts) == 1:
+                    # Just table name, column defaults to "id"
+                    fk_table = fk_parts[0]
+                    fk_column = "id"
+                elif len(fk_parts) == 2:
+                    # table.column format
+                    fk_table = fk_parts[0]
+                    fk_column = fk_parts[1]
+                else:
+                    console.print(f"[red]❌ Invalid foreign key format: '{fk_def}'[/red]")
+                    console.print("[yellow]Format: fk=table[.column][:action][/yellow]")
+                    raise typer.Exit(1)
+                
+                foreign_key = ForeignKeyRef(
+                    table=fk_table,
+                    column=fk_column,
+                    on_delete=fk_action,
+                    on_update="RESTRICT"  # Default to RESTRICT for updates
+                )
 
         if col_type not in ["TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC"]:
             console.print(f"[red]❌ Invalid type: '{col_type}'[/red]")
@@ -104,7 +149,12 @@ def create(
             )
             raise typer.Exit(1)
 
-        parsed_columns.append(Column(name=col_name, type=col_type, nullable=nullable))
+        parsed_columns.append(Column(
+            name=col_name, 
+            type=col_type, 
+            nullable=nullable,
+            foreign_key=foreign_key
+        ))
 
     try:
         table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")

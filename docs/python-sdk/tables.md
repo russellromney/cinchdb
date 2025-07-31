@@ -15,6 +15,66 @@ db.create_table("users", [
 ])
 ```
 
+### Tables with Foreign Keys
+```python
+from cinchdb.models import Column, ForeignKeyRef
+
+# Create parent table first
+db.create_table("users", [
+    Column(name="username", type="TEXT", nullable=False, unique=True),
+    Column(name="email", type="TEXT", nullable=False)
+])
+
+# Create child table with foreign key
+db.create_table("posts", [
+    Column(name="title", type="TEXT", nullable=False),
+    Column(name="content", type="TEXT"),
+    Column(
+        name="author_id",
+        type="TEXT",
+        nullable=False,
+        foreign_key=ForeignKeyRef(table="users", on_delete="CASCADE")
+    )
+])
+
+# Table with multiple foreign keys
+db.create_table("comments", [
+    Column(name="content", type="TEXT"),
+    Column(
+        name="post_id",
+        type="TEXT",
+        foreign_key=ForeignKeyRef(table="posts", on_delete="CASCADE")
+    ),
+    Column(
+        name="user_id",
+        type="TEXT",
+        foreign_key=ForeignKeyRef(table="users")
+    )
+])
+```
+
+### Foreign Key Options
+```python
+# Default: RESTRICT (prevents deletion)
+ForeignKeyRef(table="users")
+
+# CASCADE: Delete child rows when parent is deleted
+ForeignKeyRef(table="users", on_delete="CASCADE")
+
+# SET NULL: Set to NULL when parent is deleted (column must be nullable)
+ForeignKeyRef(table="users", on_delete="SET NULL")
+
+# Reference specific column (default is 'id')
+ForeignKeyRef(table="users", column="email")
+
+# Control update behavior
+ForeignKeyRef(
+    table="users",
+    on_delete="CASCADE",
+    on_update="CASCADE"  # Update child when parent key changes
+)
+```
+
 ### Column Types
 ```python
 # All supported types
@@ -167,23 +227,33 @@ db.create_table("users", [
 
 ### E-commerce Tables
 ```python
-# Products
-db.create_table("products", [
-    Column(name="sku", type="TEXT"),
+# Categories
+db.create_table("categories", [
     Column(name="name", type="TEXT"),
     Column(name="description", type="TEXT", nullable=True),
-    Column(name="category", type="TEXT"),
+    Column(name="parent_id", type="TEXT", nullable=True,
+           foreign_key=ForeignKeyRef(table="categories"))  # Self-referential
+])
+
+# Products with category reference
+db.create_table("products", [
+    Column(name="sku", type="TEXT", unique=True),
+    Column(name="name", type="TEXT"),
+    Column(name="description", type="TEXT", nullable=True),
+    Column(name="category_id", type="TEXT",
+           foreign_key=ForeignKeyRef(table="categories")),
     Column(name="price", type="REAL"),
     Column(name="cost", type="REAL"),
     Column(name="stock", type="INTEGER"),
     Column(name="min_stock", type="INTEGER"),
-    Column(name="is_active", type="BOOLEAN")
+    Column(name="is_active", type="INTEGER")
 ])
 
-# Orders
+# Orders with user reference
 db.create_table("orders", [
-    Column(name="user_id", type="TEXT"),
-    Column(name="order_number", type="TEXT"),
+    Column(name="user_id", type="TEXT",
+           foreign_key=ForeignKeyRef(table="users")),
+    Column(name="order_number", type="TEXT", unique=True),
     Column(name="status", type="TEXT"),
     Column(name="subtotal", type="REAL"),
     Column(name="tax", type="REAL"),
@@ -192,10 +262,12 @@ db.create_table("orders", [
     Column(name="notes", type="TEXT", nullable=True)
 ])
 
-# Order Items
+# Order Items with cascading deletes
 db.create_table("order_items", [
-    Column(name="order_id", type="TEXT"),
-    Column(name="product_id", type="TEXT"),
+    Column(name="order_id", type="TEXT",
+           foreign_key=ForeignKeyRef(table="orders", on_delete="CASCADE")),
+    Column(name="product_id", type="TEXT",
+           foreign_key=ForeignKeyRef(table="products")),
     Column(name="quantity", type="INTEGER"),
     Column(name="unit_price", type="REAL"),
     Column(name="total_price", type="REAL")
@@ -205,7 +277,9 @@ db.create_table("order_items", [
 ### Audit Log Table
 ```python
 db.create_table("audit_logs", [
-    Column(name="user_id", type="TEXT"),
+    Column(name="user_id", type="TEXT",
+           foreign_key=ForeignKeyRef(table="users", on_delete="SET NULL"),
+           nullable=True),  # Allow NULL if user is deleted
     Column(name="action", type="TEXT"),
     Column(name="resource_type", type="TEXT"),
     Column(name="resource_id", type="TEXT"),
@@ -213,6 +287,26 @@ db.create_table("audit_logs", [
     Column(name="new_values", type="TEXT", nullable=True),
     Column(name="ip_address", type="TEXT", nullable=True),
     Column(name="user_agent", type="TEXT", nullable=True)
+])
+```
+
+### Many-to-Many Relationships
+```python
+# Users and roles example
+db.create_table("roles", [
+    Column(name="name", type="TEXT", unique=True),
+    Column(name="description", type="TEXT", nullable=True)
+])
+
+# Junction table with composite foreign keys
+db.create_table("user_roles", [
+    Column(name="user_id", type="TEXT",
+           foreign_key=ForeignKeyRef(table="users", on_delete="CASCADE")),
+    Column(name="role_id", type="TEXT",
+           foreign_key=ForeignKeyRef(table="roles", on_delete="CASCADE")),
+    Column(name="granted_at", type="TEXT"),
+    Column(name="granted_by", type="TEXT", nullable=True,
+           foreign_key=ForeignKeyRef(table="users"))
 ])
 ```
 
@@ -260,6 +354,20 @@ db.query("""
     ADD CONSTRAINT positive_price 
     CHECK (price >= 0)
 """)
+
+# Foreign key constraints are defined during table creation
+db.create_table("posts", [
+    Column(name="title", type="TEXT"),
+    Column(
+        name="author_id",
+        type="TEXT",
+        foreign_key=ForeignKeyRef(
+            table="users",
+            on_delete="CASCADE",
+            on_update="RESTRICT"
+        )
+    )
+])
 ```
 
 ## Error Handling

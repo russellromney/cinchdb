@@ -46,7 +46,9 @@ export function ApiKeyForm() {
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
       {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-100 via-pink-50 to-blue-100 dark:from-purple-950/20 dark:via-pink-950/20 dark:to-blue-950/20">
+      <div className="absolute inset-0" style={{
+        backgroundImage: 'linear-gradient(to bottom right, rgb(243 232 255), rgb(253 242 248), rgb(219 234 254))'
+      }}>
         <div className="absolute inset-0 bg-grid-slate-900/[0.04] dark:bg-grid-slate-100/[0.02]" />
       </div>
       
@@ -99,7 +101,7 @@ export function ApiKeyForm() {
               </motion.div>
               
               <h1 className="text-5xl lg:text-6xl font-bold mb-4">
-                <span className="text-gradient gradient-primary">Modern Database</span>
+                <span style={{ backgroundImage: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))', backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent' }}>Modern Database</span>
                 <br />
                 <span className="text-foreground">Management</span>
               </h1>
@@ -117,7 +119,7 @@ export function ApiKeyForm() {
                   variants={fadeInUp}
                   whileHover={{ x: 10 }}
                 >
-                  <div className="flex-shrink-0 w-12 h-12 rounded-lg gradient-primary flex items-center justify-center">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))' }}>
                     <feature.icon className="w-6 h-6 text-white" />
                   </div>
                   <div>
@@ -134,7 +136,8 @@ export function ApiKeyForm() {
             <Card className="glass border-0 shadow-2xl">
               <CardHeader className="space-y-1 text-center pb-8">
                 <motion.div 
-                  className="mx-auto mb-4 w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center shadow-glow"
+                  className="mx-auto mb-4 w-20 h-20 rounded-2xl flex items-center justify-center shadow-glow"
+                  style={{ background: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))' }}
                   whileHover={{ rotate: 360 }}
                   transition={{ duration: 0.5 }}
                 >
@@ -207,7 +210,8 @@ export function ApiKeyForm() {
                     <Button
                       type="submit"
                       disabled={connecting || !apiKey.trim()}
-                      className="w-full h-12 text-base font-medium gradient-primary text-white border-0 shadow-glow-lg hover:shadow-glow transition-all duration-300"
+                      className="w-full h-12 text-base font-medium text-white border-0 shadow-glow-lg hover:shadow-glow transition-all duration-300"
+                      style={{ background: 'linear-gradient(to right, rgb(147 51 234), rgb(219 39 119))' }}
                     >
                       {connecting ? (
                         <>

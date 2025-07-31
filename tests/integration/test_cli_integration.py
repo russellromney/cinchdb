@@ -301,8 +301,8 @@ class TestCLIIntegration:
 
         # Insert some data with NULL phone (need to include all required fields)
         import uuid
-        from datetime import datetime
-        now = datetime.utcnow().isoformat()
+        import datetime
+        now = datetime.datetime.now(datetime.UTC).isoformat()
         result = self.run_in_project(
             ["query", f"INSERT INTO users (id, name, age, phone, created_at, updated_at) VALUES ('{uuid.uuid4()}', 'John', 30, NULL, '{now}', '{now}'), ('{uuid.uuid4()}', 'Jane', 25, '555-1234', '{now}', '{now}')"],
             temp_project,

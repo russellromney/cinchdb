@@ -196,7 +196,7 @@ export function ResultsTable({ results, error }: ResultsTableProps) {
               animate={{ scale: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              <div className="w-20 h-20 rounded-2xl gradient-secondary flex items-center justify-center mb-4">
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'linear-gradient(to right, rgb(37 99 235), rgb(8 145 178))' }}>
                 <Database className="h-10 w-10 text-white" />
               </div>
             </motion.div>
@@ -250,7 +250,7 @@ export function ResultsTable({ results, error }: ResultsTableProps) {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                 >
-                  <div className="p-2 rounded-lg gradient-success">
+                  <div className="p-2 rounded-lg" style={{ background: 'linear-gradient(to right, rgb(34 197 94), rgb(16 185 129))' }}>
                     <TableIcon className="h-5 w-5 text-white" />
                   </div>
                   <h3 className="text-lg font-semibold">Results</h3>

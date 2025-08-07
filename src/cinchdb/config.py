@@ -135,43 +135,16 @@ class Config:
             toml.dump(config_dict, f)
 
     def init_project(self) -> ProjectConfig:
-        """Initialize a new CinchDB project with default configuration."""
-        if self.exists:
-            raise FileExistsError(f"Project already exists at {self.config_dir}")
-
-        # Create default config
-        config = ProjectConfig()
-        self.save(config)
-
-        # Create default database structure
-        self._create_default_structure()
-
+        """Initialize a new CinchDB project with default configuration.
+        
+        This method now delegates to the ProjectInitializer for the actual
+        initialization logic.
+        """
+        from cinchdb.core.initializer import ProjectInitializer
+        
+        initializer = ProjectInitializer(self.project_dir)
+        config = initializer.init_project()
+        
+        # Load the config into this instance
+        self._config = config
         return config
-
-    def _create_default_structure(self) -> None:
-        """Create default project structure."""
-        # Create main database with main branch
-        db_path = self.config_dir / "databases" / "main" / "branches" / "main"
-        db_path.mkdir(parents=True, exist_ok=True)
-
-        # Create metadata files
-        from datetime import datetime, timezone
-
-        metadata = {"created_at": datetime.now(timezone.utc).isoformat()}
-
-        import json
-
-        with open(db_path / "metadata.json", "w") as f:
-            json.dump(metadata, f, indent=2)
-
-        # Create empty changes file
-        with open(db_path / "changes.json", "w") as f:
-            json.dump([], f, indent=2)
-
-        # Create main tenant directory and database
-        tenant_dir = db_path / "tenants"
-        tenant_dir.mkdir(exist_ok=True)
-
-        # Create main tenant database file
-        main_db = tenant_dir / "main.db"
-        main_db.touch()

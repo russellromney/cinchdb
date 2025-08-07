@@ -73,17 +73,30 @@ def init(
     path: Optional[Path] = typer.Argument(
         None, help="Directory to initialize project in (default: current directory)"
     ),
+    database: Optional[str] = typer.Option(
+        "main", "--database", "-d", help="Initial database name"
+    ),
+    branch: Optional[str] = typer.Option(
+        "main", "--branch", "-b", help="Initial branch name"  
+    ),
 ):
     """Initialize a new CinchDB project."""
-    from cinchdb.config import Config
+    from cinchdb.core.initializer import init_project
 
     project_path = path or Path.cwd()
 
     try:
-        config = Config(project_path)
-        config.init_project()
+        # Use the core initializer directly
+        config = init_project(
+            project_dir=project_path,
+            database_name=database,
+            branch_name=branch
+        )
         typer.secho(
             f"✅ Initialized CinchDB project in {project_path}", fg=typer.colors.GREEN
+        )
+        typer.secho(
+            f"   Database: {database}, Branch: {branch}", fg=typer.colors.CYAN
         )
     except FileExistsError:
         typer.secho(f"❌ Project already exists in {project_path}", fg=typer.colors.RED)

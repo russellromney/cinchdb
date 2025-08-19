@@ -4,7 +4,7 @@
 
 NOTE: CinchDB is in early alpha. This is project to test out an idea. Do not use this in production.
 
-CinchDB is for projects that need fast queries, data isolated data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database-b74445f4), and a branchable database.
+CinchDB is for projects that need fast queries, data isolated data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database-b74445f4), and a branchable database that makes it easy to merge changes between branches.
 
 On a meta level, I made this because I wanted a database structure that I felt comfortable letting AI agents take full control over, safely, and I didn't want to run my own Postgres instance somewhere or pay for it on e.g. Neon - I don't need hyperscaling, I just need super fast queries.
 

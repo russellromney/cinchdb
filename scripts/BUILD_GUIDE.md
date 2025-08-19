@@ -8,6 +8,14 @@ This guide explains how to build and publish the CinchDB Python package to PyPI.
 - `uv` package manager installed (`pip install uv`)
 - PyPI account and API token (for publishing)
 
+## Update the version
+
+```shell
+uv version
+
+uv version <new.version.number>
+```
+
 ## Building the Package
 
 ### Quick Build

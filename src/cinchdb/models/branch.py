@@ -22,7 +22,7 @@ class Branch(CinchDBBaseModel):
     )
     is_main: bool = Field(default=False, description="Whether this is the main branch")
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def validate_name_field(cls, v: str) -> str:
         """Validate branch name meets naming requirements."""

@@ -49,14 +49,16 @@ class TestForeignKeys:
                 name="author_id",
                 type="TEXT",
                 nullable=False,
-                foreign_key=ForeignKeyRef(table="users", column="id", on_delete="CASCADE"),
+                foreign_key=ForeignKeyRef(
+                    table="users", column="id", on_delete="CASCADE"
+                ),
             ),
         ]
         posts_table = table_manager.create_table("posts", post_columns)
 
         # Verify table was created
         assert posts_table.name == "posts"
-        
+
         # Verify foreign key is tracked in column
         author_col = next(col for col in posts_table.columns if col.name == "author_id")
         assert author_col.foreign_key is not None
@@ -71,7 +73,10 @@ class TestForeignKeys:
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name='posts'"
             )
             create_sql = cursor.fetchone()["sql"]
-            assert "FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE" in create_sql
+            assert (
+                "FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE"
+                in create_sql
+            )
 
     def test_foreign_key_default_column(self, table_manager):
         """Test foreign key defaults to id column."""
@@ -192,7 +197,7 @@ class TestForeignKeys:
                 foreign_key=ForeignKeyRef(table="employees"),
             ),
         ]
-        
+
         # This should fail because employees table doesn't exist yet
         with pytest.raises(ValueError) as exc:
             table_manager.create_table("employees", emp_cols)
@@ -200,7 +205,7 @@ class TestForeignKeys:
 
         # Create table without FK first
         table_manager.create_table("employees", [Column(name="name", type="TEXT")])
-        
+
         # Then create another table with FK to employees
         dept_cols = [
             Column(name="name", type="TEXT"),
@@ -221,7 +226,7 @@ class TestForeignKeys:
                 foreign_key=ForeignKeyRef(table="nonexistent"),
             ),
         ]
-        
+
         with pytest.raises(ValueError) as exc:
             table_manager.create_table("posts", columns)
         assert "non-existent table: 'nonexistent'" in str(exc.value)
@@ -239,7 +244,7 @@ class TestForeignKeys:
                 foreign_key=ForeignKeyRef(table="users", column="nonexistent"),
             ),
         ]
-        
+
         with pytest.raises(ValueError) as exc:
             table_manager.create_table("posts", columns)
         assert "non-existent column: 'users.nonexistent'" in str(exc.value)
@@ -255,9 +260,7 @@ class TestForeignKeys:
                 name="user_id",
                 type="TEXT",
                 foreign_key=ForeignKeyRef(
-                    table="users",
-                    on_delete="RESTRICT",
-                    on_update="CASCADE"
+                    table="users", on_delete="RESTRICT", on_update="CASCADE"
                 ),
             ),
         ]
@@ -276,13 +279,13 @@ class TestForeignKeys:
         """Test that foreign key constraints are actually enforced."""
         # Create users table and add a user
         table_manager.create_table("users", [Column(name="username", type="TEXT")])
-        
+
         db_path = get_tenant_db_path(temp_project, "main", "main", "main")
         with DatabaseConnection(db_path) as conn:
             # Add a user
             conn.execute(
                 "INSERT INTO users (id, username, created_at) VALUES (?, ?, datetime('now'))",
-                ("user1", "testuser")
+                ("user1", "testuser"),
             )
             conn.commit()
 
@@ -301,7 +304,7 @@ class TestForeignKeys:
             # This should work - valid foreign key
             conn.execute(
                 "INSERT INTO posts (id, title, author_id, created_at) VALUES (?, ?, ?, datetime('now'))",
-                ("post1", "Test Post", "user1")
+                ("post1", "Test Post", "user1"),
             )
             conn.commit()
 
@@ -309,7 +312,7 @@ class TestForeignKeys:
             with pytest.raises(Exception) as exc:
                 conn.execute(
                     "INSERT INTO posts (id, title, author_id, created_at) VALUES (?, ?, ?, datetime('now'))",
-                    ("post2", "Bad Post", "nonexistent_user")
+                    ("post2", "Bad Post", "nonexistent_user"),
                 )
             assert "FOREIGN KEY constraint failed" in str(exc.value)
 
@@ -317,7 +320,7 @@ class TestForeignKeys:
         """Test CASCADE delete action."""
         # Create users table
         table_manager.create_table("users", [Column(name="username", type="TEXT")])
-        
+
         # Create posts table with CASCADE delete
         columns = [
             Column(name="title", type="TEXT"),
@@ -334,11 +337,11 @@ class TestForeignKeys:
             # Add a user and post
             conn.execute(
                 "INSERT INTO users (id, username, created_at) VALUES (?, ?, datetime('now'))",
-                ("user1", "testuser")
+                ("user1", "testuser"),
             )
             conn.execute(
                 "INSERT INTO posts (id, title, author_id, created_at) VALUES (?, ?, ?, datetime('now'))",
-                ("post1", "Test Post", "user1")
+                ("post1", "Test Post", "user1"),
             )
             conn.commit()
 

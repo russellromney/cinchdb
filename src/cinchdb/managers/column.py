@@ -439,16 +439,20 @@ class ColumnManager:
             conn.commit()
 
     def alter_column_nullable(
-        self, table_name: str, column_name: str, nullable: bool, fill_value: Optional[Any] = None
+        self,
+        table_name: str,
+        column_name: str,
+        nullable: bool,
+        fill_value: Optional[Any] = None,
     ) -> None:
         """Change the nullable constraint on a column.
-        
+
         Args:
             table_name: Name of the table
             column_name: Name of the column to modify
             nullable: Whether the column should allow NULL values
             fill_value: Value to use for existing NULL values when making column NOT NULL
-        
+
         Raises:
             ValueError: If table/column doesn't exist or column is protected
             ValueError: If making NOT NULL and column has NULL values without fill_value
@@ -469,13 +473,13 @@ class ColumnManager:
         existing_columns = self.list_columns(table_name)
         column_found = False
         old_column = None
-        
+
         for col in existing_columns:
             if col.name == column_name:
                 column_found = True
                 old_column = col
                 break
-                
+
         if not column_found:
             raise ValueError(
                 f"Column '{column_name}' does not exist in table '{table_name}'"
@@ -494,7 +498,7 @@ class ColumnManager:
                     f"SELECT COUNT(*) FROM {table_name} WHERE {column_name} IS NULL"
                 )
                 null_count = cursor.fetchone()[0]
-                
+
                 if null_count > 0 and fill_value is None:
                     raise ValueError(
                         f"Column '{column_name}' has {null_count} NULL values. "
@@ -503,7 +507,7 @@ class ColumnManager:
 
         # Build SQL statements for table recreation
         temp_table = f"{table_name}_temp"
-        
+
         # Create new table with modified column
         col_defs = []
         for col in existing_columns:
@@ -527,7 +531,7 @@ class ColumnManager:
         # Column names for copying
         col_names = [col.name for col in existing_columns]
         col_list = ", ".join(col_names)
-        
+
         # Build copy SQL with COALESCE if needed
         if not nullable and fill_value is not None:
             # Build select list with COALESCE for the target column
@@ -545,7 +549,7 @@ class ColumnManager:
             copy_sql = f"INSERT INTO {temp_table} ({col_list}) SELECT {select_list} FROM {table_name}"
         else:
             copy_sql = f"INSERT INTO {temp_table} ({col_list}) SELECT {col_list} FROM {table_name}"
-            
+
         drop_sql = f"DROP TABLE {table_name}"
         rename_sql = f"ALTER TABLE {temp_table} RENAME TO {table_name}"
 

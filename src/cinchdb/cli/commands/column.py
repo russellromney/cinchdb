@@ -235,7 +235,10 @@ def alter_nullable(
         None, "--nullable/--not-nullable", help="Make column nullable or NOT NULL"
     ),
     fill_value: Optional[str] = typer.Option(
-        None, "--fill-value", "-f", help="Value to use for NULL values when making NOT NULL"
+        None,
+        "--fill-value",
+        "-f",
+        help="Value to use for NULL values when making NOT NULL",
     ),
     apply: bool = typer.Option(
         True, "--apply/--no-apply", help="Apply changes to all tenants"
@@ -244,20 +247,22 @@ def alter_nullable(
     """Change the nullable constraint on a column."""
     table = validate_required_arg(table, "table", ctx)
     column = validate_required_arg(column, "column", ctx)
-    
+
     # Validate nullable flag was provided
     if nullable is None:
         console.print(ctx.get_help())
-        console.print("\n[red]❌ Error: Must specify either --nullable or --not-nullable[/red]")
+        console.print(
+            "\n[red]❌ Error: Must specify either --nullable or --not-nullable[/red]"
+        )
         raise typer.Exit(1)
-    
+
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
 
     try:
         column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
-        
+
         # Check if column has NULLs when making NOT NULL
         if not nullable and fill_value is None:
             # Get column info to check current state
@@ -266,18 +271,22 @@ def alter_nullable(
                 # Check for NULL values
                 from cinchdb.core.connection import DatabaseConnection
                 from cinchdb.core.path_utils import get_tenant_db_path
-                
-                db_path = get_tenant_db_path(config.project_dir, db_name, branch_name, "main")
+
+                db_path = get_tenant_db_path(
+                    config.project_dir, db_name, branch_name, "main"
+                )
                 with DatabaseConnection(db_path) as conn:
                     cursor = conn.execute(
                         f"SELECT COUNT(*) FROM {table} WHERE {column} IS NULL"
                     )
                     null_count = cursor.fetchone()[0]
-                    
+
                     if null_count > 0:
-                        console.print(f"[yellow]Column '{column}' has {null_count} NULL values.[/yellow]")
+                        console.print(
+                            f"[yellow]Column '{column}' has {null_count} NULL values.[/yellow]"
+                        )
                         fill_value = typer.prompt("Provide a fill value")
-        
+
         # Convert fill_value to appropriate type
         if fill_value is not None:
             # Try to interpret the value
@@ -288,13 +297,17 @@ def alter_nullable(
             elif fill_value.replace(".", "", 1).isdigit():
                 fill_value = float(fill_value)
             # Otherwise keep as string
-        
+
         column_mgr.alter_column_nullable(table, column, nullable, fill_value)
-        
+
         if nullable:
-            console.print(f"[green]✅ Made column '{column}' nullable in table '{table}'[/green]")
+            console.print(
+                f"[green]✅ Made column '{column}' nullable in table '{table}'[/green]"
+            )
         else:
-            console.print(f"[green]✅ Made column '{column}' NOT NULL in table '{table}'[/green]")
+            console.print(
+                f"[green]✅ Made column '{column}' NOT NULL in table '{table}'[/green]"
+            )
 
         if apply:
             # Apply to all tenants

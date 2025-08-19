@@ -17,7 +17,7 @@ from cinchdb.core.maintenance import MaintenanceError
 from pydantic import BaseModel
 
 
-class TestTable(BaseModel):
+class SampleTable(BaseModel):
     """Test model for data operations."""
 
     id: str = ""
@@ -167,7 +167,7 @@ class TestMaintenanceMode:
         """Test that data creation is blocked during maintenance."""
         self._enter_maintenance_mode()
 
-        record = TestTable(name="test", value=123)
+        record = SampleTable(name="test", value=123)
 
         with pytest.raises(MaintenanceError) as exc_info:
             self.data_manager.create(record)
@@ -180,7 +180,7 @@ class TestMaintenanceMode:
         """Test that data save is blocked during maintenance."""
         self._enter_maintenance_mode()
 
-        record = TestTable(name="test", value=123)
+        record = SampleTable(name="test", value=123)
 
         with pytest.raises(MaintenanceError) as exc_info:
             self.data_manager.save(record)
@@ -192,7 +192,7 @@ class TestMaintenanceMode:
     def test_data_update_blocked(self):
         """Test that data update is blocked during maintenance."""
         # First create a record
-        record = TestTable(name="test", value=123)
+        record = SampleTable(name="test", value=123)
         created = self.data_manager.create(record)
 
         self._enter_maintenance_mode()
@@ -209,13 +209,13 @@ class TestMaintenanceMode:
     def test_data_delete_blocked(self):
         """Test that data deletion is blocked during maintenance."""
         # First create a record
-        record = TestTable(name="test", value=123)
+        record = SampleTable(name="test", value=123)
         created = self.data_manager.create(record)
 
         self._enter_maintenance_mode()
 
         with pytest.raises(MaintenanceError) as exc_info:
-            self.data_manager.delete(TestTable, id=created.id)
+            self.data_manager.delete(SampleTable, id=created.id)
 
         assert "maintenance mode" in str(exc_info.value)
 
@@ -226,8 +226,8 @@ class TestMaintenanceMode:
         self._enter_maintenance_mode()
 
         records = [
-            TestTable(name="test1", value=123),
-            TestTable(name="test2", value=456),
+            SampleTable(name="test1", value=123),
+            SampleTable(name="test2", value=456),
         ]
 
         with pytest.raises(MaintenanceError) as exc_info:
@@ -318,7 +318,7 @@ class TestMaintenanceMode:
     def test_read_operations_allowed(self):
         """Test that read operations are allowed during maintenance."""
         # Create some data
-        record = TestTable(name="test", value=123)
+        record = SampleTable(name="test", value=123)
         created = self.data_manager.create(record)
 
         self._enter_maintenance_mode()
@@ -333,13 +333,13 @@ class TestMaintenanceMode:
         columns = self.column_manager.list_columns("test_table")
         assert len(columns) > 0
 
-        records = self.data_manager.select(TestTable)
+        records = self.data_manager.select(SampleTable)
         assert len(records) == 1
 
-        found = self.data_manager.find_by_id(TestTable, created.id)
+        found = self.data_manager.find_by_id(SampleTable, created.id)
         assert found is not None
 
-        count = self.data_manager.count(TestTable)
+        count = self.data_manager.count(SampleTable)
         assert count == 1
 
         self._exit_maintenance_mode()

@@ -3,10 +3,9 @@
 from pathlib import Path
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 
-from cinchdb.config import Config
 from cinchdb.models import Column, Change
 from cinchdb.core.path_utils import get_project_root
-from cinchdb.utils import validate_query_safe, SQLValidationError
+from cinchdb.utils import validate_query_safe
 
 if TYPE_CHECKING:
     from cinchdb.managers.table import TableManager
@@ -307,7 +306,10 @@ class CinchDB:
     # Convenience methods for common operations
 
     def query(
-        self, sql: str, params: Optional[List[Any]] = None, skip_validation: bool = False
+        self,
+        sql: str,
+        params: Optional[List[Any]] = None,
+        skip_validation: bool = False,
     ) -> List[Dict[str, Any]]:
         """Execute a SQL query.
 
@@ -318,14 +320,14 @@ class CinchDB:
 
         Returns:
             List of result rows as dictionaries
-            
+
         Raises:
             SQLValidationError: If the query contains restricted operations
         """
         # Validate query unless explicitly skipped
         if not skip_validation:
             validate_query_safe(sql)
-            
+
         if self.is_local:
             if self._query_manager is None:
                 from cinchdb.managers.query import QueryManager
@@ -427,6 +429,7 @@ class CinchDB:
         """
         if self.is_local:
             from cinchdb.managers.change_tracker import ChangeTracker
+
             tracker = ChangeTracker(self.project_dir, self.database, self.branch)
             return tracker.get_changes()
         else:
@@ -435,6 +438,7 @@ class CinchDB:
             # Convert API response to Change objects
             from cinchdb.models import Change
             from datetime import datetime
+
             changes = []
             for data in result.get("changes", []):
                 # Convert string dates back to datetime if present

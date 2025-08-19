@@ -185,7 +185,6 @@ class TestCinchDB:
                 },
             )
 
-
     def test_context_manager(self):
         """Test context manager functionality."""
         # Create a mock session
@@ -212,11 +211,11 @@ class TestCinchDB:
     def test_local_list_changes(self, tmp_path):
         """Test list_changes on local connection."""
         db = CinchDB(database="test_db", project_dir=tmp_path)
-        
+
         with patch("cinchdb.managers.change_tracker.ChangeTracker") as mock_tracker:
             from cinchdb.models import Change, ChangeType
             from datetime import datetime, timezone
-            
+
             # Mock changes
             mock_changes = [
                 Change(
@@ -226,7 +225,7 @@ class TestCinchDB:
                     entity_name="users",
                     branch="main",
                     applied=True,
-                    created_at=datetime.now(timezone.utc)
+                    created_at=datetime.now(timezone.utc),
                 ),
                 Change(
                     id="change-2",
@@ -235,16 +234,16 @@ class TestCinchDB:
                     entity_name="users",
                     branch="main",
                     applied=False,
-                    created_at=datetime.now(timezone.utc)
-                )
+                    created_at=datetime.now(timezone.utc),
+                ),
             ]
-            
+
             mock_instance = Mock()
             mock_instance.get_changes.return_value = mock_changes
             mock_tracker.return_value = mock_instance
-            
+
             result = db.list_changes()
-            
+
             mock_tracker.assert_called_once_with(tmp_path, "test_db", "main")
             mock_instance.get_changes.assert_called_once()
             assert len(result) == 2
@@ -256,15 +255,15 @@ class TestCinchDB:
     def test_remote_list_changes(self):
         """Test list_changes on remote connection."""
         db = CinchDB(
-            database="test_db", 
+            database="test_db",
             branch="dev",
-            api_url="https://api.example.com", 
-            api_key="test-key"
+            api_url="https://api.example.com",
+            api_key="test-key",
         )
-        
+
         with patch.object(db, "_make_request") as mock_request:
             from datetime import datetime
-            
+
             # Mock API response
             mock_request.return_value = {
                 "changes": [
@@ -278,7 +277,7 @@ class TestCinchDB:
                         "created_at": "2024-01-01T12:00:00",
                         "updated_at": None,
                         "details": {},
-                        "sql": "CREATE TABLE users (...)"
+                        "sql": "CREATE TABLE users (...)",
                     },
                     {
                         "id": "change-2",
@@ -290,13 +289,13 @@ class TestCinchDB:
                         "created_at": "2024-01-02T12:00:00",
                         "updated_at": "2024-01-02T13:00:00",
                         "details": {"column_name": "email"},
-                        "sql": "ALTER TABLE users ADD COLUMN email TEXT"
-                    }
+                        "sql": "ALTER TABLE users ADD COLUMN email TEXT",
+                    },
                 ]
             }
-            
+
             result = db.list_changes()
-            
+
             mock_request.assert_called_once_with("GET", "/branches/dev/changes")
             assert len(result) == 2
             assert result[0].id == "change-1"
@@ -312,7 +311,7 @@ class TestCinchDB:
 class TestFactoryFunctions:
     """Test the factory functions."""
 
-    @patch("cinchdb.core.database.Config")
+    @patch("cinchdb.config.Config")
     def test_connect_with_project_dir(self, mock_config, tmp_path):
         """Test connect function with explicit project dir."""
         db = connect("test_db", "dev", "tenant1", project_dir=tmp_path)
@@ -344,7 +343,9 @@ class TestFactoryFunctions:
     @patch("cinchdb.core.database.get_project_root")
     def test_connect_no_project_found(self, mock_get_project_root):
         """Test connect function when no project found."""
-        mock_get_project_root.side_effect = FileNotFoundError("No .cinchdb directory found")
+        mock_get_project_root.side_effect = FileNotFoundError(
+            "No .cinchdb directory found"
+        )
 
         with pytest.raises(ValueError, match="No .cinchdb directory found"):
             connect("test_db")

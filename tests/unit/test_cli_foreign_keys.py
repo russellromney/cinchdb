@@ -20,18 +20,19 @@ class TestCLIForeignKeys:
         """Create a temporary project directory."""
         temp = tempfile.mkdtemp()
         project_dir = Path(temp)
-        
+
         # Initialize project
         config = Config(project_dir)
         config.init_project()
-        
+
         # Change to project directory for CLI commands
         import os
+
         old_cwd = os.getcwd()
         os.chdir(temp)
-        
+
         yield project_dir
-        
+
         os.chdir(old_cwd)
         shutil.rmtree(temp)
 
@@ -43,13 +44,22 @@ class TestCLIForeignKeys:
     def test_cli_create_table_with_foreign_key_basic(self, runner, temp_project):
         """Test creating table with basic foreign key syntax."""
         # Create users table first
-        result = runner.invoke(app, ["table", "create", "users", "username:TEXT", "email:TEXT"])
+        result = runner.invoke(
+            app, ["table", "create", "users", "username:TEXT", "email:TEXT"]
+        )
         assert result.exit_code == 0
 
         # Create posts table with foreign key
         result = runner.invoke(
             app,
-            ["table", "create", "posts", "title:TEXT", "content:TEXT", "author_id:TEXT:fk=users"]
+            [
+                "table",
+                "create",
+                "posts",
+                "title:TEXT",
+                "content:TEXT",
+                "author_id:TEXT:fk=users",
+            ],
         )
         assert result.exit_code == 0
         assert "Created table 'posts'" in result.output
@@ -66,13 +76,15 @@ class TestCLIForeignKeys:
     def test_cli_foreign_key_with_column(self, runner, temp_project):
         """Test foreign key with specific column."""
         # Create users table
-        result = runner.invoke(app, ["table", "create", "users", "username:TEXT", "email:TEXT"])
+        result = runner.invoke(
+            app, ["table", "create", "users", "username:TEXT", "email:TEXT"]
+        )
         assert result.exit_code == 0
 
         # Create posts with FK to specific column
         result = runner.invoke(
             app,
-            ["table", "create", "posts", "title:TEXT", "author_id:TEXT:fk=users.id"]
+            ["table", "create", "posts", "title:TEXT", "author_id:TEXT:fk=users.id"],
         )
         assert result.exit_code == 0
 
@@ -94,7 +106,13 @@ class TestCLIForeignKeys:
         # Create posts with CASCADE delete
         result = runner.invoke(
             app,
-            ["table", "create", "posts", "title:TEXT", "author_id:TEXT:fk=users.cascade"]
+            [
+                "table",
+                "create",
+                "posts",
+                "title:TEXT",
+                "author_id:TEXT:fk=users.cascade",
+            ],
         )
         assert result.exit_code == 0
 
@@ -116,7 +134,13 @@ class TestCLIForeignKeys:
         # Create posts with full FK syntax
         result = runner.invoke(
             app,
-            ["table", "create", "posts", "title:TEXT", "author_id:TEXT:fk=users.id.cascade"]
+            [
+                "table",
+                "create",
+                "posts",
+                "title:TEXT",
+                "author_id:TEXT:fk=users.id.cascade",
+            ],
         )
         assert result.exit_code == 0
 
@@ -127,7 +151,9 @@ class TestCLIForeignKeys:
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name='posts'"
             )
             sql = cursor.fetchone()["sql"]
-            assert "FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE" in sql
+            assert (
+                "FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE" in sql
+            )
 
     def test_cli_nullable_with_foreign_key(self, runner, temp_project):
         """Test combining nullable and foreign key."""
@@ -138,7 +164,13 @@ class TestCLIForeignKeys:
         # Create posts with nullable FK
         result = runner.invoke(
             app,
-            ["table", "create", "posts", "title:TEXT", "author_id:TEXT:nullable:fk=users"]
+            [
+                "table",
+                "create",
+                "posts",
+                "title:TEXT",
+                "author_id:TEXT:nullable:fk=users",
+            ],
         )
         assert result.exit_code == 0
 
@@ -155,7 +187,7 @@ class TestCLIForeignKeys:
         # Create referenced tables
         result = runner.invoke(app, ["table", "create", "users", "username:TEXT"])
         assert result.exit_code == 0
-        
+
         result = runner.invoke(app, ["table", "create", "posts", "title:TEXT"])
         assert result.exit_code == 0
 
@@ -163,11 +195,13 @@ class TestCLIForeignKeys:
         result = runner.invoke(
             app,
             [
-                "table", "create", "comments",
+                "table",
+                "create",
+                "comments",
                 "content:TEXT",
                 "user_id:TEXT:fk=users",
-                "post_id:TEXT:fk=posts"
-            ]
+                "post_id:TEXT:fk=posts",
+            ],
         )
         assert result.exit_code == 0
 
@@ -190,7 +224,13 @@ class TestCLIForeignKeys:
         # Try invalid action
         result = runner.invoke(
             app,
-            ["table", "create", "posts", "title:TEXT", "author_id:TEXT:fk=users.id.invalid"]
+            [
+                "table",
+                "create",
+                "posts",
+                "title:TEXT",
+                "author_id:TEXT:fk=users.id.invalid",
+            ],
         )
         assert result.exit_code == 1
         assert "Invalid foreign key format" in result.output
@@ -199,7 +239,7 @@ class TestCLIForeignKeys:
         """Test foreign key to non-existent table."""
         result = runner.invoke(
             app,
-            ["table", "create", "posts", "title:TEXT", "author_id:TEXT:fk=nonexistent"]
+            ["table", "create", "posts", "title:TEXT", "author_id:TEXT:fk=nonexistent"],
         )
         assert result.exit_code == 1
         assert "non-existent table" in result.output
@@ -213,7 +253,13 @@ class TestCLIForeignKeys:
         # Create posts with SET NULL
         result = runner.invoke(
             app,
-            ["table", "create", "posts", "title:TEXT", "author_id:TEXT:nullable:fk=users.set null"]
+            [
+                "table",
+                "create",
+                "posts",
+                "title:TEXT",
+                "author_id:TEXT:nullable:fk=users.set null",
+            ],
         )
         assert result.exit_code == 0
 

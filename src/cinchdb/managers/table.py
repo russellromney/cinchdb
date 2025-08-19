@@ -95,13 +95,13 @@ class TableManager:
         for column in columns:
             if column.foreign_key:
                 fk = column.foreign_key
-                
+
                 # Validate referenced table exists
                 if not self._table_exists(fk.table):
                     raise ValueError(
                         f"Foreign key reference to non-existent table: '{fk.table}'"
                     )
-                
+
                 # Validate referenced column exists
                 ref_table = self.get_table(fk.table)
                 ref_col_names = [col.name for col in ref_table.columns]
@@ -109,9 +109,11 @@ class TableManager:
                     raise ValueError(
                         f"Foreign key reference to non-existent column: '{fk.table}.{fk.column}'"
                     )
-                
+
                 # Build foreign key constraint
-                fk_constraint = f"FOREIGN KEY ({column.name}) REFERENCES {fk.table}({fk.column})"
+                fk_constraint = (
+                    f"FOREIGN KEY ({column.name}) REFERENCES {fk.table}({fk.column})"
+                )
                 if fk.on_delete != "RESTRICT":
                     fk_constraint += f" ON DELETE {fk.on_delete}"
                 if fk.on_update != "RESTRICT":
@@ -143,7 +145,7 @@ class TableManager:
                 col_def += " UNIQUE"
 
             sql_parts.append(col_def)
-        
+
         # Add foreign key constraints
         sql_parts.extend(foreign_key_constraints)
 
@@ -201,16 +203,17 @@ class TableManager:
                 to_col = fk_row["to"]
                 on_update = fk_row["on_update"]
                 on_delete = fk_row["on_delete"]
-                
+
                 # Create ForeignKeyRef
                 from cinchdb.models import ForeignKeyRef
+
                 foreign_keys[from_col] = ForeignKeyRef(
                     table=to_table,
                     column=to_col,
                     on_update=on_update,
-                    on_delete=on_delete
+                    on_delete=on_delete,
                 )
-            
+
             # Get column information
             cursor = conn.execute(f"PRAGMA table_info({table_name})")
 
@@ -241,7 +244,7 @@ class TableManager:
                     nullable=(row["notnull"] == 0),
                     default=row["dflt_value"],
                     primary_key=(row["pk"] == 1),
-                    foreign_key=foreign_key
+                    foreign_key=foreign_key,
                 )
                 columns.append(column)
 

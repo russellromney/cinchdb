@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class RemoteConfig(BaseModel):
     """Configuration for a remote CinchDB instance."""
-    
+
     url: str = Field(description="Base URL of the remote CinchDB API")
     key: str = Field(description="API key for authentication")
 
@@ -50,7 +50,7 @@ class Config:
             env_dir = os.environ.get("CINCHDB_PROJECT_DIR")
             if env_dir:
                 project_dir = Path(env_dir)
-        
+
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.config_dir = self.project_dir / ".cinchdb"
         self.config_path = self.config_dir / "config.toml"
@@ -86,24 +86,24 @@ class Config:
         # Override database and branch
         if env_db := os.environ.get("CINCHDB_DATABASE"):
             data["active_database"] = env_db
-        
+
         if env_branch := os.environ.get("CINCHDB_BRANCH"):
             data["active_branch"] = env_branch
-        
+
         # Override or create remote configuration
         env_url = os.environ.get("CINCHDB_REMOTE_URL")
         env_key = os.environ.get("CINCHDB_API_KEY")
-        
+
         if env_url and env_key:
             # Create or update "env" remote
             if "remotes" not in data:
                 data["remotes"] = {}
-            
+
             data["remotes"]["env"] = {
                 "url": env_url.rstrip("/"),  # Remove trailing slash
-                "key": env_key
+                "key": env_key,
             }
-            
+
             # Make it active if no other remote is set
             if not data.get("active_remote"):
                 data["active_remote"] = "env"
@@ -130,21 +130,21 @@ class Config:
             for alias, remote in config_dict["remotes"].items():
                 if isinstance(remote, dict):
                     config_dict["remotes"][alias] = remote
-        
+
         with open(self.config_path, "w") as f:
             toml.dump(config_dict, f)
 
     def init_project(self) -> ProjectConfig:
         """Initialize a new CinchDB project with default configuration.
-        
+
         This method now delegates to the ProjectInitializer for the actual
         initialization logic.
         """
         from cinchdb.core.initializer import ProjectInitializer
-        
+
         initializer = ProjectInitializer(self.project_dir)
         config = initializer.init_project()
-        
+
         # Load the config into this instance
         self._config = config
         return config

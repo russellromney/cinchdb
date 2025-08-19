@@ -16,7 +16,7 @@ class Database(CinchDBBaseModel):
     active_branch: str = Field(default="main", description="Currently active branch")
     description: Optional[str] = Field(default=None, description="Database description")
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def validate_name_field(cls, v: str) -> str:
         """Validate database name meets naming requirements."""

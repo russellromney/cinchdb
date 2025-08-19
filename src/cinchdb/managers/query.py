@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
-from cinchdb.utils import validate_query_safe, SQLValidationError
+from cinchdb.utils import validate_query_safe
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -33,7 +33,10 @@ class QueryManager:
         self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
 
     def execute(
-        self, sql: str, params: Optional[Union[tuple, dict]] = None, skip_validation: bool = False
+        self,
+        sql: str,
+        params: Optional[Union[tuple, dict]] = None,
+        skip_validation: bool = False,
     ) -> List[Dict[str, Any]]:
         """Execute a SQL query and return results as dictionaries.
 
@@ -52,7 +55,7 @@ class QueryManager:
         # Validate query unless explicitly skipped
         if not skip_validation:
             validate_query_safe(sql)
-            
+
         # Note: The original code had SELECT-only validation, but we're now more permissive
         if not sql.strip().upper().startswith("SELECT"):
             raise ValueError(
@@ -161,7 +164,10 @@ class QueryManager:
         return results[0] if results else None
 
     def execute_non_query(
-        self, sql: str, params: Optional[Union[tuple, dict]] = None, skip_validation: bool = False
+        self,
+        sql: str,
+        params: Optional[Union[tuple, dict]] = None,
+        skip_validation: bool = False,
     ) -> int:
         """Execute a non-SELECT SQL query (INSERT, UPDATE, DELETE, etc.).
 
@@ -172,7 +178,7 @@ class QueryManager:
 
         Returns:
             Number of rows affected
-            
+
         Raises:
             SQLValidationError: If query contains restricted operations
             Exception: If query execution fails
@@ -180,7 +186,7 @@ class QueryManager:
         # Validate query unless explicitly skipped
         if not skip_validation:
             validate_query_safe(sql)
-            
+
         with DatabaseConnection(self.db_path) as conn:
             cursor = conn.execute(sql, params)
             affected_rows = cursor.rowcount

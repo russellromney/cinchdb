@@ -1,6 +1,6 @@
 .PHONY: help install install-dev install-all dev test coverage lint format typecheck clean \
-        build-python build-ts build-frontend build-docs \
-        dev-frontend dev-docs \
+        build-python build-ts build-docs \
+        dev-docs \
         test-python test-ts test-integration test-unit test-python-integration \
         all
 
@@ -11,11 +11,10 @@ help:
 	@echo "Installation:"
 	@echo "  make install          - Install Python dependencies only"
 	@echo "  make install-dev      - Install CinchDB CLI in editable mode"
-	@echo "  make install-all      - Install everything (dependencies + CLI + TypeScript + Frontend + Docs)"
+	@echo "  make install-all      - Install everything (dependencies + CLI + TypeScript + Docs)"
 	@echo ""
 	@echo "Development:"
-	@echo "  make dev              - Run development mode (Frontend only)"
-	@echo "  make dev-frontend     - Run frontend in development mode"
+	@echo "  make dev              - Run development mode (Docs only)"
 	@echo "  make dev-docs         - Run documentation site in development mode"
 	@echo ""
 	@echo "Testing:"
@@ -34,7 +33,6 @@ help:
 	@echo "Building:"
 	@echo "  make build-python     - Build Python package"
 	@echo "  make build-ts         - Build TypeScript SDK"
-	@echo "  make build-frontend   - Build frontend application"
 	@echo "  make build-docs       - Build documentation site"
 	@echo "  make build-all        - Build everything"
 	@echo ""
@@ -50,15 +48,11 @@ install-dev:
 
 install-all: install install-dev
 	cd sdk/typescript && npm install
-	cd frontend && npm install
 	cd docs && npm install
 
 # Development targets
-dev: dev-frontend
+dev: dev-docs
 	@echo "Starting CinchDB development environment..."
-
-dev-frontend:
-	cd frontend && npm run dev
 
 dev-docs:
 	cd docs && npm run dev
@@ -98,12 +92,6 @@ lint-ts:
 build-ts:
 	cd sdk/typescript && npm run build
 
-# Frontend targets
-lint-frontend:
-	cd frontend && npm run lint
-
-build-frontend:
-	cd frontend && npm run build
 
 # Documentation targets
 build-docs:
@@ -115,13 +103,13 @@ test-integration: test-python-integration
 # Combined targets
 test: test-python test-ts
 
-lint: lint-python lint-ts lint-frontend
+lint: lint-python lint-ts
 
 format: format-python
 
 typecheck: typecheck-python
 
-build-all: build-python build-ts build-frontend build-docs
+build-all: build-python build-ts build-docs
 
 # Clean target
 clean:
@@ -137,8 +125,6 @@ clean:
 	find . -type f -name ".coverage" -delete
 	rm -rf htmlcov/
 	rm -rf sdk/typescript/dist/
-	rm -rf frontend/.next/
-	rm -rf frontend/out/
 	rm -rf docs/.next/
 	rm -rf docs/out/
 

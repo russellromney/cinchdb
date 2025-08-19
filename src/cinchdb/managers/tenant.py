@@ -70,7 +70,7 @@ class TenantManager:
         """
         # Validate tenant name
         validate_name(tenant_name, "tenant")
-        
+
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
@@ -168,7 +168,7 @@ class TenantManager:
         """
         # Validate target tenant name
         validate_name(target_tenant, "tenant")
-        
+
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
@@ -213,7 +213,7 @@ class TenantManager:
         """
         # Validate new tenant name
         validate_name(new_name, "tenant")
-        
+
         # Can't rename main tenant
         if old_name == "main":
             raise ValueError("Cannot rename the main tenant")

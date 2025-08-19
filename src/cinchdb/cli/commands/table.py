@@ -60,7 +60,8 @@ def create(
     ctx: typer.Context,
     name: Optional[str] = typer.Argument(None, help="Name of the table"),
     columns: Optional[List[str]] = typer.Argument(
-        None, help="Column definitions (format: name:type[:nullable][:fk=table[.column][:action]])"
+        None,
+        help="Column definitions (format: name:type[:nullable][:fk=table[.column][:action]])",
     ),
     apply: bool = typer.Option(
         True, "--apply/--no-apply", help="Apply changes to all tenants"
@@ -92,14 +93,16 @@ def create(
         parts = col_def.split(":")
         if len(parts) < 2:
             console.print(f"[red]❌ Invalid column definition: '{col_def}'[/red]")
-            console.print("[yellow]Format: name:type[:nullable][:fk=table[.column][:action]][/yellow]")
+            console.print(
+                "[yellow]Format: name:type[:nullable][:fk=table[.column][:action]][/yellow]"
+            )
             raise typer.Exit(1)
 
         col_name = parts[0]
         col_type = parts[1].upper()
         nullable = False
         foreign_key = None
-        
+
         # Parse additional parts
         for i in range(2, len(parts)):
             part = parts[i]
@@ -108,7 +111,7 @@ def create(
             elif part.startswith("fk="):
                 # Parse foreign key definition
                 fk_def = part[3:]  # Remove "fk=" prefix
-                
+
                 # Handle actions with spaces (e.g., "set null", "no action")
                 # Check for known actions at the end
                 fk_action = "RESTRICT"  # Default
@@ -116,12 +119,12 @@ def create(
                     if fk_def.lower().endswith("." + action):
                         fk_action = action.upper()
                         # Remove the action part from fk_def
-                        fk_def = fk_def[:-len("." + action)]
+                        fk_def = fk_def[: -len("." + action)]
                         break
-                
+
                 # Now split the remaining parts
                 fk_parts = fk_def.split(".")
-                
+
                 if len(fk_parts) == 1:
                     # Just table name, column defaults to "id"
                     fk_table = fk_parts[0]
@@ -131,15 +134,17 @@ def create(
                     fk_table = fk_parts[0]
                     fk_column = fk_parts[1]
                 else:
-                    console.print(f"[red]❌ Invalid foreign key format: '{fk_def}'[/red]")
+                    console.print(
+                        f"[red]❌ Invalid foreign key format: '{fk_def}'[/red]"
+                    )
                     console.print("[yellow]Format: fk=table[.column][:action][/yellow]")
                     raise typer.Exit(1)
-                
+
                 foreign_key = ForeignKeyRef(
                     table=fk_table,
                     column=fk_column,
                     on_delete=fk_action,
-                    on_update="RESTRICT"  # Default to RESTRICT for updates
+                    on_update="RESTRICT",  # Default to RESTRICT for updates
                 )
 
         if col_type not in ["TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC"]:
@@ -149,12 +154,11 @@ def create(
             )
             raise typer.Exit(1)
 
-        parsed_columns.append(Column(
-            name=col_name, 
-            type=col_type, 
-            nullable=nullable,
-            foreign_key=foreign_key
-        ))
+        parsed_columns.append(
+            Column(
+                name=col_name, type=col_type, nullable=nullable, foreign_key=foreign_key
+            )
+        )
 
     try:
         table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")

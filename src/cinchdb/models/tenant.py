@@ -15,7 +15,7 @@ class Tenant(CinchDBBaseModel):
     description: Optional[str] = Field(default=None, description="Tenant description")
     is_main: bool = Field(default=False, description="Whether this is the main tenant")
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def validate_name_field(cls, v: str) -> str:
         """Validate tenant name meets naming requirements."""

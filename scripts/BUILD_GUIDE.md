@@ -98,7 +98,6 @@ The build process includes only the Python package:
 - `pyproject.toml` - Package metadata
 
 The following are explicitly excluded:
-- `frontend/` - React frontend application
 - `docs/` - Documentation site source
 - `sdk/` - TypeScript SDK
 - `examples/` - Example code

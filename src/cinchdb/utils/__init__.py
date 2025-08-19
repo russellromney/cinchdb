@@ -4,13 +4,13 @@ from cinchdb.utils.sql_validator import (
     validate_sql_query,
     validate_query_safe,
     SQLValidationError,
-    SQLOperation
+    SQLOperation,
 )
 from cinchdb.utils.name_validator import (
     validate_name,
     clean_name,
     is_valid_name,
-    InvalidNameError
+    InvalidNameError,
 )
 
 __all__ = [
@@ -19,7 +19,7 @@ __all__ = [
     "SQLValidationError",
     "SQLOperation",
     "validate_name",
-    "clean_name", 
+    "clean_name",
     "is_valid_name",
-    "InvalidNameError"
+    "InvalidNameError",
 ]

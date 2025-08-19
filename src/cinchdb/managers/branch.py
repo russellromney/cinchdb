@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime, timezone
 
-from cinchdb.config import Config
 from cinchdb.models import Branch
 from cinchdb.core.path_utils import (
     get_database_path,
@@ -68,7 +67,7 @@ class BranchManager:
         """
         # Validate new branch name
         validate_name(new_branch_name, "branch")
-        
+
         # Validate source branch exists
         if source_branch not in list_branches(self.project_root, self.database):
             raise ValueError(f"Source branch '{source_branch}' does not exist")
@@ -121,7 +120,6 @@ class BranchManager:
         # Delete branch directory
         branch_path = get_branch_path(self.project_root, self.database, branch_name)
         shutil.rmtree(branch_path)
-
 
     def get_branch_metadata(self, branch_name: str) -> Dict[str, Any]:
         """Get metadata for a branch.

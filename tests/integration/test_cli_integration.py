@@ -48,12 +48,12 @@ class TestCLIIntegration:
         # Check version
         result = self.run_in_project(["version"], temp_project)
         assert result.exit_code == 0
-    
+
     def test_status_command(self, temp_project):
         """Test the status command."""
         # Initialize project
         self.run_in_project(["init"], temp_project)
-        
+
         # Run status command
         result = self.run_in_project(["status"], temp_project)
         assert result.exit_code == 0
@@ -62,18 +62,18 @@ class TestCLIIntegration:
         assert "Active Database: main" in result.stdout
         assert "Active Branch: main" in result.stdout
         assert "Active Remote: None (local mode)" in result.stdout
-    
+
     def test_status_with_env_vars(self, temp_project, monkeypatch):
         """Test status command shows environment variables."""
         # Initialize project
         self.run_in_project(["init"], temp_project)
-        
+
         # Set environment variables
         monkeypatch.setenv("CINCHDB_DATABASE", "test_db")
         monkeypatch.setenv("CINCHDB_BRANCH", "test_branch")
         monkeypatch.setenv("CINCHDB_REMOTE_URL", "https://test.example.com")
         monkeypatch.setenv("CINCHDB_API_KEY", "test_key_123")
-        
+
         # Run status command
         result = self.run_in_project(["status"], temp_project)
         assert result.exit_code == 0
@@ -82,25 +82,25 @@ class TestCLIIntegration:
         assert "CINCHDB_BRANCH=test_branch" in result.stdout
         assert "CINCHDB_REMOTE_URL=https://test.example.com" in result.stdout
         assert "CINCHDB_API_KEY=***" in result.stdout
-    
+
     def test_env_var_override_behavior(self, temp_project, monkeypatch):
         """Test that environment variables override config values in actual usage."""
         # Initialize project
         self.run_in_project(["init"], temp_project)
-        
+
         # Create a second database
         self.run_in_project(["db", "create", "prod"], temp_project)
-        
+
         # Switch to prod database
         self.run_in_project(["db", "switch", "prod"], temp_project)
-        
+
         # Verify current database is prod
         result = self.run_in_project(["db", "info"], temp_project)
         assert "Database: prod" in result.stdout
-        
+
         # Set environment variable to override to main
         monkeypatch.setenv("CINCHDB_DATABASE", "main")
-        
+
         # Run db info again - should show main due to env override
         result = self.run_in_project(["db", "info"], temp_project)
         assert "Database: main" in result.stdout
@@ -193,11 +193,14 @@ class TestCLIIntegration:
         assert result.exit_code == 0
         assert "create_table" in result.stdout
         assert "users" in result.stdout
-        
+
         # List changes in JSON format
-        result = self.run_in_project(["branch", "changes", "--format", "json"], temp_project)
+        result = self.run_in_project(
+            ["branch", "changes", "--format", "json"], temp_project
+        )
         assert result.exit_code == 0
         import json
+
         # Debug: print the output to see what's wrong
         # print(f"JSON output: {repr(result.stdout)}")
         try:
@@ -302,17 +305,29 @@ class TestCLIIntegration:
         # Insert some data with NULL phone (need to include all required fields)
         import uuid
         import datetime
+
         now = datetime.datetime.now(datetime.UTC).isoformat()
         result = self.run_in_project(
-            ["query", f"INSERT INTO users (id, name, age, phone, created_at, updated_at) VALUES ('{uuid.uuid4()}', 'John', 30, NULL, '{now}', '{now}'), ('{uuid.uuid4()}', 'Jane', 25, '555-1234', '{now}', '{now}')"],
+            [
+                "query",
+                f"INSERT INTO users (id, name, age, phone, created_at, updated_at) VALUES ('{uuid.uuid4()}', 'John', 30, NULL, '{now}', '{now}'), ('{uuid.uuid4()}', 'Jane', 25, '555-1234', '{now}', '{now}')",
+            ],
             temp_project,
         )
         assert result.exit_code == 0
 
         # Try to make phone NOT NULL without fill value (should fail)
         result = self.run_in_project(
-            ["column", "alter-nullable", "users", "phone", "--not-nullable", "--fill-value", "000-0000"], 
-            temp_project
+            [
+                "column",
+                "alter-nullable",
+                "users",
+                "phone",
+                "--not-nullable",
+                "--fill-value",
+                "000-0000",
+            ],
+            temp_project,
         )
         assert result.exit_code == 0
         assert "Made column 'phone' NOT NULL" in result.stdout

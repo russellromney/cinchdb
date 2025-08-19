@@ -1,12 +1,11 @@
 # CinchDB
 
-CinchDB has six components: 
+CinchDB has five components: 
 1. a Python SDK where the core functionality lives, that can either operate locally or use a remote connection. This also manages simple UUID4 API keys that have read/write permissions for all branches or a specific branch
 2. a FastAPI API that uses the SDK to implement core functionality in a remote server
 3. a Typescript SDK that can only call the API, designed for Node backends or Javascript webapps
 4. a Python Typer CLI that simply calls the Python SDK to do all its work either locally or to call the API
-5. a Typescript NextJS frontend that uses the Typescript SDK to provide a simple view of your projects. This uses the API itself to store auth information
-6. A docs server that unifies all docs into one place including tutorials, SDK, CLI, API, etc. 
+5. A docs server that unifies all docs into one place including tutorials, SDK, CLI, API, etc. 
 
 Core functionality: 
 * CinchDB uses SQLite in WAL mode with autocheckpoint turned off, in NORMAL mode

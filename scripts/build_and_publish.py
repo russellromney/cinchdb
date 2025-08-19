@@ -72,8 +72,7 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# Frontend and other non-Python directories
-frontend/
+# Other non-Python directories
 docs/
 sdk/
 site/
@@ -143,7 +142,7 @@ def check_package_contents():
         files = zf.namelist()
         
         # Check for unwanted directories
-        unwanted_patterns = ["frontend/", "docs/", "sdk/", "site/", "examples/typescript"]
+        unwanted_patterns = ["docs/", "sdk/", "site/", "examples/typescript"]
         found_unwanted = False
         
         for file in files:

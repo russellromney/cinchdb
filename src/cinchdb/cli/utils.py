@@ -119,15 +119,15 @@ def get_cinchdb_instance(
         typer.Exit: If configuration is invalid
     """
     config, config_data = get_config_with_data()
-    
+
     # Use provided or active database/branch
     database = database or config_data.active_database
     branch = branch or config_data.active_branch
-    
+
     # Determine if we should use remote connection
     use_remote = False
     remote_config = None
-    
+
     if not force_local:
         if remote_alias:
             # Use specific remote alias
@@ -139,11 +139,13 @@ def get_cinchdb_instance(
         elif config_data.active_remote:
             # Use active remote
             if config_data.active_remote not in config_data.remotes:
-                console.print(f"[red]❌ Active remote '{config_data.active_remote}' not found[/red]")
+                console.print(
+                    f"[red]❌ Active remote '{config_data.active_remote}' not found[/red]"
+                )
                 raise typer.Exit(1)
             remote_config = config_data.remotes[config_data.active_remote]
             use_remote = True
-    
+
     if use_remote and remote_config:
         # Create remote connection
         return CinchDB(
@@ -172,7 +174,7 @@ def show_env_config():
         "CINCHDB_REMOTE_URL": os.environ.get("CINCHDB_REMOTE_URL"),
         "CINCHDB_API_KEY": "***" if "CINCHDB_API_KEY" in os.environ else None,
     }
-    
+
     active = {k: v for k, v in env_vars.items() if v}
     if active:
         console.print("\n[yellow]Active environment variables:[/yellow]")

@@ -77,7 +77,7 @@ def init(
         "main", "--database", "-d", help="Initial database name"
     ),
     branch: Optional[str] = typer.Option(
-        "main", "--branch", "-b", help="Initial branch name"  
+        "main", "--branch", "-b", help="Initial branch name"
     ),
 ):
     """Initialize a new CinchDB project."""
@@ -87,17 +87,13 @@ def init(
 
     try:
         # Use the core initializer directly
-        config = init_project(
-            project_dir=project_path,
-            database_name=database,
-            branch_name=branch
+        init_project(
+            project_dir=project_path, database_name=database, branch_name=branch
         )
         typer.secho(
             f"✅ Initialized CinchDB project in {project_path}", fg=typer.colors.GREEN
         )
-        typer.secho(
-            f"   Database: {database}, Branch: {branch}", fg=typer.colors.CYAN
-        )
+        typer.secho(f"   Database: {database}, Branch: {branch}", fg=typer.colors.CYAN)
     except FileExistsError:
         typer.secho(f"❌ Project already exists in {project_path}", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -116,31 +112,32 @@ def status():
     """Show CinchDB status including configuration and environment variables."""
     from cinchdb.cli.utils import get_config_with_data, show_env_config
     from rich.console import Console
-    from rich.table import Table as RichTable
-    
+
     console = Console()
-    
+
     # Show project configuration
     try:
         config, config_data = get_config_with_data()
-        
+
         console.print("\n[bold]CinchDB Status[/bold]")
         console.print(f"Project: {config.project_dir}")
         console.print(f"Active Database: {config_data.active_database}")
         console.print(f"Active Branch: {config_data.active_branch}")
-        
+
         if config_data.active_remote:
             console.print(f"Active Remote: {config_data.active_remote}")
             if config_data.active_remote in config_data.remotes:
                 remote = config_data.remotes[config_data.active_remote]
                 console.print(f"  URL: {remote.url}")
-                console.print(f"  Key: ***{remote.key[-8:] if len(remote.key) > 8 else '*' * len(remote.key)}")
+                console.print(
+                    f"  Key: ***{remote.key[-8:] if len(remote.key) > 8 else '*' * len(remote.key)}"
+                )
         else:
             console.print("Active Remote: [dim]None (local mode)[/dim]")
-        
+
         # Show environment variables
         show_env_config()
-        
+
     except Exception as e:
         console.print(f"[red]❌ Error: {e}[/red]")
         raise typer.Exit(1)

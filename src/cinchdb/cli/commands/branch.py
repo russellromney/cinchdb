@@ -81,14 +81,14 @@ def create(
 ):
     """Create a new branch."""
     name = validate_required_arg(name, "name", ctx)
-    
+
     # Validate branch name
     try:
         validate_name(name, "branch")
     except InvalidNameError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)
-        
+
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     source_branch = source or config_data.active_branch
@@ -338,24 +338,25 @@ def changes(
 
     try:
         from cinchdb.managers.change_tracker import ChangeTracker
-        
+
         tracker = ChangeTracker(config.project_dir, db_name, branch_name)
         changes = tracker.get_changes()
 
         if not changes:
-            console.print(f"[yellow]No changes found in branch '{branch_name}'[/yellow]")
+            console.print(
+                f"[yellow]No changes found in branch '{branch_name}'[/yellow]"
+            )
             return
 
         if format == "json":
             # JSON output
             import json
-            from datetime import datetime
-            
+
             changes_data = []
             for change in changes:
-                change_dict = change.model_dump(mode='json')
+                change_dict = change.model_dump(mode="json")
                 changes_data.append(change_dict)
-            
+
             console.print(json.dumps(changes_data, indent=2, default=str))
         else:
             # Table output
@@ -368,24 +369,32 @@ def changes(
             table.add_column("Created", style="dim")
 
             for change in changes:
-                created_at = change.created_at.strftime("%Y-%m-%d %H:%M:%S") if change.created_at else "Unknown"
+                created_at = (
+                    change.created_at.strftime("%Y-%m-%d %H:%M:%S")
+                    if change.created_at
+                    else "Unknown"
+                )
                 applied_status = "✓" if change.applied else "✗"
                 table.add_row(
                     change.id[:8] if change.id else "Unknown",
-                    change.type.value if hasattr(change.type, 'value') else str(change.type),
+                    change.type.value
+                    if hasattr(change.type, "value")
+                    else str(change.type),
                     change.entity_name,
                     change.entity_type,
                     applied_status,
-                    created_at
+                    created_at,
                 )
 
             console.print(table)
-            
+
             # Summary
             total = len(changes)
             applied = sum(1 for c in changes if c.applied)
             unapplied = total - applied
-            console.print(f"\n[bold]Total:[/bold] {total} changes ({applied} applied, {unapplied} unapplied)")
+            console.print(
+                f"\n[bold]Total:[/bold] {total} changes ({applied} applied, {unapplied} unapplied)"
+            )
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")

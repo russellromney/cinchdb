@@ -241,7 +241,9 @@ class TestColumnManager:
         # Verify change was tracked
         tracker = ChangeTracker(temp_project, "main", "main")
         changes = tracker.get_changes()
-        alter_change = next(c for c in changes if c.type == ChangeType.ALTER_COLUMN_NULLABLE)
+        alter_change = next(
+            c for c in changes if c.type == ChangeType.ALTER_COLUMN_NULLABLE
+        )
         assert alter_change.entity_name == "name"
         assert alter_change.details["nullable"] is True
         assert alter_change.details["old_nullable"] is False
@@ -253,10 +255,11 @@ class TestColumnManager:
         with DatabaseConnection(db_path) as conn:
             import uuid
             import datetime
+
             now = datetime.datetime.now(datetime.UTC).isoformat()
             conn.execute(
-                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', 'john@example.com', ?, ?)", 
-                (str(uuid.uuid4()), now, now)
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', 'john@example.com', ?, ?)",
+                (str(uuid.uuid4()), now, now),
             )
             conn.commit()
 
@@ -277,14 +280,15 @@ class TestColumnManager:
         with DatabaseConnection(db_path) as conn:
             import uuid
             import datetime
+
             now = datetime.datetime.now(datetime.UTC).isoformat()
             conn.execute(
-                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', NULL, ?, ?)", 
-                (str(uuid.uuid4()), now, now)
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', NULL, ?, ?)",
+                (str(uuid.uuid4()), now, now),
             )
             conn.execute(
-                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'Jane', 'jane@example.com', ?, ?)", 
-                (str(uuid.uuid4()), now, now)
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'Jane', 'jane@example.com', ?, ?)",
+                (str(uuid.uuid4()), now, now),
             )
             conn.commit()
 
@@ -294,7 +298,9 @@ class TestColumnManager:
         assert "NULL values" in str(exc.value)
 
         # Now with fill_value should succeed
-        managers["column"].alter_column_nullable("users", "email", nullable=False, fill_value="default@example.com")
+        managers["column"].alter_column_nullable(
+            "users", "email", nullable=False, fill_value="default@example.com"
+        )
 
         # Verify NULLs were replaced
         with DatabaseConnection(db_path) as conn:
@@ -331,7 +337,9 @@ class TestColumnManager:
     def test_alter_column_nullable_not_exists(self, managers):
         """Test altering nullable on non-existent column."""
         with pytest.raises(ValueError) as exc:
-            managers["column"].alter_column_nullable("users", "non_existent", nullable=True)
+            managers["column"].alter_column_nullable(
+                "users", "non_existent", nullable=True
+            )
         assert "does not exist" in str(exc.value)
 
     def test_alter_column_nullable_preserves_data(self, managers, temp_project):
@@ -341,14 +349,15 @@ class TestColumnManager:
         with DatabaseConnection(db_path) as conn:
             import uuid
             import datetime
+
             now = datetime.datetime.now(datetime.UTC).isoformat()
             conn.execute(
-                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', 'john@example.com', ?, ?)", 
-                (str(uuid.uuid4()), now, now)
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'John', 'john@example.com', ?, ?)",
+                (str(uuid.uuid4()), now, now),
             )
             conn.execute(
-                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'Jane', 'jane@example.com', ?, ?)", 
-                (str(uuid.uuid4()), now, now)
+                "INSERT INTO users (id, name, email, created_at, updated_at) VALUES (?, 'Jane', 'jane@example.com', ?, ?)",
+                (str(uuid.uuid4()), now, now),
             )
             conn.commit()
 

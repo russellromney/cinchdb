@@ -15,17 +15,16 @@ class TestRemoteConfig:
         # Initialize config
         config = Config(tmp_path)
         project_config = ProjectConfig()
-        
+
         # Add a remote
         project_config.remotes["production"] = RemoteConfig(
-            url="https://api.example.com",
-            key="test-api-key"
+            url="https://api.example.com", key="test-api-key"
         )
-        
+
         # Save and reload
         config.save(project_config)
         loaded = config.load()
-        
+
         # Verify
         assert "production" in loaded.remotes
         assert loaded.remotes["production"].url == "https://api.example.com"
@@ -36,24 +35,22 @@ class TestRemoteConfig:
         # Initialize config
         config = Config(tmp_path)
         project_config = ProjectConfig()
-        
+
         # Add remotes
         project_config.remotes["production"] = RemoteConfig(
-            url="https://prod.example.com",
-            key="prod-key"
+            url="https://prod.example.com", key="prod-key"
         )
         project_config.remotes["staging"] = RemoteConfig(
-            url="https://staging.example.com",
-            key="staging-key"
+            url="https://staging.example.com", key="staging-key"
         )
-        
+
         # Set active remote
         project_config.active_remote = "production"
-        
+
         # Save and reload
         config.save(project_config)
         loaded = config.load()
-        
+
         # Verify
         assert loaded.active_remote == "production"
 
@@ -62,26 +59,24 @@ class TestRemoteConfig:
         # Initialize config
         config = Config(tmp_path)
         project_config = ProjectConfig()
-        
+
         # Add remotes
         project_config.remotes["production"] = RemoteConfig(
-            url="https://api.example.com",
-            key="test-key"
+            url="https://api.example.com", key="test-key"
         )
         project_config.remotes["staging"] = RemoteConfig(
-            url="https://staging.example.com",
-            key="staging-key"
+            url="https://staging.example.com", key="staging-key"
         )
         project_config.active_remote = "production"
-        
+
         # Remove active remote
         del project_config.remotes["production"]
         project_config.active_remote = None
-        
+
         # Save and reload
         config.save(project_config)
         loaded = config.load()
-        
+
         # Verify
         assert "production" not in loaded.remotes
         assert "staging" in loaded.remotes
@@ -92,29 +87,22 @@ class TestRemoteConfig:
         # Initialize config
         config = Config(tmp_path)
         project_config = ProjectConfig()
-        
+
         # Add multiple remotes
         remotes = {
-            "production": RemoteConfig(
-                url="https://prod.example.com",
-                key="prod-key"
-            ),
+            "production": RemoteConfig(url="https://prod.example.com", key="prod-key"),
             "staging": RemoteConfig(
-                url="https://staging.example.com",
-                key="staging-key"
+                url="https://staging.example.com", key="staging-key"
             ),
-            "development": RemoteConfig(
-                url="http://localhost:8000",
-                key="dev-key"
-            )
+            "development": RemoteConfig(url="http://localhost:8000", key="dev-key"),
         }
-        
+
         project_config.remotes = remotes
-        
+
         # Save and reload
         config.save(project_config)
         loaded = config.load()
-        
+
         # Verify all remotes
         assert len(loaded.remotes) == 3
         for alias, remote in remotes.items():
@@ -127,16 +115,15 @@ class TestRemoteConfig:
         # Initialize config
         config = Config(tmp_path)
         project_config = ProjectConfig()
-        
+
         # Add remote with trailing slash
         project_config.remotes["production"] = RemoteConfig(
-            url="https://api.example.com/",
-            key="test-key"
+            url="https://api.example.com/", key="test-key"
         )
-        
+
         # Save and reload
         config.save(project_config)
         loaded = config.load()
-        
+
         # URL should be stored with trailing slash (normalization happens in CLI)
         assert loaded.remotes["production"].url == "https://api.example.com/"

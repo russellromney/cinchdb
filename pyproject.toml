@@ -51,7 +51,6 @@ include = [
 
 # Explicitly exclude other directories
 exclude = [
-    "frontend/",
     "docs/",
     "sdk/",
     "site/",

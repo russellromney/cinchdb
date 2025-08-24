@@ -371,10 +371,24 @@ class CinchDB:
             data: Record data as dictionary
 
         Returns:
-            Inserted record with generated fields
+            Inserted record with generated fields (id, created_at, updated_at)
+
+        Examples:
+            # Simple insert
+            db.insert("users", {"name": "John", "email": "john@example.com"})
+            
+            # Insert with custom ID
+            db.insert("products", {"id": "prod-123", "name": "Widget", "price": 9.99})
         """
         if self.is_local:
-            return self.data.create(table, data)
+            # Initialize data manager if needed
+            if self._data_manager is None:
+                from cinchdb.managers.data import DataManager
+                self._data_manager = DataManager(
+                    self.project_dir, self.database, self.branch, self.tenant
+                )
+            # Use the new create_from_dict method
+            return self._data_manager.create_from_dict(table, data)
         else:
             # Remote insert - use new data CRUD endpoint
             result = self._make_request(

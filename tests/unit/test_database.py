@@ -185,6 +185,64 @@ class TestCinchDB:
                 },
             )
 
+    def test_local_insert(self, tmp_path):
+        """Test insert on local connection."""
+        db = CinchDB(database="test_db", project_dir=tmp_path)
+        
+        with patch("cinchdb.managers.data.DataManager") as mock_data_manager:
+            mock_instance = Mock()
+            mock_instance.create_from_dict.return_value = {
+                "id": "generated-id",
+                "name": "Test User",
+                "email": "test@example.com",
+                "created_at": "2024-01-01T00:00:00",
+                "updated_at": "2024-01-01T00:00:00"
+            }
+            mock_data_manager.return_value = mock_instance
+            
+            result = db.insert("users", {"name": "Test User", "email": "test@example.com"})
+            
+            mock_data_manager.assert_called_once_with(
+                tmp_path, "test_db", "main", "main"
+            )
+            mock_instance.create_from_dict.assert_called_once_with(
+                "users", {"name": "Test User", "email": "test@example.com"}
+            )
+            assert result["id"] == "generated-id"
+            assert result["name"] == "Test User"
+    
+    def test_remote_insert(self):
+        """Test insert on remote connection."""
+        mock_session = Mock()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "id": "remote-id",
+            "name": "Remote User",
+            "created_at": "2024-01-01T00:00:00"
+        }
+        mock_session.request.return_value = mock_response
+        
+        with patch.object(CinchDB, "session", new_callable=PropertyMock) as mock_session_prop:
+            mock_session_prop.return_value = mock_session
+            
+            db = CinchDB(
+                database="test_db",
+                api_url="https://api.example.com",
+                api_key="test-key"
+            )
+            
+            result = db.insert("users", {"name": "Remote User"})
+            
+            mock_session.request.assert_called_once_with(
+                "POST",
+                "https://api.example.com/tables/users/data",
+                params={"database": "test_db", "branch": "main", "tenant": "main"},
+                json={"data": {"name": "Remote User"}}
+            )
+            assert result["id"] == "remote-id"
+            assert result["name"] == "Remote User"
+
     def test_context_manager(self):
         """Test context manager functionality."""
         # Create a mock session

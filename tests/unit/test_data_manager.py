@@ -81,6 +81,42 @@ class TestDataManager:
         assert created_user.email == "john@example.com"
         assert created_user.age == 30
 
+    def test_create_from_dict(self, data_manager):
+        """Test creating a record from a dictionary."""
+        user_data = {"name": "Alice Smith", "email": "alice@example.com", "age": 28}
+        created_data = data_manager.create_from_dict("users", user_data)
+        
+        assert created_data["id"] is not None
+        assert created_data["created_at"] is not None
+        assert created_data["updated_at"] is not None
+        assert created_data["name"] == "Alice Smith"
+        assert created_data["email"] == "alice@example.com"
+        assert created_data["age"] == 28
+    
+    def test_create_from_dict_with_custom_id(self, data_manager):
+        """Test creating a record from a dictionary with custom ID."""
+        user_data = {
+            "id": "custom-123",
+            "name": "Bob Jones",
+            "email": "bob@example.com",
+            "age": 35
+        }
+        created_data = data_manager.create_from_dict("users", user_data)
+        
+        assert created_data["id"] == "custom-123"
+        assert created_data["created_at"] is not None
+        assert created_data["updated_at"] is not None
+    
+    def test_create_from_dict_duplicate_id_fails(self, data_manager):
+        """Test that creating from dict with existing ID fails."""
+        user_data1 = {"id": "dup-id", "name": "User1", "email": "user1@example.com", "age": 20}
+        user_data2 = {"id": "dup-id", "name": "User2", "email": "user2@example.com", "age": 25}
+        
+        data_manager.create_from_dict("users", user_data1)
+        
+        with pytest.raises(ValueError, match="Record with ID dup-id already exists"):
+            data_manager.create_from_dict("users", user_data2)
+
     def test_create_duplicate_id_fails(self, data_manager):
         """Test that creating a record with existing ID fails."""
         user1 = UserModel(id="test-id", name="John", email="john@example.com", age=30)

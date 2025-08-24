@@ -93,8 +93,58 @@ class DataManager:
         results = self.select(model_class, limit=1, id=record_id)
         return results[0] if results else None
 
+    def create_from_dict(self, table_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new record from a dictionary.
+
+        Args:
+            table_name: Name of the table to insert into
+            data: Dictionary containing the record data
+
+        Returns:
+            Dictionary with created record including generated ID and timestamps
+
+        Raises:
+            ValueError: If record with same ID already exists
+            MaintenanceError: If branch is in maintenance mode
+        """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+
+        # Make a copy to avoid modifying the original
+        record_data = data.copy()
+
+        # Generate ID if not provided
+        if not record_data.get("id"):
+            record_data["id"] = str(uuid.uuid4())
+
+        # Set timestamps
+        now = datetime.now()
+        record_data["created_at"] = now
+        record_data["updated_at"] = now
+
+        # Build INSERT query
+        columns = list(record_data.keys())
+        placeholders = [f":{col}" for col in columns]
+        query = f"""
+            INSERT INTO {table_name} ({", ".join(columns)}) 
+            VALUES ({", ".join(placeholders)})
+        """
+
+        with DatabaseConnection(self.db_path) as conn:
+            try:
+                conn.execute(query, record_data)
+                conn.commit()
+
+                # Return the created record data
+                return record_data
+            except Exception as e:
+                conn.rollback()
+                if "UNIQUE constraint failed" in str(e):
+                    raise ValueError(f"Record with ID {record_data['id']} already exists")
+                raise
+
     def create(self, instance: T) -> T:
-        """Create a new record.
+        """Create a new record from a model instance.
 
         Args:
             instance: Model instance to create
@@ -106,43 +156,14 @@ class DataManager:
             ValueError: If record with same ID already exists
             MaintenanceError: If branch is in maintenance mode
         """
-        # Check maintenance mode
-        check_maintenance_mode(self.project_root, self.database, self.branch)
-
         table_name = self._get_table_name(type(instance))
-
-        # Prepare data for insertion
         data = instance.model_dump()
-
-        # Generate ID if not provided
-        if not data.get("id"):
-            data["id"] = str(uuid.uuid4())
-
-        # Set timestamps
-        now = datetime.now()
-        data["created_at"] = now
-        data["updated_at"] = now
-
-        # Build INSERT query
-        columns = list(data.keys())
-        placeholders = [f":{col}" for col in columns]
-        query = f"""
-            INSERT INTO {table_name} ({", ".join(columns)}) 
-            VALUES ({", ".join(placeholders)})
-        """
-
-        with DatabaseConnection(self.db_path) as conn:
-            try:
-                conn.execute(query, data)
-                conn.commit()
-
-                # Return updated instance
-                return type(instance)(**data)
-            except Exception as e:
-                conn.rollback()
-                if "UNIQUE constraint failed" in str(e):
-                    raise ValueError(f"Record with ID {data['id']} already exists")
-                raise
+        
+        # Use the new create_from_dict method
+        created_data = self.create_from_dict(table_name, data)
+        
+        # Return updated instance
+        return type(instance)(**created_data)
 
     def save(self, instance: T) -> T:
         """Save (upsert) a record - insert if new, update if exists.

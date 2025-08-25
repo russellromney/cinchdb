@@ -4,7 +4,7 @@
 
 NOTE: CinchDB is in early alpha. This is project to test out an idea. Do not use this in production.
 
-CinchDB is for projects that need fast queries, data isolated data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database-b74445f4), and a branchable database that makes it easy to merge changes between branches.
+CinchDB is for projects that need fast queries, isolated data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database-b74445f4), and a branchable database that makes it easy to merge changes between branches.
 
 On a meta level: I made this because I wanted a database structure that I felt comfortable letting AI agents take full control over, safely, and I didn't want to run my own Postgres instance somewhere or pay for it on e.g. Neon - I don't need hyperscaling, I just need super fast queries.
 
@@ -31,6 +31,7 @@ cinch branch merge-into-main feature
 cinch tenant create customer_a
 cinch query "SELECT * FROM users" --tenant customer_a
 
+# Coming soon 
 # Connect to remote CinchDB instance
 cinch remote add production https://your-cinchdb-server.com your-api-key
 cinch remote use production
@@ -49,7 +50,7 @@ CinchDB combines SQLite with Git-like workflows for database schema management:
 - **Safe structure changes** - change merges happen atomically with zero rollback risk (seriously)
 - **Remote connectivity** - Connect to hosted CinchDB instances
 - **Type-safe SDK** - Python and TypeScript SDKs with full type safety
-- **Remote-capable** - CLI and SDK can connect to remote instances
+- **Remote-capable** - coming soon - CLI and SDK can connect to remote instances
 - **SDK generation from database schema** - Generate a typesafe SDK from your database models for CRUD operations
 
 ## Installation
@@ -123,6 +124,8 @@ db.update("posts", post_id, {"content": "Updated content"})
 
 ### Remote Connection
 
+Coming soon.
+
 ```python
 # Connect to remote instance
 db = cinchdb.connect("myapp", url="https://your-cinchdb-server.com", api_key="your-api-key")
@@ -132,7 +135,7 @@ results = db.query("SELECT * FROM users")
 user_id = db.insert("users", {"username": "alice", "email": "alice@example.com"})
 ```
 
-## Remote Access
+## Remote Access - coming soon 
 
 Connect to a remote CinchDB instance:
 

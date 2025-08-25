@@ -180,4 +180,81 @@ describe('CinchDBClient', () => {
       expect(mockAxiosInstance.delete).toHaveBeenCalledWith('/tables/products/data/123');
     });
   });
+  
+  describe('insert operations', () => {
+    it('should insert a single record', async () => {
+      const mockAxiosInstance = mockedAxios.create();
+      const mockResponse = {
+        data: { id: '123', name: 'Test User', created_at: '2024-01-01' }
+      };
+      
+      (mockAxiosInstance.post as jest.Mock).mockResolvedValue(mockResponse);
+      
+      const result = await client.insert('users', { name: 'Test User' });
+      
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/tables/users/data', {
+        data: { name: 'Test User' }
+      });
+      expect(result).toHaveProperty('id', '123');
+      expect(result).toHaveProperty('name', 'Test User');
+    });
+    
+    it('should insert multiple records using spread operator', async () => {
+      const mockAxiosInstance = mockedAxios.create();
+      const mockResponse = {
+        data: [
+          { id: '1', name: 'User 1' },
+          { id: '2', name: 'User 2' },
+          { id: '3', name: 'User 3' }
+        ]
+      };
+      
+      (mockAxiosInstance.post as jest.Mock).mockResolvedValue(mockResponse);
+      
+      const result = await client.insert('users',
+        { name: 'User 1' },
+        { name: 'User 2' },
+        { name: 'User 3' }
+      );
+      
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/tables/users/data/bulk', {
+        records: [
+          { name: 'User 1' },
+          { name: 'User 2' },
+          { name: 'User 3' }
+        ]
+      });
+      expect(result).toHaveLength(3);
+      expect((result as any[])[0]).toHaveProperty('id', '1');
+      expect((result as any[])[2]).toHaveProperty('name', 'User 3');
+    });
+    
+    it('should insert array using spread operator', async () => {
+      const mockAxiosInstance = mockedAxios.create();
+      const mockResponse = {
+        data: [
+          { id: '1', name: 'Alice' },
+          { id: '2', name: 'Bob' }
+        ]
+      };
+      
+      (mockAxiosInstance.post as jest.Mock).mockResolvedValue(mockResponse);
+      
+      const users = [
+        { name: 'Alice' },
+        { name: 'Bob' }
+      ];
+      
+      const result = await client.insert('users', ...users);
+      
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/tables/users/data/bulk', {
+        records: users
+      });
+      expect(result).toHaveLength(2);
+    });
+    
+    it('should throw error when no data provided', async () => {
+      await expect(client.insert('users')).rejects.toThrow('At least one record must be provided');
+    });
+  });
 });

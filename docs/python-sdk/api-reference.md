@@ -248,27 +248,45 @@ db.create_table("products", [
 
 #### insert()
 
-Insert a record into a table.
+Insert one or more records into a table.
 
 ```python
-insert(table: str, data: Dict[str, Any]) -> Dict[str, Any]
+insert(table: str, *data: Dict[str, Any]) -> Dict[str, Any] | List[Dict[str, Any]]
 ```
 
 **Parameters:**
 - `table` (str): Table name
-- `data` (Dict[str, Any]): Record data as dictionary
+- `*data` (Dict[str, Any]): One or more record data dictionaries
 
 **Returns:**
-- `Dict[str, Any]`: Inserted record with generated fields (id, created_at, updated_at)
+- `Dict[str, Any]`: Single record if one item provided
+- `List[Dict[str, Any]]`: List of records if multiple items provided
 
 **Example:**
 ```python
+# Single insert
 record = db.insert("users", {
     "name": "John Doe",
     "email": "john@example.com",
     "active": True
 })
 print(record["id"])  # Generated UUID
+
+# Batch insert - multiple records at once
+users = db.insert("users",
+    {"name": "Alice", "email": "alice@example.com"},
+    {"name": "Bob", "email": "bob@example.com"},
+    {"name": "Charlie", "email": "charlie@example.com"}
+)
+for user in users:
+    print(f"Created {user['name']} with ID: {user['id']}")
+
+# Using list expansion
+user_list = [
+    {"name": "Dave", "email": "dave@example.com"},
+    {"name": "Eve", "email": "eve@example.com"}
+]
+results = db.insert("users", *user_list)
 ```
 
 #### update()

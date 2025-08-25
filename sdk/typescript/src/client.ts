@@ -361,8 +361,18 @@ export class CinchDBClient {
   }
 
   // Convenience methods matching Python SDK
-  async insert(table: string, data: Record<string, any>): Promise<DataRecord> {
-    return this.createRecord(table, data);
+  async insert(table: string, ...data: Record<string, any>[]): Promise<DataRecord | DataRecord[]> {
+    if (data.length === 0) {
+      throw new Error('At least one record must be provided');
+    }
+    
+    // Single record
+    if (data.length === 1) {
+      return this.createRecord(table, data[0]);
+    }
+    
+    // Multiple records - use bulk endpoint
+    return this.bulkCreateRecords(table, data);
   }
 
   async update(table: string, id: string, data: Record<string, any>): Promise<DataRecord> {

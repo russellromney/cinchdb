@@ -63,7 +63,7 @@ async function main() {
       ],
     });
 
-    // Insert some data
+    // Insert single record
     const product = await featureClient.insert('products', {
       name: 'Widget',
       description: 'A useful widget',
@@ -71,6 +71,22 @@ async function main() {
       in_stock: 100,
     });
     console.log('Created product:', product);
+    
+    // Batch insert multiple records
+    const moreProducts = await featureClient.insert('products',
+      { name: 'Gadget', description: 'Cool gadget', price: 39.99, in_stock: 50 },
+      { name: 'Tool', description: 'Handy tool', price: 19.99, in_stock: 200 },
+      { name: 'Device', description: 'Smart device', price: 89.99, in_stock: 25 }
+    );
+    console.log('Created multiple products:', moreProducts);
+    
+    // Or with an array using spread operator
+    const productList = [
+      { name: 'Item A', description: 'Description A', price: 15.99, in_stock: 75 },
+      { name: 'Item B', description: 'Description B', price: 25.99, in_stock: 60 }
+    ];
+    const batchResult = await featureClient.insert('products', ...productList);
+    console.log('Batch insert result:', batchResult);
 
     // Query data
     const result = await featureClient.query('SELECT * FROM products WHERE price < ?', [50]);

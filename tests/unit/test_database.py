@@ -242,6 +242,106 @@ class TestCinchDB:
             )
             assert result["id"] == "remote-id"
             assert result["name"] == "Remote User"
+    
+    def test_local_insert_multiple(self, tmp_path):
+        """Test multiple insert on local connection."""
+        db = CinchDB(database="test_db", project_dir=tmp_path)
+        
+        with patch("cinchdb.managers.data.DataManager") as mock_data_manager:
+            mock_instance = Mock()
+            
+            # Mock return values for each insert
+            mock_instance.create_from_dict.side_effect = [
+                {"id": "id-1", "name": "User 1"},
+                {"id": "id-2", "name": "User 2"},
+                {"id": "id-3", "name": "User 3"}
+            ]
+            mock_data_manager.return_value = mock_instance
+            
+            # Test with multiple arguments
+            result = db.insert("users", 
+                {"name": "User 1"},
+                {"name": "User 2"},
+                {"name": "User 3"}
+            )
+            
+            assert len(result) == 3
+            assert result[0]["id"] == "id-1"
+            assert result[1]["id"] == "id-2"
+            assert result[2]["id"] == "id-3"
+            
+            # Verify create_from_dict was called 3 times
+            assert mock_instance.create_from_dict.call_count == 3
+    
+    def test_remote_insert_multiple(self):
+        """Test multiple insert on remote connection."""
+        mock_session = Mock()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {"id": "id-1", "name": "User 1"},
+            {"id": "id-2", "name": "User 2"}
+        ]
+        mock_session.request.return_value = mock_response
+        
+        with patch.object(CinchDB, "session", new_callable=PropertyMock) as mock_session_prop:
+            mock_session_prop.return_value = mock_session
+            
+            db = CinchDB(
+                database="test_db",
+                api_url="https://api.example.com",
+                api_key="test-key"
+            )
+            
+            # Test with multiple arguments
+            result = db.insert("users",
+                {"name": "User 1"},
+                {"name": "User 2"}
+            )
+            
+            # Should use bulk endpoint for multiple records
+            mock_session.request.assert_called_once_with(
+                "POST",
+                "https://api.example.com/tables/users/data/bulk",
+                params={"database": "test_db", "branch": "main", "tenant": "main"},
+                json={"records": [{"name": "User 1"}, {"name": "User 2"}]}
+            )
+            
+            assert len(result) == 2
+            assert result[0]["id"] == "id-1"
+            assert result[1]["id"] == "id-2"
+    
+    def test_insert_with_list_expansion(self, tmp_path):
+        """Test insert with star expansion of a list."""
+        db = CinchDB(database="test_db", project_dir=tmp_path)
+        
+        with patch("cinchdb.managers.data.DataManager") as mock_data_manager:
+            mock_instance = Mock()
+            mock_instance.create_from_dict.side_effect = [
+                {"id": "id-1", "name": "Alice"},
+                {"id": "id-2", "name": "Bob"}
+            ]
+            mock_data_manager.return_value = mock_instance
+            
+            # Create a list of users
+            users = [
+                {"name": "Alice"},
+                {"name": "Bob"}
+            ]
+            
+            # Use star expansion
+            result = db.insert("users", *users)
+            
+            assert len(result) == 2
+            assert result[0]["name"] == "Alice"
+            assert result[1]["name"] == "Bob"
+    
+    def test_insert_no_data_raises_error(self, tmp_path):
+        """Test that insert with no data raises an error."""
+        db = CinchDB(database="test_db", project_dir=tmp_path)
+        
+        with pytest.raises(ValueError, match="At least one record must be provided"):
+            db.insert("users")
 
     def test_context_manager(self):
         """Test context manager functionality."""

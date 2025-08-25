@@ -78,28 +78,27 @@ print(f"Created user: {user['id']}")
 print(f"Created at: {user['created_at']}")
 ```
 
-### Bulk Insert
+### Batch Insert
 ```python
-# Insert multiple records
+# Insert multiple records at once using star expansion
+users = db.insert("users",
+    {"name": "Alice", "email": "alice@example.com"},
+    {"name": "Bob", "email": "bob@example.com"},
+    {"name": "Charlie", "email": "charlie@example.com"}
+)
+# Returns a list of created records
+
+# Or with a list using star expansion
 users_data = [
     {"name": "Alice", "email": "alice@example.com"},
     {"name": "Bob", "email": "bob@example.com"},
     {"name": "Charlie", "email": "charlie@example.com"}
 ]
+inserted_users = db.insert("users", *users_data)
 
-for user_data in users_data:
-    db.insert("users", user_data)
-
-# Or use raw SQL for efficiency
-db.query("""
-    INSERT INTO users (id, name, email, created_at, updated_at) 
-    VALUES 
-    (?, ?, ?, datetime('now'), datetime('now')),
-    (?, ?, ?, datetime('now'), datetime('now'))
-""", [
-    str(uuid.uuid4()), "Alice", "alice@example.com",
-    str(uuid.uuid4()), "Bob", "bob@example.com"
-])
+# Each record includes generated fields (id, created_at, updated_at)
+for user in inserted_users:
+    print(f"Created user {user['name']} with ID: {user['id']}")
 ```
 
 ## UPDATE Operations
@@ -117,17 +116,21 @@ print(f"Updated at: {updated['updated_at']}")
 
 ### Update with Conditions
 ```python
-# Update multiple records
-db.query(
-    "UPDATE users SET active = ? WHERE last_login < ?",
-    [False, "2024-01-01"]
+# For conditional updates, iterate through matching records
+users_to_update = db.query(
+    "SELECT id FROM users WHERE last_login < ?",
+    ["2024-01-01"]
 )
+for user in users_to_update:
+    db.update("users", user["id"], {"active": False})
 
-# Update with calculations
-db.query(
-    "UPDATE products SET price = price * ? WHERE category = ?",
-    [1.1, "electronics"]
+# For bulk updates with calculations, fetch and update individually
+products = db.query(
+    "SELECT id, price FROM products WHERE category = ?",
+    ["electronics"]
 )
+for product in products:
+    db.update("products", product["id"], {"price": product["price"] * 1.1})
 ```
 
 ## DELETE Operations
@@ -140,16 +143,20 @@ db.delete("users", user_id)
 
 ### Delete with Conditions
 ```python
-# Delete multiple records
-db.query(
-    "DELETE FROM sessions WHERE created_at < datetime('now', '-7 days')"
+# For conditional deletes, fetch matching records first
+old_sessions = db.query(
+    "SELECT id FROM sessions WHERE created_at < datetime('now', '-7 days')"
 )
+for session in old_sessions:
+    db.delete("sessions", session["id"])
 
-# Delete with parameters
-db.query(
-    "DELETE FROM users WHERE active = ? AND last_login < ?",
+# Delete with multiple conditions
+inactive_users = db.query(
+    "SELECT id FROM users WHERE active = ? AND last_login < ?",
     [False, "2023-01-01"]
 )
+for user in inactive_users:
+    db.delete("users", user["id"])
 ```
 
 ## Advanced Queries
@@ -275,35 +282,35 @@ monthly = db.query("""
 
 ## Transactions
 
-### Manual Transactions
+### Automatic Transactions
+Individual operations (insert, update, delete) are automatically wrapped in transactions.
+
+### Complex Operations
 ```python
-# For complex operations
+# For operations requiring multiple steps, use the API methods
 try:
-    db.query("BEGIN")
-    
-    # Multiple operations
+    # Create user and profile
     user = db.insert("users", {"name": "Alice"})
-    db.insert("profiles", {"user_id": user["id"], "bio": "..."})
-    db.query("UPDATE stats SET user_count = user_count + 1")
+    profile = db.insert("profiles", {"user_id": user["id"], "bio": "..."})
     
-    db.query("COMMIT")
+    # Update stats
+    stats = db.query("SELECT * FROM stats WHERE id = 1")[0]
+    db.update("stats", stats["id"], {"user_count": stats["user_count"] + 1})
+    
 except Exception as e:
-    db.query("ROLLBACK")
+    print(f"Operation failed: {e}")
     raise
 ```
-
-### Automatic Transactions
-Individual operations are automatically wrapped in transactions.
 
 ## Query Optimization
 
 ### Use Indexes
 ```python
-# Create indexes for frequently queried columns
-db.query("CREATE INDEX idx_users_email ON users(email)")
-db.query("CREATE INDEX idx_orders_user_status ON orders(user_id, status)")
+# Create indexes through table management
+# Indexes should be created when defining tables or through schema migrations
+# For frequently queried columns, consider adding indexes at table creation time
 
-# Check query plan
+# Check query plan (read-only operation)
 plan = db.query("EXPLAIN QUERY PLAN SELECT * FROM users WHERE email = ?", ["test@example.com"])
 ```
 

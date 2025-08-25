@@ -6,7 +6,7 @@ NOTE: CinchDB is in early alpha. This is project to test out an idea. Do not use
 
 CinchDB is for projects that need fast queries, data isolated data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database-b74445f4), and a branchable database that makes it easy to merge changes between branches.
 
-On a meta level, I made this because I wanted a database structure that I felt comfortable letting AI agents take full control over, safely, and I didn't want to run my own Postgres instance somewhere or pay for it on e.g. Neon - I don't need hyperscaling, I just need super fast queries.
+On a meta level: I made this because I wanted a database structure that I felt comfortable letting AI agents take full control over, safely, and I didn't want to run my own Postgres instance somewhere or pay for it on e.g. Neon - I don't need hyperscaling, I just need super fast queries.
 
 Because it's so lightweight and its only dependencies are pydantic, requests, and Typer, it makes for a perfect local development database that can be controlled programmatically.
 
@@ -101,8 +101,23 @@ db.create_table("posts", [
 # Query data
 results = db.query("SELECT * FROM posts WHERE title LIKE ?", ["%python%"])
 
-# CRUD operations
+# CRUD operations - single insert
 post_id = db.insert("posts", {"title": "Hello World", "content": "First post"})
+
+# Batch insert - multiple records at once
+posts = db.insert("posts",
+    {"title": "First", "content": "Content 1"},
+    {"title": "Second", "content": "Content 2"},
+    {"title": "Third", "content": "Content 3"}
+)
+
+# Or with a list using star expansion
+post_list = [
+    {"title": "Post A", "content": "Content A"},
+    {"title": "Post B", "content": "Content B"}
+]
+results = db.insert("posts", *post_list)
+
 db.update("posts", post_id, {"content": "Updated content"})
 ```
 

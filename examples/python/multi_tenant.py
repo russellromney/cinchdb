@@ -104,16 +104,17 @@ class SaaSApplication:
             ("Explore integrations", "next week"),
         ]
 
-        for title, due in tasks:
-            tenant_db.insert(
-                "tasks",
-                {
-                    "project_id": project["id"],
-                    "title": title,
-                    "status": "pending",
-                    "due_date": self._calculate_due_date(due),
-                },
-            )
+        # Insert all tasks at once using batch insert
+        task_records = [
+            {
+                "project_id": project["id"],
+                "title": title,
+                "status": "pending",
+                "due_date": self._calculate_due_date(due),
+            }
+            for title, due in tasks
+        ]
+        tenant_db.insert("tasks", *task_records)
 
         print(f"✓ Created tenant: {tenant_name}")
         print(f"✓ Created account: {account['id']}")
@@ -211,16 +212,17 @@ class SaaSApplication:
             "Deployment",
         ]
 
-        for i, title in enumerate(tasks):
-            task = tenant_db.insert(
-                "tasks",
-                {
-                    "project_id": project["id"],
-                    "title": title,
-                    "status": "completed" if i < 2 else "pending",
-                    "due_date": (datetime.now() + timedelta(days=i * 7)).isoformat(),
-                },
-            )
+        # Insert all tasks at once using batch insert
+        task_records = [
+            {
+                "project_id": project["id"],
+                "title": title,
+                "status": "completed" if i < 2 else "pending",
+                "due_date": (datetime.now() + timedelta(days=i * 7)).isoformat(),
+            }
+            for i, title in enumerate(tasks)
+        ]
+        tenant_db.insert("tasks", *task_records)
 
         print(f"✓ Created project: {project['name']}")
         print(f"✓ Added {len(tasks)} tasks (2 completed)")

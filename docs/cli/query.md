@@ -216,10 +216,9 @@ cinch query "
 
 ## Performance Tips
 
-1. **Use Indexes** - CinchDB automatically indexes `id` fields
-2. **Limit Results** - Always use LIMIT for large tables
-3. **Select Specific Columns** - Avoid `SELECT *` in production
-4. **Use Views** - Pre-define complex queries as views
+1. **Limit Results** - Always use LIMIT for large tables
+2. **Select Specific Columns** - Avoid `SELECT *` in production
+3. **Use Views** - Pre-define complex queries as views
 
 ## Remote Queries
 

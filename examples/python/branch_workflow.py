@@ -116,17 +116,18 @@ def feature_add_reviews(db):
         {"rating": 5, "comment": "Highly recommend", "verified": False},
     ]
 
-    for r in reviews:
-        feature_db.insert(
-            "reviews",
-            {
-                "product_id": product["id"],
-                "user_id": user["id"],
-                "rating": r["rating"],
-                "comment": r["comment"],
-                "verified_purchase": r["verified"],
-            },
-        )
+    # Insert all reviews at once using batch insert
+    review_records = [
+        {
+            "product_id": product["id"],
+            "user_id": user["id"],
+            "rating": r["rating"],
+            "comment": r["comment"],
+            "verified_purchase": r["verified"],
+        }
+        for r in reviews
+    ]
+    feature_db.insert("reviews", *review_records)
 
     # Update product stats
     stats = feature_db.query(
@@ -210,18 +211,22 @@ def feature_add_inventory(db):
         {"qty": -5, "type": "out", "reason": "Sale Order #457"},
     ]
 
+    # Prepare movement records for batch insert
+    movement_records = [
+        {
+            "product_id": product["id"],
+            "quantity": abs(m["qty"]),
+            "movement_type": m["type"],
+            "reason": m["reason"],
+        }
+        for m in movements
+    ]
+    
+    # Insert all movements at once
+    feature_db.insert("inventory_movements", *movement_records)
+    
+    # Update stock after all movements
     for m in movements:
-        feature_db.insert(
-            "inventory_movements",
-            {
-                "product_id": product["id"],
-                "quantity": abs(m["qty"]),
-                "movement_type": m["type"],
-                "reason": m["reason"],
-            },
-        )
-
-        # Update stock
         new_stock = product["stock"] + m["qty"]
         feature_db.update("products", product["id"], {"stock": new_stock})
         product["stock"] = new_stock

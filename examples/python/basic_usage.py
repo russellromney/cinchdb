@@ -50,8 +50,9 @@ def main():
         {"username": "charlie", "email": "charlie@example.com", "active": False},
     ]
 
-    for user_data in users:
-        user = db.insert("users", user_data)
+    # Insert all users at once using batch insert
+    inserted_users = db.insert("users", *users)
+    for user in inserted_users:
         print(f"Created user: {user['username']} with ID: {user['id']}")
 
     # Query all users

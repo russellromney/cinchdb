@@ -363,23 +363,37 @@ class CinchDB:
                 "POST", "/tables", json={"name": name, "columns": columns_data}
             )
 
-    def insert(self, table: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Insert a record into a table.
+    def insert(self, table: str, *data: Dict[str, Any]) -> Dict[str, Any] | List[Dict[str, Any]]:
+        """Insert one or more records into a table.
 
         Args:
             table: Table name
-            data: Record data as dictionary
+            *data: One or more record data dictionaries
 
         Returns:
-            Inserted record with generated fields (id, created_at, updated_at)
+            Single record dict if one record inserted, list of dicts if multiple
 
         Examples:
-            # Simple insert
+            # Single insert
             db.insert("users", {"name": "John", "email": "john@example.com"})
             
-            # Insert with custom ID
-            db.insert("products", {"id": "prod-123", "name": "Widget", "price": 9.99})
+            # Multiple inserts using star expansion
+            db.insert("users", 
+                {"name": "John", "email": "john@example.com"},
+                {"name": "Jane", "email": "jane@example.com"},
+                {"name": "Bob", "email": "bob@example.com"}
+            )
+            
+            # Or with a list using star expansion
+            users = [
+                {"name": "Alice", "email": "alice@example.com"},
+                {"name": "Charlie", "email": "charlie@example.com"}
+            ]
+            db.insert("users", *users)
         """
+        if not data:
+            raise ValueError("At least one record must be provided")
+            
         if self.is_local:
             # Initialize data manager if needed
             if self._data_manager is None:
@@ -387,14 +401,31 @@ class CinchDB:
                 self._data_manager = DataManager(
                     self.project_dir, self.database, self.branch, self.tenant
                 )
-            # Use the new create_from_dict method
-            return self._data_manager.create_from_dict(table, data)
+            
+            # Single record
+            if len(data) == 1:
+                return self._data_manager.create_from_dict(table, data[0])
+            
+            # Multiple records - batch insert
+            results = []
+            for record in data:
+                result = self._data_manager.create_from_dict(table, record)
+                results.append(result)
+            return results
         else:
-            # Remote insert - use new data CRUD endpoint
-            result = self._make_request(
-                "POST", f"/tables/{table}/data", json={"data": data}
-            )
-            return result
+            # Remote insert
+            if len(data) == 1:
+                # Single record - use existing endpoint
+                result = self._make_request(
+                    "POST", f"/tables/{table}/data", json={"data": data[0]}
+                )
+                return result
+            else:
+                # Multiple records - use bulk endpoint
+                result = self._make_request(
+                    "POST", f"/tables/{table}/data/bulk", json={"records": list(data)}
+                )
+                return result
 
     def update(self, table: str, id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update a record in a table.

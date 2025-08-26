@@ -88,17 +88,17 @@ class TestFullWorkflow:
         assert len(views) == 1
         assert views[0].name == "user_posts"
 
-        # Step 5: Create additional tenant
+        # Step 5: Create additional eager tenant (need schema copied)
         tenant_mgr = TenantManager(temp_project, "main", "feature")
-        tenant_mgr.create_tenant("test_tenant")
+        tenant_mgr.create_tenant("test-tenant", lazy=False)
 
         tenants = tenant_mgr.list_tenants()
         tenant_names = [t.name for t in tenants]
         assert "main" in tenant_names
-        assert "test_tenant" in tenant_names
+        assert "test-tenant" in tenant_names
 
         # Step 6: Verify schema was copied to new tenant
-        test_table_mgr = TableManager(temp_project, "main", "feature", "test_tenant")
+        test_table_mgr = TableManager(temp_project, "main", "feature", "test-tenant")
         test_tables = test_table_mgr.list_tables()
         table_names = [t.name for t in test_tables]
         assert "users" in table_names
@@ -194,13 +194,13 @@ class TestFullWorkflow:
             "items", [Column(name="name", type="TEXT", nullable=False)]
         )
 
-        # Create additional tenant
+        # Create additional eager tenants (need schema copied)
         tenant_mgr = TenantManager(temp_project, "main", "feature")
-        tenant_mgr.create_tenant("tenant_a")
-        tenant_mgr.create_tenant("tenant_b")
+        tenant_mgr.create_tenant("tenant-a", lazy=False)
+        tenant_mgr.create_tenant("tenant-b", lazy=False)
 
         # Verify all tenants have the table structure
-        for tenant in ["main", "tenant_a", "tenant_b"]:
+        for tenant in ["main", "tenant-a", "tenant-b"]:
             tenant_table_mgr = TableManager(temp_project, "main", "feature", tenant)
             tables = tenant_table_mgr.list_tables()
             table_names = [t.name for t in tables]
@@ -211,7 +211,7 @@ class TestFullWorkflow:
         column_mgr.add_column("items", Column(name="description", type="TEXT"))
 
         # Verify column exists in all tenants
-        for tenant in ["main", "tenant_a", "tenant_b"]:
+        for tenant in ["main", "tenant-a", "tenant-b"]:
             tenant_column_mgr = ColumnManager(temp_project, "main", "feature", tenant)
             columns = tenant_column_mgr.list_columns("items")
             column_names = [col.name for col in columns]

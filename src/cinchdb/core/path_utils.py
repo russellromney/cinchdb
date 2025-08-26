@@ -109,7 +109,16 @@ def list_databases(project_root: Path) -> List[str]:
     if not db_dir.exists():
         return []
 
-    return sorted([d.name for d in db_dir.iterdir() if d.is_dir()])
+    databases = set()
+    for item in db_dir.iterdir():
+        if item.is_dir():
+            databases.add(item.name)
+        elif item.is_file() and item.suffix == ".meta" and item.name.startswith("."):
+            # Lazy database metadata files are named .{database_name}.meta
+            database_name = item.stem[1:]  # Remove leading dot
+            databases.add(database_name)
+    
+    return sorted(list(databases))
 
 
 def list_branches(project_root: Path, database: str) -> List[str]:

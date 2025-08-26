@@ -30,6 +30,7 @@ class TenantManager:
         self.database = database
         self.branch = branch
         self.branch_path = get_branch_path(self.project_root, database, branch)
+        self._empty_tenant_name = "__empty__"  # Reserved name for lazy tenant template
 
     def list_tenants(self) -> List[Tenant]:
         """List all tenants in the branch.
@@ -41,6 +42,10 @@ class TenantManager:
         tenants = []
 
         for name in tenant_names:
+            # Filter out the __empty__ tenant from user-facing listings
+            if name == self._empty_tenant_name:
+                continue
+                
             tenant = Tenant(
                 name=name,
                 database=self.database,
@@ -52,7 +57,7 @@ class TenantManager:
         return tenants
 
     def create_tenant(
-        self, tenant_name: str, description: Optional[str] = None, lazy: bool = False
+        self, tenant_name: str, description: Optional[str] = None, lazy: bool = True
     ) -> Tenant:
         """Create a new tenant by copying schema from main tenant.
 
@@ -65,10 +70,14 @@ class TenantManager:
             Created Tenant object
 
         Raises:
-            ValueError: If tenant already exists
+            ValueError: If tenant already exists or uses reserved name
             InvalidNameError: If tenant name is invalid
             MaintenanceError: If branch is in maintenance mode
         """
+        # Check for reserved name
+        if tenant_name == self._empty_tenant_name:
+            raise ValueError(f"'{self._empty_tenant_name}' is a reserved tenant name")
+            
         # Validate tenant name
         validate_name(tenant_name, "tenant")
 
@@ -142,6 +151,71 @@ class TenantManager:
             is_main=False,
         )
 
+    def _ensure_empty_tenant(self) -> None:
+        """Ensure the __empty__ tenant exists with current schema.
+        
+        This tenant serves as a template for lazy tenants.
+        It's created on-demand when first lazy tenant is read.
+        """
+        empty_db_path = get_tenant_db_path(
+            self.project_root, self.database, self.branch, self._empty_tenant_name
+        )
+        
+        # If __empty__ doesn't exist, create it by copying main's schema
+        if not empty_db_path.exists():
+            main_db_path = get_tenant_db_path(
+                self.project_root, self.database, self.branch, "main"
+            )
+            
+            # Copy main tenant database to __empty__
+            shutil.copy2(main_db_path, empty_db_path)
+            
+            # Clear all data from tables (keep schema only)
+            with DatabaseConnection(empty_db_path) as conn:
+                # Get all tables
+                result = conn.execute("""
+                    SELECT name FROM sqlite_master 
+                    WHERE type='table' 
+                    AND name NOT LIKE 'sqlite_%'
+                """)
+                tables = [row["name"] for row in result.fetchall()]
+                
+                # Clear data from each table
+                for table in tables:
+                    conn.execute(f"DELETE FROM {table}")
+                
+                conn.commit()
+            
+            # Vacuum to reduce size
+            import sqlite3
+            vacuum_conn = sqlite3.connect(str(empty_db_path))
+            vacuum_conn.isolation_level = None
+            vacuum_conn.execute("VACUUM")
+            vacuum_conn.close()
+    
+    def _update_empty_tenant_schema(self) -> None:
+        """Update __empty__ tenant with latest schema from main.
+        
+        Called after schema changes are applied to ensure __empty__ stays current.
+        """
+        empty_db_path = get_tenant_db_path(
+            self.project_root, self.database, self.branch, self._empty_tenant_name
+        )
+        
+        # Remove existing __empty__ if it exists
+        if empty_db_path.exists():
+            empty_db_path.unlink()
+            # Also remove WAL and SHM files if they exist
+            wal_path = empty_db_path.with_suffix(".db-wal")
+            shm_path = empty_db_path.with_suffix(".db-shm")
+            if wal_path.exists():
+                wal_path.unlink()
+            if shm_path.exists():
+                shm_path.unlink()
+        
+        # Recreate with current schema
+        self._ensure_empty_tenant()
+
     def delete_tenant(self, tenant_name: str) -> None:
         """Delete a tenant.
 
@@ -149,15 +223,17 @@ class TenantManager:
             tenant_name: Name of tenant to delete
 
         Raises:
-            ValueError: If tenant doesn't exist or is main tenant
+            ValueError: If tenant doesn't exist, is main tenant, or is reserved
             MaintenanceError: If branch is in maintenance mode
         """
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
-        # Can't delete main tenant
+        # Can't delete main or __empty__ tenants
         if tenant_name == "main":
             raise ValueError("Cannot delete the main tenant")
+        if tenant_name == self._empty_tenant_name:
+            raise ValueError(f"Cannot delete the reserved '{self._empty_tenant_name}' tenant")
 
         # Validate tenant exists
         if tenant_name not in list_tenants(
@@ -209,14 +285,17 @@ class TenantManager:
         # Check if metadata exists
         if not tenant_meta_file.exists():
             raise ValueError(f"Tenant '{tenant_name}' does not exist")
+        
+        # Ensure __empty__ tenant exists with current schema
+        self._ensure_empty_tenant()
             
-        # Get main tenant path for schema copy
-        main_db_path = get_tenant_db_path(
-            self.project_root, self.database, self.branch, "main"
+        # Get __empty__ tenant path for schema copy
+        empty_db_path = get_tenant_db_path(
+            self.project_root, self.database, self.branch, self._empty_tenant_name
         )
         
-        # Copy main tenant database to new tenant
-        shutil.copy2(main_db_path, db_path)
+        # Copy __empty__ tenant database to new tenant
+        shutil.copy2(empty_db_path, db_path)
 
         # Clear any data from the copied database (keep schema only)
         with DatabaseConnection(db_path) as conn:
@@ -347,11 +426,80 @@ class TenantManager:
         if old_shm.exists():
             old_shm.rename(new_shm)
 
-    def get_tenant_connection(self, tenant_name: str) -> DatabaseConnection:
+    def is_tenant_lazy(self, tenant_name: str) -> bool:
+        """Check if a tenant is lazy (not materialized).
+        
+        Args:
+            tenant_name: Name of the tenant to check
+            
+        Returns:
+            True if tenant is lazy, False if materialized
+        """
+        # Check if it's the __empty__ tenant (always materialized when exists)
+        if tenant_name == self._empty_tenant_name:
+            return False
+            
+        # Check if metadata file exists
+        tenants_dir = self.branch_path / "tenants"
+        tenant_meta_file = tenants_dir / f".{tenant_name}.meta"
+        
+        # Check if database file exists
+        db_path = get_tenant_db_path(
+            self.project_root, self.database, self.branch, tenant_name
+        )
+        
+        # If metadata exists but database doesn't, it's lazy
+        return tenant_meta_file.exists() and not db_path.exists()
+    
+    def get_tenant_db_path_for_operation(self, tenant_name: str, is_write: bool = False) -> Path:
+        """Get the appropriate database path for a tenant operation.
+        
+        For lazy tenants:
+        - Read operations use __empty__ tenant
+        - Write operations trigger materialization
+        
+        Args:
+            tenant_name: Name of the tenant
+            is_write: Whether this is for a write operation
+            
+        Returns:
+            Path to the appropriate database file
+            
+        Raises:
+            ValueError: If tenant doesn't exist
+        """
+        # Check if tenant exists
+        if tenant_name not in list_tenants(
+            self.project_root, self.database, self.branch
+        ) and tenant_name != self._empty_tenant_name:
+            raise ValueError(f"Tenant '{tenant_name}' does not exist")
+        
+        # For lazy tenants
+        if self.is_tenant_lazy(tenant_name):
+            if is_write:
+                # Materialize the tenant for writes
+                self.materialize_tenant(tenant_name)
+                return get_tenant_db_path(
+                    self.project_root, self.database, self.branch, tenant_name
+                )
+            else:
+                # Use __empty__ tenant for reads
+                self._ensure_empty_tenant()
+                return get_tenant_db_path(
+                    self.project_root, self.database, self.branch, self._empty_tenant_name
+                )
+        else:
+            # For materialized tenants, use their actual database
+            return get_tenant_db_path(
+                self.project_root, self.database, self.branch, tenant_name
+            )
+
+    def get_tenant_connection(self, tenant_name: str, is_write: bool = False) -> DatabaseConnection:
         """Get a database connection for a tenant.
 
         Args:
             tenant_name: Tenant name
+            is_write: Whether this connection will be used for writes
 
         Returns:
             DatabaseConnection object
@@ -359,12 +507,5 @@ class TenantManager:
         Raises:
             ValueError: If tenant doesn't exist
         """
-        if tenant_name not in list_tenants(
-            self.project_root, self.database, self.branch
-        ):
-            raise ValueError(f"Tenant '{tenant_name}' does not exist")
-
-        db_path = get_tenant_db_path(
-            self.project_root, self.database, self.branch, tenant_name
-        )
+        db_path = self.get_tenant_db_path_for_operation(tenant_name, is_write)
         return DatabaseConnection(db_path)

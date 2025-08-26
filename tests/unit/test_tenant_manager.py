@@ -42,8 +42,8 @@ class TestTenantManager:
 
     def test_create_tenant(self, tenant_manager):
         """Test creating a new tenant."""
-        # Create a tenant
-        new_tenant = tenant_manager.create_tenant("customer1", "Customer 1 data")
+        # Create an eager tenant for this test since we check file existence
+        new_tenant = tenant_manager.create_tenant("customer1", "Customer 1 data", lazy=False)
 
         assert new_tenant.name == "customer1"
         assert new_tenant.database == "main"
@@ -94,8 +94,8 @@ class TestTenantManager:
             """)
             conn.commit()
 
-        # Create new tenant
-        tenant_manager.create_tenant("customer1")
+        # Create new eager tenant to test schema copying
+        tenant_manager.create_tenant("customer1", lazy=False)
 
         # Check schema was copied
         customer_db_path = (
@@ -215,8 +215,8 @@ class TestTenantManager:
 
     def test_rename_tenant(self, tenant_manager):
         """Test renaming a tenant."""
-        # Create a tenant
-        tenant_manager.create_tenant("customer1")
+        # Create an eager tenant (rename requires actual file)
+        tenant_manager.create_tenant("customer1", lazy=False)
 
         # Rename it
         tenant_manager.rename_tenant("customer1", "customer2")

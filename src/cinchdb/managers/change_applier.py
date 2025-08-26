@@ -118,6 +118,9 @@ class ChangeApplier:
 
                 # Phase 3: Mark as applied
                 self.change_tracker.mark_change_applied(change_id)
+                
+                # Update __empty__ tenant with new schema
+                self.tenant_manager._update_empty_tenant_schema()
 
                 # Exit maintenance mode before cleanup
                 self._exit_maintenance_mode()

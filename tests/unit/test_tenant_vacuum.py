@@ -63,12 +63,12 @@ def test_tenant_vacuum_reduces_size():
         # Get size of main tenant with data
         main_size_with_data = get_file_size_kb(main_db_path)
         
-        # Create new tenant
+        # Create new eager tenant (need actual file to test vacuum)
         tenant_manager = TenantManager(project_dir, "testdb", "main")
-        tenant_manager.create_tenant("test_tenant")
+        tenant_manager.create_tenant("test-tenant", lazy=False)
         
         # Check new tenant size
-        new_tenant_path = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / "test_tenant.db"
+        new_tenant_path = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / "test-tenant.db"
         new_tenant_size = get_file_size_kb(new_tenant_path)
         
         # New tenant should be MUCH smaller (less than 25% of main with data)
@@ -123,12 +123,12 @@ def test_tenant_vacuum_with_indexes():
         
         main_size = get_file_size_kb(main_db_path)
         
-        # Create new tenant
+        # Create new eager tenant
         tenant_manager = TenantManager(project_dir, "testdb", "main")
-        tenant_manager.create_tenant("indexed_tenant")
+        tenant_manager.create_tenant("indexed-tenant", lazy=False)
         
         # Check new tenant
-        new_tenant_path = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / "indexed_tenant.db"
+        new_tenant_path = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / "indexed-tenant.db"
         new_tenant_size = get_file_size_kb(new_tenant_path)
         
         # Should be much smaller (less than 30% of original)

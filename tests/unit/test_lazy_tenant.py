@@ -23,26 +23,26 @@ def test_lazy_tenant_creation():
         tenant_manager = TenantManager(project_dir, "testdb", "main")
         
         # Create lazy tenant
-        tenant = tenant_manager.create_tenant("lazy_tenant", lazy=True)
-        assert tenant.name == "lazy_tenant"
+        tenant = tenant_manager.create_tenant("lazy-tenant", lazy=True)
+        assert tenant.name == "lazy-tenant"
         
         # Check that metadata file exists
-        meta_file = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / ".lazy_tenant.meta"
+        meta_file = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / ".lazy-tenant.meta"
         assert meta_file.exists()
         
         # Check metadata content
         with open(meta_file) as f:
             metadata = json.load(f)
-        assert metadata["name"] == "lazy_tenant"
+        assert metadata["name"] == "lazy-tenant"
         assert metadata["lazy"] is True
         
         # Check that database file does NOT exist
-        db_path = get_tenant_db_path(project_dir, "testdb", "main", "lazy_tenant")
+        db_path = get_tenant_db_path(project_dir, "testdb", "main", "lazy-tenant")
         assert not db_path.exists()
         
         # Verify tenant appears in list
         tenants = list_tenants(project_dir, "testdb", "main")
-        assert "lazy_tenant" in tenants
+        assert "lazy-tenant" in tenants
 
 
 def test_lazy_tenant_materialization():
@@ -68,14 +68,14 @@ def test_lazy_tenant_materialization():
         tenant_manager = TenantManager(project_dir, "testdb", "main")
         
         # Create lazy tenant
-        tenant_manager.create_tenant("lazy_tenant", lazy=True)
+        tenant_manager.create_tenant("lazy-tenant", lazy=True)
         
         # Database shouldn't exist yet
-        db_path = get_tenant_db_path(project_dir, "testdb", "main", "lazy_tenant")
+        db_path = get_tenant_db_path(project_dir, "testdb", "main", "lazy-tenant")
         assert not db_path.exists()
         
         # Materialize the tenant
-        tenant_manager.materialize_tenant("lazy_tenant")
+        tenant_manager.materialize_tenant("lazy-tenant")
         
         # Now database should exist
         assert db_path.exists()
@@ -94,7 +94,7 @@ def test_lazy_tenant_materialization():
             assert result.fetchone()["count"] == 0
         
         # Check that metadata was updated
-        meta_file = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / ".lazy_tenant.meta"
+        meta_file = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / ".lazy-tenant.meta"
         with open(meta_file) as f:
             metadata = json.load(f)
         assert metadata["lazy"] is False
@@ -113,13 +113,13 @@ def test_lazy_vs_eager_tenant_size():
         tenant_manager = TenantManager(project_dir, "testdb", "main")
         
         # Create eager tenant
-        tenant_manager.create_tenant("eager_tenant", lazy=False)
-        eager_db_path = get_tenant_db_path(project_dir, "testdb", "main", "eager_tenant")
+        tenant_manager.create_tenant("eager-tenant", lazy=False)
+        eager_db_path = get_tenant_db_path(project_dir, "testdb", "main", "eager-tenant")
         eager_size = eager_db_path.stat().st_size
         
         # Create lazy tenant
-        tenant_manager.create_tenant("lazy_tenant", lazy=True)
-        lazy_meta_file = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / ".lazy_tenant.meta"
+        tenant_manager.create_tenant("lazy-tenant", lazy=True)
+        lazy_meta_file = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / ".lazy-tenant.meta"
         lazy_size = lazy_meta_file.stat().st_size
         
         # Lazy tenant should be much smaller (metadata only)
@@ -140,11 +140,11 @@ def test_duplicate_lazy_tenant_fails():
         tenant_manager = TenantManager(project_dir, "testdb", "main")
         
         # Create lazy tenant
-        tenant_manager.create_tenant("test_tenant", lazy=True)
+        tenant_manager.create_tenant("test-tenant", lazy=True)
         
         # Try to create again (should fail)
         with pytest.raises(ValueError) as exc_info:
-            tenant_manager.create_tenant("test_tenant", lazy=True)
+            tenant_manager.create_tenant("test-tenant", lazy=True)
         assert "already exists" in str(exc_info.value)
 
 
@@ -177,14 +177,14 @@ def test_materialize_already_materialized():
         tenant_manager = TenantManager(project_dir, "testdb", "main")
         
         # Create eager tenant
-        tenant_manager.create_tenant("eager_tenant", lazy=False)
-        db_path = get_tenant_db_path(project_dir, "testdb", "main", "eager_tenant")
+        tenant_manager.create_tenant("eager-tenant", lazy=False)
+        db_path = get_tenant_db_path(project_dir, "testdb", "main", "eager-tenant")
         
         # Get original modification time
         original_mtime = db_path.stat().st_mtime
         
         # Try to materialize (should be no-op)
-        tenant_manager.materialize_tenant("eager_tenant")
+        tenant_manager.materialize_tenant("eager-tenant")
         
         # Modification time should not change
         assert db_path.stat().st_mtime == original_mtime
@@ -202,16 +202,16 @@ def test_delete_lazy_tenant():
         tenant_manager = TenantManager(project_dir, "testdb", "main")
         
         # Create lazy tenant
-        tenant_manager.create_tenant("lazy_tenant", lazy=True)
-        meta_file = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / ".lazy_tenant.meta"
+        tenant_manager.create_tenant("lazy-tenant", lazy=True)
+        meta_file = project_dir / ".cinchdb" / "databases" / "testdb" / "branches" / "main" / "tenants" / ".lazy-tenant.meta"
         assert meta_file.exists()
         
         # Delete tenant
-        tenant_manager.delete_tenant("lazy_tenant")
+        tenant_manager.delete_tenant("lazy-tenant")
         
         # Metadata file should be gone
         assert not meta_file.exists()
         
         # Tenant should not appear in list
         tenants = list_tenants(project_dir, "testdb", "main")
-        assert "lazy_tenant" not in tenants
+        assert "lazy-tenant" not in tenants

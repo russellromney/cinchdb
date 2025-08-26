@@ -260,11 +260,11 @@ class TestChangeApplier:
             added = managers["tracker"].add_change(change)
             managers["applier"].apply_change(added.id)
 
-        # Create new tenant - should copy schema from main
-        managers["tenant"].create_tenant("new_tenant")
+        # Create new eager tenant - should copy schema from main
+        managers["tenant"].create_tenant("new-tenant", lazy=False)
 
         # Verify tables already exist in new tenant (copied from main)
-        db_path = get_tenant_db_path(temp_project, "main", "main", "new_tenant")
+        db_path = get_tenant_db_path(temp_project, "main", "main", "new-tenant")
         with DatabaseConnection(db_path) as conn:
             cursor = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users', 'posts')"
@@ -287,7 +287,7 @@ class TestChangeApplier:
         managers["applier"].apply_change(added.id)
 
         # Verify new table exists in both tenants
-        for tenant_name in ["main", "new_tenant"]:
+        for tenant_name in ["main", "new-tenant"]:
             db_path = get_tenant_db_path(temp_project, "main", "main", tenant_name)
             with DatabaseConnection(db_path) as conn:
                 cursor = conn.execute(

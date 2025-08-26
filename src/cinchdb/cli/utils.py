@@ -13,6 +13,29 @@ from cinchdb.core.database import CinchDB
 console = Console()
 
 
+def handle_cli_error(func):
+    """Decorator to handle CLI errors with consistent formatting.
+    
+    Args:
+        func: The function to wrap
+    """
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as error:
+            error_msg = str(error)
+            if "not found" in error_msg.lower():
+                console.print(f"[yellow]⚠️  {error_msg}[/yellow]")
+            elif "already exists" in error_msg.lower():
+                console.print(f"[yellow]⚠️  {error_msg}[/yellow]")
+            elif "invalid" in error_msg.lower():
+                console.print(f"[red]❌ {error_msg}[/red]")
+            else:
+                console.print(f"[red]❌ Error: {error_msg}[/red]")
+            raise typer.Exit(1)
+    return wrapper
+
+
 def get_config_with_data():
     """Get config and load data from current directory.
 

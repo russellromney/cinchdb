@@ -86,6 +86,9 @@ class CinchDB:
             self.api_url = None
             self.api_key = None
             self.is_local = True
+            
+            # Auto-materialize lazy database if needed
+            self._materialize_database_if_lazy()
         elif api_url is not None and api_key is not None:
             # Remote connection
             self.project_dir = None
@@ -110,6 +113,21 @@ class CinchDB:
         self._codegen_manager: Optional["CodegenManager"] = None
         self._merge_manager: Optional["MergeManager"] = None
         self._index_manager: Optional["IndexManager"] = None
+
+    def _materialize_database_if_lazy(self) -> None:
+        """Auto-materialize a lazy database if accessing it."""
+        if not self.is_local:
+            return
+            
+        # Check if this is a lazy database
+        db_path = self.project_dir / ".cinchdb" / "databases" / self.database
+        db_meta_path = self.project_dir / ".cinchdb" / "databases" / f".{self.database}.meta"
+        
+        # If database directory doesn't exist but metadata does, materialize it
+        if not db_path.exists() and db_meta_path.exists():
+            from cinchdb.core.initializer import ProjectInitializer
+            initializer = ProjectInitializer(self.project_dir)
+            initializer.materialize_database(self.database)
 
     @property
     def session(self):

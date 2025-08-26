@@ -411,19 +411,19 @@ class TestCLIIntegration:
         assert "main" in result.stdout
 
         # Create new tenant
-        result = self.run_in_project(["tenant", "create", "test_tenant"], temp_project)
+        result = self.run_in_project(["tenant", "create", "test-tenant"], temp_project)
         assert result.exit_code == 0
-        assert "Created tenant 'test_tenant'" in result.stdout
+        assert "Created tenant 'test-tenant'" in result.stdout
 
         # List tenants again
         result = self.run_in_project(["tenant", "list"], temp_project)
         assert result.exit_code == 0
         assert "main" in result.stdout
-        assert "test_tenant" in result.stdout
+        assert "test-tenant" in result.stdout
 
         # Query from specific tenant
         result = self.run_in_project(
-            ["query", "SELECT * FROM items", "--tenant", "test_tenant"], temp_project
+            ["query", "SELECT * FROM items", "--tenant", "test-tenant"], temp_project
         )
         assert result.exit_code == 0
 

@@ -36,7 +36,13 @@ class ProjectInitializer:
 
         Raises:
             FileExistsError: If project already exists at the location
+            InvalidNameError: If database name is invalid
         """
+        from cinchdb.utils.name_validator import validate_name
+        
+        # Validate database name
+        validate_name(database_name, "database")
+        
         if self.config_path.exists():
             raise FileExistsError(f"Project already exists at {self.config_dir}")
 
@@ -59,6 +65,7 @@ class ProjectInitializer:
         database_name: str,
         branch_name: str = "main",
         description: Optional[str] = None,
+        lazy: bool = True,
     ) -> None:
         """Initialize a new database within an existing project.
 
@@ -66,20 +73,46 @@ class ProjectInitializer:
             database_name: Name for the database
             branch_name: Initial branch name (default: "main")
             description: Optional description for the database
+            lazy: If True, don't create actual database files until first use
 
         Raises:
             FileNotFoundError: If project doesn't exist
             FileExistsError: If database already exists
+            InvalidNameError: If database name is invalid
         """
+        from cinchdb.utils.name_validator import validate_name
+        
+        # Validate database name
+        validate_name(database_name, "database")
+        
         if not self.config_path.exists():
             raise FileNotFoundError(f"No CinchDB project found at {self.config_dir}")
 
         db_path = self.config_dir / "databases" / database_name
-        if db_path.exists():
+        db_meta_path = self.config_dir / "databases" / f".{database_name}.meta"
+        
+        # Check if database already exists (either as directory or metadata)
+        if db_path.exists() or db_meta_path.exists():
             raise FileExistsError(f"Database '{database_name}' already exists")
 
-        # Create database structure
-        self._create_database_structure(database_name, branch_name, description)
+        if lazy:
+            # Just create metadata file, don't create actual database structure
+            databases_dir = self.config_dir / "databases"
+            databases_dir.mkdir(parents=True, exist_ok=True)
+            
+            metadata = {
+                "name": database_name,
+                "description": description,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "initial_branch": branch_name,
+                "lazy": True
+            }
+            
+            with open(db_meta_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+        else:
+            # Create database structure
+            self._create_database_structure(database_name, branch_name, description)
 
     def _create_database_structure(
         self,
@@ -140,6 +173,41 @@ class ProjectInitializer:
             # - foreign_keys = ON
             pass
 
+    def materialize_database(self, database_name: str) -> None:
+        """Materialize a lazy database into actual database structure.
+        
+        Args:
+            database_name: Name of the database to materialize
+            
+        Raises:
+            ValueError: If database doesn't exist or is already materialized
+        """
+        db_path = self.config_dir / "databases" / database_name
+        db_meta_path = self.config_dir / "databases" / f".{database_name}.meta"
+        
+        # Check if already materialized
+        if db_path.exists():
+            return  # Already materialized
+            
+        # Check if metadata exists
+        if not db_meta_path.exists():
+            raise ValueError(f"Database '{database_name}' does not exist")
+            
+        # Load metadata
+        with open(db_meta_path, 'r') as f:
+            metadata = json.load(f)
+            
+        # Create the actual database structure
+        branch_name = metadata.get("initial_branch", "main")
+        description = metadata.get("description")
+        self._create_database_structure(database_name, branch_name, description)
+        
+        # Update metadata to indicate it's no longer lazy
+        metadata['lazy'] = False
+        metadata['materialized_at'] = datetime.now(timezone.utc).isoformat()
+        with open(db_meta_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+
     def _save_config(self, config: ProjectConfig) -> None:
         """Save configuration to disk.
 
@@ -194,6 +262,7 @@ def init_database(
     database_name: str = "main",
     branch_name: str = "main",
     description: Optional[str] = None,
+    lazy: bool = True,
 ) -> None:
     """Initialize a new database within an existing project.
 
@@ -205,10 +274,11 @@ def init_database(
         database_name: Name for the database
         branch_name: Initial branch name (default: "main")
         description: Optional description
+        lazy: If True, don't create actual database files until first use
 
     Raises:
         FileNotFoundError: If project doesn't exist
         FileExistsError: If database already exists
     """
     initializer = ProjectInitializer(project_dir)
-    initializer.init_database(database_name, branch_name, description)
+    initializer.init_database(database_name, branch_name, description, lazy)

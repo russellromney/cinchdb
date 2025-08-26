@@ -8,6 +8,7 @@ from pydantic import BaseModel, ValidationError
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.utils import validate_query_safe
+from cinchdb.managers.tenant import TenantManager
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -30,7 +31,24 @@ class QueryManager:
         self.database = database
         self.branch = branch
         self.tenant = tenant
-        self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
+        # Initialize tenant manager for lazy tenant handling
+        self.tenant_manager = TenantManager(project_root, database, branch)
+    
+    def _is_write_query(self, sql: str) -> bool:
+        """Check if a SQL query is a write operation.
+        
+        Args:
+            sql: SQL query string
+            
+        Returns:
+            True if query performs writes, False otherwise
+        """
+        sql_upper = sql.strip().upper()
+        write_keywords = [
+            "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP",
+            "TRUNCATE", "REPLACE", "MERGE"
+        ]
+        return any(sql_upper.startswith(keyword) for keyword in write_keywords)
 
     def execute(
         self,
@@ -62,7 +80,12 @@ class QueryManager:
                 "execute() can only be used with SELECT queries. Use execute_non_query() for INSERT/UPDATE/DELETE operations."
             )
 
-        with DatabaseConnection(self.db_path) as conn:
+        # Get appropriate database path based on operation type (read for SELECT)
+        db_path = self.tenant_manager.get_tenant_db_path_for_operation(
+            self.tenant, is_write=False
+        )
+        
+        with DatabaseConnection(db_path) as conn:
             cursor = conn.execute(sql, params)
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
@@ -187,7 +210,12 @@ class QueryManager:
         if not skip_validation:
             validate_query_safe(sql)
 
-        with DatabaseConnection(self.db_path) as conn:
+        # Get appropriate database path based on operation type (write for non-SELECT)
+        db_path = self.tenant_manager.get_tenant_db_path_for_operation(
+            self.tenant, is_write=True
+        )
+
+        with DatabaseConnection(db_path) as conn:
             cursor = conn.execute(sql, params)
             affected_rows = cursor.rowcount
             conn.commit()
@@ -208,7 +236,15 @@ class QueryManager:
         """
         total_affected = 0
 
-        with DatabaseConnection(self.db_path) as conn:
+        # Determine if this is a write operation
+        is_write = self._is_write_query(sql)
+        
+        # Get appropriate database path
+        db_path = self.tenant_manager.get_tenant_db_path_for_operation(
+            self.tenant, is_write=is_write
+        )
+
+        with DatabaseConnection(db_path) as conn:
             try:
                 for params in params_list:
                     cursor = conn.execute(sql, params)

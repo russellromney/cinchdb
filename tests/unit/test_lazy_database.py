@@ -103,7 +103,7 @@ def test_auto_materialization_on_connect():
         assert not db_path.exists()
         
         # Connect to the database
-        db = connect("lazy-db", project_dir=project_dir)
+        connect("lazy-db", project_dir=project_dir)
         
         # Database should now be materialized
         assert db_path.exists()

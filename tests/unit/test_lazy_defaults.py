@@ -69,7 +69,7 @@ def test_tenant_default_is_lazy():
         tenant_manager = TenantManager(project_dir, "test-db", "main")
         
         # Create tenant without specifying lazy parameter
-        tenant = tenant_manager.create_tenant("test-tenant")
+        tenant_manager.create_tenant("test-tenant")
         
         # Should be lazy (database file should not exist)
         tenant_db = get_tenant_db_path(project_dir, "test-db", "main", "test-tenant")
@@ -98,7 +98,7 @@ def test_tenant_explicit_eager():
         tenant_manager = TenantManager(project_dir, "test-db", "main")
         
         # Create tenant explicitly as eager
-        tenant = tenant_manager.create_tenant("eager-tenant", lazy=False)
+        tenant_manager.create_tenant("eager-tenant", lazy=False)
         
         # Should be eager (database file exists)
         tenant_db = get_tenant_db_path(project_dir, "test-db", "main", "eager-tenant")

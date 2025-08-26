@@ -7,7 +7,6 @@ from pathlib import Path
 from cinchdb.core.initializer import ProjectInitializer
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.managers.table import TableManager
-from cinchdb.managers.column import ColumnManager
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.models import Column, Change, ChangeType
@@ -70,7 +69,6 @@ class TestEmptyTenantSchema:
         """Test that __empty__ tenant receives schema updates along with other tenants."""
         tenant_manager = TenantManager(test_project, "testdb", "main")
         table_manager = TableManager(test_project, "testdb", "main", "main")
-        column_manager = ColumnManager(test_project, "testdb", "main", "main")
         change_tracker = ChangeTracker(test_project, "testdb", "main")
         change_applier = ChangeApplier(test_project, "testdb", "main")
         

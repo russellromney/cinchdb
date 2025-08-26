@@ -262,7 +262,7 @@ class IndexManager:
             
             # Get index statistics
             xinfo_result = conn.execute(f"PRAGMA index_xinfo({index_name})")
-            extended_info = xinfo_result.fetchall()
+            xinfo_result.fetchall()
             
             return {
                 "name": index_name,

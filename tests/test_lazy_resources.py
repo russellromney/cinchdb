@@ -86,7 +86,7 @@ class TestLazyDatabases:
         initializer.init_database("lazy_db3", lazy=True)
         
         # Access it through CinchDB (should trigger materialization)
-        db = CinchDB(database="lazy_db3", project_dir=test_project)
+        CinchDB(database="lazy_db3", project_dir=test_project)
         
         # Verify it was materialized
         db_path = test_project / ".cinchdb" / "databases" / "lazy_db3"
@@ -197,7 +197,6 @@ class TestIntegration:
         import time
         
         initializer = ProjectInitializer(test_project)
-        metadata_db = MetadataDB(test_project)
         
         # Create many lazy databases
         n_databases = 100

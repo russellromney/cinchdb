@@ -47,7 +47,7 @@ def test_empty_tenant_uses_small_page_size():
         tenant_path = get_tenant_db_path(project_dir, "testdb", "main", "empty-tenant")
         conn = sqlite3.connect(str(tenant_path))
         page_size = conn.execute("PRAGMA page_size").fetchone()[0]
-        page_count = conn.execute("PRAGMA page_count").fetchone()[0]
+        conn.execute("PRAGMA page_count").fetchone()[0]
         conn.close()
         
         assert page_size == 512, f"Expected 512 byte pages, got {page_size}"

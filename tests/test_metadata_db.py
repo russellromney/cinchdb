@@ -1,6 +1,7 @@
 """Tests for SQLite metadata database."""
 
 import pytest
+import sqlite3
 import tempfile
 from pathlib import Path
 import uuid
@@ -216,6 +217,3 @@ class TestMetadataDB:
         print(f"List {n_tenants} tenants in {list_time:.2f}s")
         assert len(tenants) == n_tenants
         assert list_time < 1.0  # Should be fast
-
-
-import sqlite3

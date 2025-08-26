@@ -24,7 +24,7 @@ def test_lazy_database_with_lazy_tenants():
         init_database(project_dir, database_name="lazy-db", lazy=True)
         
         # Try to create tenant in lazy database (should auto-materialize)
-        db = CinchDB(database="lazy-db", project_dir=project_dir)
+        CinchDB(database="lazy-db", project_dir=project_dir)
         tenant_manager = TenantManager(project_dir, "lazy-db", "main")
         
         # Create lazy tenant
@@ -138,7 +138,7 @@ def test_lazy_database_with_description():
             assert not db_info['materialized']  # lazy = not materialized
             
         # Access database to auto-materialize it
-        db = CinchDB(database="test-db", project_dir=project_dir)
+        CinchDB(database="test-db", project_dir=project_dir)
         
         # Verify it's now materialized but description is preserved
         with MetadataDB(project_dir) as metadata_db:
@@ -228,7 +228,7 @@ def test_lazy_tenant_in_lazy_database_lifecycle():
         init_database(project_dir, "lazy-db", lazy=True)
         
         # Connect to database (auto-materializes)
-        db = CinchDB(database="lazy-db", project_dir=project_dir)
+        CinchDB(database="lazy-db", project_dir=project_dir)
         
         # Create lazy tenant
         tenant_manager = TenantManager(project_dir, "lazy-db", "main")

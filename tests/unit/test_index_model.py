@@ -96,7 +96,7 @@ class TestTableCreationWithIndexes:
             Index(columns=["city", "age"], name="location_age_idx")
         ]
         
-        table = table_manager.create_table("users", columns, indexes)
+        table_manager.create_table("users", columns, indexes)
         
         # Verify all indexes were created
         from cinchdb.managers.index import IndexManager

@@ -144,10 +144,15 @@ def list_tenants(project_root: Path, database: str, branch: str) -> List[str]:
     if not tenants_dir.exists():
         return []
 
-    # Only list .db files, not WAL or SHM files
-    tenants = []
+    # List both .db files and .meta files for lazy tenants
+    tenants = set()
     for f in tenants_dir.iterdir():
-        if f.is_file() and f.suffix == ".db":
-            tenants.append(f.stem)
+        if f.is_file():
+            if f.suffix == ".db":
+                tenants.add(f.stem)
+            elif f.suffix == ".meta" and f.name.startswith("."):
+                # Lazy tenant metadata files are named .{tenant_name}.meta
+                tenant_name = f.stem[1:]  # Remove leading dot
+                tenants.add(tenant_name)
 
-    return sorted(tenants)
+    return sorted(list(tenants))

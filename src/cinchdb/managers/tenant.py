@@ -52,13 +52,14 @@ class TenantManager:
         return tenants
 
     def create_tenant(
-        self, tenant_name: str, description: Optional[str] = None
+        self, tenant_name: str, description: Optional[str] = None, lazy: bool = False
     ) -> Tenant:
         """Create a new tenant by copying schema from main tenant.
 
         Args:
             tenant_name: Name for the new tenant
             description: Optional description
+            lazy: If True, don't create database file until first use
 
         Returns:
             Created Tenant object
@@ -74,44 +75,64 @@ class TenantManager:
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
-        # Validate tenant doesn't exist
-        if tenant_name in list_tenants(self.project_root, self.database, self.branch):
-            raise ValueError(f"Tenant '{tenant_name}' already exists")
-
-        # Get paths
-        main_db_path = get_tenant_db_path(
-            self.project_root, self.database, self.branch, "main"
-        )
+        # Check if tenant metadata already exists
+        tenants_dir = self.branch_path / "tenants"
+        tenant_meta_file = tenants_dir / f".{tenant_name}.meta"
         new_db_path = get_tenant_db_path(
             self.project_root, self.database, self.branch, tenant_name
         )
-
-        # Copy main tenant database to new tenant
-        shutil.copy2(main_db_path, new_db_path)
-
-        # Clear any data from the copied database (keep schema only)
-        with DatabaseConnection(new_db_path) as conn:
-            # Get all tables
-            result = conn.execute("""
-                SELECT name FROM sqlite_master 
-                WHERE type='table' 
-                AND name NOT LIKE 'sqlite_%'
-            """)
-            tables = [row["name"] for row in result.fetchall()]
-
-            # Clear data from each table
-            for table in tables:
-                conn.execute(f"DELETE FROM {table}")
-
-            conn.commit()
         
-        # Vacuum the database to reduce size
-        # Must use raw sqlite3 connection with autocommit mode for VACUUM
-        import sqlite3
-        vacuum_conn = sqlite3.connect(str(new_db_path))
-        vacuum_conn.isolation_level = None  # Autocommit mode required for VACUUM
-        vacuum_conn.execute("VACUUM")
-        vacuum_conn.close()
+        # Validate tenant doesn't exist (either as file or metadata)
+        if new_db_path.exists() or tenant_meta_file.exists():
+            raise ValueError(f"Tenant '{tenant_name}' already exists")
+
+        if lazy:
+            # Just create metadata file, don't create actual database
+            tenants_dir.mkdir(parents=True, exist_ok=True)
+            import json
+            from datetime import datetime, timezone
+            
+            metadata = {
+                "name": tenant_name,
+                "description": description,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "lazy": True
+            }
+            
+            with open(tenant_meta_file, 'w') as f:
+                json.dump(metadata, f)
+        else:
+            # Create actual database file (existing behavior)
+            main_db_path = get_tenant_db_path(
+                self.project_root, self.database, self.branch, "main"
+            )
+            
+            # Copy main tenant database to new tenant
+            shutil.copy2(main_db_path, new_db_path)
+
+            # Clear any data from the copied database (keep schema only)
+            with DatabaseConnection(new_db_path) as conn:
+                # Get all tables
+                result = conn.execute("""
+                    SELECT name FROM sqlite_master 
+                    WHERE type='table' 
+                    AND name NOT LIKE 'sqlite_%'
+                """)
+                tables = [row["name"] for row in result.fetchall()]
+
+                # Clear data from each table
+                for table in tables:
+                    conn.execute(f"DELETE FROM {table}")
+
+                conn.commit()
+            
+            # Vacuum the database to reduce size
+            # Must use raw sqlite3 connection with autocommit mode for VACUUM
+            import sqlite3
+            vacuum_conn = sqlite3.connect(str(new_db_path))
+            vacuum_conn.isolation_level = None  # Autocommit mode required for VACUUM
+            vacuum_conn.execute("VACUUM")
+            vacuum_conn.close()
 
         return Tenant(
             name=tenant_name,
@@ -144,20 +165,90 @@ class TenantManager:
         ):
             raise ValueError(f"Tenant '{tenant_name}' does not exist")
 
-        # Delete tenant database file and related files
+        # Check for and delete metadata file (for lazy tenants)
+        tenants_dir = self.branch_path / "tenants"
+        meta_file = tenants_dir / f".{tenant_name}.meta"
+        if meta_file.exists():
+            meta_file.unlink()
+
+        # Delete tenant database file and related files (if they exist)
         db_path = get_tenant_db_path(
             self.project_root, self.database, self.branch, tenant_name
         )
-        db_path.unlink()
+        if db_path.exists():
+            db_path.unlink()
 
-        # Also remove WAL and SHM files if they exist
-        wal_path = db_path.with_suffix(".db-wal")
-        shm_path = db_path.with_suffix(".db-shm")
+            # Also remove WAL and SHM files if they exist
+            wal_path = db_path.with_suffix(".db-wal")
+            shm_path = db_path.with_suffix(".db-shm")
 
-        if wal_path.exists():
-            wal_path.unlink()
-        if shm_path.exists():
-            shm_path.unlink()
+            if wal_path.exists():
+                wal_path.unlink()
+            if shm_path.exists():
+                shm_path.unlink()
+
+    def materialize_tenant(self, tenant_name: str) -> None:
+        """Materialize a lazy tenant into an actual database file.
+        
+        Args:
+            tenant_name: Name of the tenant to materialize
+            
+        Raises:
+            ValueError: If tenant doesn't exist or is already materialized
+        """
+        tenants_dir = self.branch_path / "tenants"
+        tenant_meta_file = tenants_dir / f".{tenant_name}.meta"
+        db_path = get_tenant_db_path(
+            self.project_root, self.database, self.branch, tenant_name
+        )
+        
+        # Check if already materialized
+        if db_path.exists():
+            return  # Already materialized
+            
+        # Check if metadata exists
+        if not tenant_meta_file.exists():
+            raise ValueError(f"Tenant '{tenant_name}' does not exist")
+            
+        # Get main tenant path for schema copy
+        main_db_path = get_tenant_db_path(
+            self.project_root, self.database, self.branch, "main"
+        )
+        
+        # Copy main tenant database to new tenant
+        shutil.copy2(main_db_path, db_path)
+
+        # Clear any data from the copied database (keep schema only)
+        with DatabaseConnection(db_path) as conn:
+            # Get all tables
+            result = conn.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' 
+                AND name NOT LIKE 'sqlite_%'
+            """)
+            tables = [row["name"] for row in result.fetchall()]
+
+            # Clear data from each table
+            for table in tables:
+                conn.execute(f"DELETE FROM {table}")
+
+            conn.commit()
+        
+        # Vacuum the database to reduce size
+        import sqlite3
+        vacuum_conn = sqlite3.connect(str(db_path))
+        vacuum_conn.isolation_level = None
+        vacuum_conn.execute("VACUUM")
+        vacuum_conn.close()
+        
+        # Update metadata to indicate it's no longer lazy
+        import json
+        with open(tenant_meta_file, 'r') as f:
+            metadata = json.load(f)
+        metadata['lazy'] = False
+        metadata['materialized_at'] = Path(db_path).stat().st_mtime
+        with open(tenant_meta_file, 'w') as f:
+            json.dump(metadata, f)
 
     def copy_tenant(self, source_tenant: str, target_tenant: str) -> Tenant:
         """Copy a tenant to a new tenant.

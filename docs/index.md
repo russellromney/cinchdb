@@ -50,7 +50,7 @@ cinch codegen generate python models/
 ### Performance Benefits  
 - **Ultra-fast queries** - Data size ÷ tenant count
 - **Small footprint** - Only depends on Pydantic, Requests, Typer
-- **Cheap hosting** - Runs great on small VMs
+- **Self hosting** - Runs great on small VMs
 
 ## Installation
 

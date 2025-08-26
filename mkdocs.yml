@@ -6,6 +6,8 @@ repo_name: russellromney/cinchdb
 
 theme:
   name: material
+  logo: static/cinch.svg
+  favicon: static/cinch.svg
   features:
     - navigation.instant
     - navigation.tracking
@@ -92,6 +94,7 @@ nav:
     - Branching: concepts/branching.md
     - Multi-Tenancy: concepts/multi-tenancy.md
     - Change Tracking: concepts/change-tracking.md
+    - Security & Encryption: concepts/security.md
 
 extra:
   social:

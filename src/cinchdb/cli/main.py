@@ -18,7 +18,7 @@ from cinchdb.cli.commands import (
 
 app = typer.Typer(
     name="cinch",
-    help="CinchDB - A Git-like SQLite database management system",
+    help="CinchDB - A Git-like SQLite database management system\n\nENCRYPTION: Set CINCH_ENCRYPT_DATA=true to enable tenant database encryption.",
     add_completion=False,
     invoke_without_command=True,
 )
@@ -28,6 +28,11 @@ app = typer.Typer(
 def main(ctx: typer.Context):
     """
     CinchDB - A Git-like SQLite database management system
+    
+    ENCRYPTION:
+      Set CINCH_ENCRYPT_DATA=true to enable tenant database encryption.
+      Set CINCH_ENCRYPTION_KEY=your-key to provide encryption key.
+      Requires SQLite3MultipleCiphers for encryption support.
     """
     if ctx.invoked_subcommand is None:
         # No subcommand was invoked, show help

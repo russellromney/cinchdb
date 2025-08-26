@@ -6,6 +6,8 @@ from typing import Optional, Dict, List
 from contextlib import contextmanager
 from datetime import datetime
 
+from cinchdb.security.encryption import encryption
+
 
 # Custom datetime adapter and converter for SQLite
 def adapt_datetime(dt):
@@ -42,18 +44,24 @@ class DatabaseConnection:
         # Ensure directory exists
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Connect with row factory for dict-like access
-        # detect_types=PARSE_DECLTYPES tells SQLite to use our registered converters
-        self._conn = sqlite3.connect(
-            str(self.path),
-            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-        )
+        # Use encryption if enabled, otherwise standard connection
+        if encryption.enabled:
+            self._conn = encryption.get_connection(self.path)
+        else:
+            # Connect with row factory for dict-like access
+            # detect_types=PARSE_DECLTYPES tells SQLite to use our registered converters
+            self._conn = sqlite3.connect(
+                str(self.path),
+                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+            )
+            
+            # Configure WAL mode and settings (encryption module handles this if enabled)
+            self._conn.execute("PRAGMA journal_mode = WAL")
+            self._conn.execute("PRAGMA synchronous = NORMAL")
+            self._conn.execute("PRAGMA wal_autocheckpoint = 0")
+        
+        # Always set row factory and foreign keys
         self._conn.row_factory = sqlite3.Row
-
-        # Configure WAL mode and settings
-        self._conn.execute("PRAGMA journal_mode = WAL")
-        self._conn.execute("PRAGMA synchronous = NORMAL")
-        self._conn.execute("PRAGMA wal_autocheckpoint = 0")
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.commit()
 

@@ -127,6 +127,25 @@ db.update("posts", post_id, {"content": "Updated content"})
 - **Python SDK**: Core functionality for local development
 - **CLI**: Full-featured command-line interface
 
+## Security & Encryption
+
+Optional transparent encryption for tenant databases:
+
+```bash
+# Enable encryption
+export CINCH_ENCRYPT_DATA=true
+export CINCH_ENCRYPTION_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+
+# Install encryption library
+pip install pysqlcipher3
+```
+
+- **Tenant databases**: Encrypted with ChaCha20-Poly1305 (~2-5% overhead)
+- **Metadata**: Unencrypted for operational simplicity
+- **Integration**: Transparent - no code changes needed
+
+Works without encryption libraries - gracefully falls back to standard SQLite.
+
 ## Development
 
 ```bash

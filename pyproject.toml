@@ -26,6 +26,11 @@ dependencies = [
     "requests>=2.28.0",
 ]
 
+[project.optional-dependencies]
+encryption = [
+    "pysqlcipher3>=1.2.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/russellromney/cinchdb"
 Documentation = "https://russellromney.github.io/cinchdb"

@@ -5,7 +5,7 @@ from .project import Project
 from .database import Database
 from .branch import Branch
 from .tenant import Tenant
-from .table import Table, Column, ColumnType, ForeignKeyRef, ForeignKeyAction
+from .table import Table, Column, ColumnType, ForeignKeyRef, ForeignKeyAction, Index
 from .view import View
 from .change import Change, ChangeType
 
@@ -21,6 +21,7 @@ __all__ = [
     "ColumnType",
     "ForeignKeyRef",
     "ForeignKeyAction",
+    "Index",
     "View",
     "Change",
     "ChangeType",

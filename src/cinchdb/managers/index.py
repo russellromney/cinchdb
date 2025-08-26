@@ -52,14 +52,18 @@ class IndexManager:
         Raises:
             ValueError: If table doesn't exist or columns are invalid
         """
-        if not columns:
+        # Convert parameters to Index model for validation
+        from cinchdb.models import Index
+        index = Index(columns=columns, name=name, unique=unique)
+        
+        if not index.columns:
             raise ValueError("At least one column must be specified for the index")
 
         # Generate index name if not provided
-        if not name:
-            column_str = "_".join(columns)
-            unique_prefix = "uniq_" if unique else "idx_"
-            name = f"{unique_prefix}{table}_{column_str}"
+        if not index.name:
+            column_str = "_".join(index.columns)
+            unique_prefix = "uniq_" if index.unique else "idx_"
+            index.name = f"{unique_prefix}{table}_{column_str}"
 
         # Get connection to main tenant database (indexes are branch-level)
         db_path = get_tenant_db_path(
@@ -79,18 +83,18 @@ class IndexManager:
             result = conn.execute(f"PRAGMA table_info({table})")
             existing_columns = {row[1] for row in result.fetchall()}
             
-            invalid_columns = set(columns) - existing_columns
+            invalid_columns = set(index.columns) - existing_columns
             if invalid_columns:
                 raise ValueError(
                     f"Columns {invalid_columns} do not exist in table '{table}'"
                 )
             
             # Build and execute CREATE INDEX statement
-            unique_clause = "UNIQUE " if unique else ""
+            unique_clause = "UNIQUE " if index.unique else ""
             if_not_exists_clause = "IF NOT EXISTS " if if_not_exists else ""
-            column_list = ", ".join(columns)
+            column_list = ", ".join(index.columns)
             
-            sql = f"CREATE {unique_clause}INDEX {if_not_exists_clause}{name} ON {table} ({column_list})"
+            sql = f"CREATE {unique_clause}INDEX {if_not_exists_clause}{index.name} ON {table} ({column_list})"
             
             try:
                 result = conn.execute(sql)
@@ -98,18 +102,18 @@ class IndexManager:
             except sqlite3.Error as e:
                 if "already exists" in str(e):
                     if not if_not_exists:
-                        raise ValueError(f"Index '{name}' already exists")
+                        raise ValueError(f"Index '{index.name}' already exists")
                 else:
                     raise
         
         # Track the change
         self._track_change(
             ChangeType.CREATE_INDEX,
-            name,
-            {"table": table, "columns": columns, "unique": unique}
+            index.name,
+            {"table": table, "columns": index.columns, "unique": index.unique}
         )
         
-        return name
+        return index.name
 
     def drop_index(self, name: str, if_exists: bool = True) -> None:
         """Drop an index.

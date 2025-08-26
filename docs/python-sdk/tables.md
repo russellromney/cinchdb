@@ -8,11 +8,64 @@ Create and manage database tables with the Python SDK.
 ```python
 from cinchdb.models import Column
 
-db.create_table("users", [
+db.tables.create_table("users", [
     Column(name="name", type="TEXT"),
     Column(name="email", type="TEXT"),
     Column(name="age", type="INTEGER")
 ])
+```
+
+### Tables with Indexes (Enhanced API)
+```python
+from cinchdb.models import Column, Index
+
+# Create table with indexes in one operation
+db.tables.create_table("users", 
+    columns=[
+        Column(name="name", type="TEXT", nullable=False),
+        Column(name="email", type="TEXT", nullable=False),
+        Column(name="age", type="INTEGER", nullable=True),
+        Column(name="city", type="TEXT", nullable=True)
+    ],
+    indexes=[
+        Index(columns=["email"], unique=True),    # Auto-named: uniq_users_email
+        Index(columns=["name"]),                  # Auto-named: idx_users_name
+        Index(columns=["city", "age"])            # Auto-named: idx_users_city_age
+    ]
+)
+```
+
+### Index Types
+```python
+from cinchdb.models import Index
+
+# Simple index (auto-named as idx_table_column)
+Index(columns=["name"])
+
+# Unique index (auto-named as uniq_table_column) 
+Index(columns=["email"], unique=True)
+
+# Compound index on multiple columns (auto-named as idx_table_col1_col2)
+Index(columns=["user_id", "created_at"])              # → idx_table_user_id_created_at
+Index(columns=["category", "price"])                  # → idx_table_category_price
+Index(columns=["city", "state", "country"])           # → idx_table_city_state_country
+
+# Custom named index (only when you need specific naming)
+Index(columns=["category", "price"], name="fast_product_lookup")
+Index(columns=["user_id", "created_at"], name="user_timeline_idx")
+```
+
+### Backward Compatibility
+```python
+# Old approach still works - create table then add indexes separately
+db.tables.create_table("products", [
+    Column(name="name", type="TEXT"),
+    Column(name="price", type="REAL")
+])
+
+# Add indexes after table creation
+db.create_index("products", ["name"], unique=True)
+db.create_index("products", ["price"])
 ```
 
 ### Tables with Foreign Keys
@@ -337,7 +390,24 @@ Column(name="optional_field", type="TEXT", nullable=True)
 
 ### 3. Indexes for Performance
 ```python
-# Create indexes on frequently queried columns
+# Preferred: Create indexes with table creation (Enhanced API)
+from cinchdb.models import Index
+
+db.tables.create_table("users",
+    columns=[...],
+    indexes=[
+        Index(columns=["email"], unique=True),
+        Index(columns=["name"]),
+        Index(columns=["created_at"])
+    ]
+)
+
+# Alternative: Create indexes separately (still supported)
+db.create_index("users", ["email"], unique=True)
+db.create_index("orders", ["user_id"])
+db.create_index("orders", ["status"])
+
+# Raw SQL approach (also works)
 db.query("CREATE INDEX idx_users_email ON users(email)")
 db.query("CREATE INDEX idx_orders_user_id ON orders(user_id)")
 db.query("CREATE INDEX idx_orders_status ON orders(status)")

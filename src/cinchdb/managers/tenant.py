@@ -104,6 +104,10 @@ class TenantManager:
                 conn.execute(f"DELETE FROM {table}")
 
             conn.commit()
+        
+        # Open a new connection to vacuum the database
+        with DatabaseConnection(new_db_path) as conn:
+            conn.execute("VACUUM")
 
         return Tenant(
             name=tenant_name,

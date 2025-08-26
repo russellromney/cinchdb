@@ -27,6 +27,16 @@ class ForeignKeyRef(BaseModel):
     )
 
 
+class Index(BaseModel):
+    """Index specification for table columns."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    columns: List[str] = Field(description="Column names to index")
+    name: Optional[str] = Field(default=None, description="Index name")
+    unique: bool = Field(default=False, description="Create unique index")
+
+
 class Column(BaseModel):
     """Represents a column in a table."""
 

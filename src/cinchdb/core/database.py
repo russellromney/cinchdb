@@ -507,8 +507,12 @@ class CinchDB:
             # Named index
             db.create_index("products", ["category", "price"], name="idx_category_price")
         """
+        # Convert parameters to Index model for validation
+        from cinchdb.models import Index
+        index = Index(columns=columns, name=name, unique=unique)
+        
         if self.is_local:
-            return self.indexes.create_index(table, columns, name, unique)
+            return self.indexes.create_index(table, index.columns, index.name, index.unique)
         else:
             # Remote index creation
             result = self._make_request(
@@ -516,9 +520,9 @@ class CinchDB:
                 "/indexes",
                 json={
                     "table": table,
-                    "columns": columns,
-                    "name": name,
-                    "unique": unique,
+                    "columns": index.columns,
+                    "name": index.name,
+                    "unique": index.unique,
                 },
             )
             return result.get("name")

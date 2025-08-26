@@ -1,9 +1,12 @@
 """Table management for CinchDB."""
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional, TYPE_CHECKING
 
 from cinchdb.models import Table, Column, Change, ChangeType
+
+if TYPE_CHECKING:
+    from cinchdb.models import Index
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.core.maintenance import check_maintenance_mode
@@ -61,12 +64,13 @@ class TableManager:
 
         return tables
 
-    def create_table(self, table_name: str, columns: List[Column]) -> Table:
-        """Create a new table with optional foreign key constraints.
+    def create_table(self, table_name: str, columns: List[Column], indexes: Optional[List["Index"]] = None) -> Table:
+        """Create a new table with optional foreign key constraints and indexes.
 
         Args:
             table_name: Name of the table
             columns: List of Column objects defining the schema
+            indexes: Optional list of Index objects to create on the table
 
         Returns:
             Created Table object
@@ -167,6 +171,20 @@ class TableManager:
 
         applier = ChangeApplier(self.project_root, self.database, self.branch)
         applier.apply_change(change.id)
+
+        # Create indexes if specified
+        if indexes:
+            from cinchdb.managers.index import IndexManager
+            index_manager = IndexManager(self.project_root, self.database, self.branch)
+            
+            for index in indexes:
+                index_manager.create_index(
+                    table=table_name,
+                    columns=index.columns,
+                    name=index.name,
+                    unique=index.unique,
+                    if_not_exists=True
+                )
 
         # Return the created table
         return Table(

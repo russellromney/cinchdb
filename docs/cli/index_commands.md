@@ -179,6 +179,37 @@ cinch index list
 cinch index info idx_users_email
 ```
 
+## Python SDK Integration
+
+The Python SDK provides an enhanced API for creating tables with indexes:
+
+```python
+from cinchdb.models import Column, Index
+
+# Create table with indexes in one operation
+db.tables.create_table("users",
+    columns=[
+        Column(name="name", type="TEXT", nullable=False),
+        Column(name="email", type="TEXT", nullable=False)
+    ],
+    indexes=[
+        Index(columns=["email"], unique=True),    # Auto-named: uniq_users_email
+        Index(columns=["name"]),                  # Auto-named: idx_users_name
+        Index(columns=["name", "email"])          # Auto-named: idx_users_name_email
+    ]
+)
+
+# Backward compatibility - old approach still works
+db.create_index("users", ["created_at"])
+db.create_index("products", ["category", "price"], unique=True)
+```
+
+**Benefits:**
+- **Atomic Operations**: Table and indexes created together
+- **Type Safety**: Index model validates parameters
+- **Consistency**: Same naming conventions as CLI
+- **Performance**: No separate transactions needed
+
 ## Integration with Branches
 
 Indexes are branch-specific and included in branch merges:

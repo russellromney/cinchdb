@@ -105,9 +105,13 @@ class TenantManager:
 
             conn.commit()
         
-        # Open a new connection to vacuum the database
-        with DatabaseConnection(new_db_path) as conn:
-            conn.execute("VACUUM")
+        # Vacuum the database to reduce size
+        # Must use raw sqlite3 connection with autocommit mode for VACUUM
+        import sqlite3
+        vacuum_conn = sqlite3.connect(str(new_db_path))
+        vacuum_conn.isolation_level = None  # Autocommit mode required for VACUUM
+        vacuum_conn.execute("VACUUM")
+        vacuum_conn.close()
 
         return Tenant(
             name=tenant_name,

@@ -3,6 +3,10 @@
 Connect to databases, manage schema, run queries.
 
 ```bash
+# Recommended: Install with uv (faster)
+uv add cinchdb
+
+# Or with pip
 pip install cinchdb
 ```
 
@@ -95,7 +99,10 @@ except Exception as e:
 - `"BOOLEAN"` - True/false values
 - `"BLOB"` - Binary data
 
-Every table automatically gets `id`, `created_at`, and `updated_at` fields.
+Every table automatically includes:
+- `id` - UUID primary key
+- `created_at` - Creation timestamp  
+- `updated_at` - Last update timestamp
 
 ## More Information
 

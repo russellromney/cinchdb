@@ -17,21 +17,25 @@ CinchDB maintains a complete history of all schema modifications. This enables:
 CinchDB tracks these schema modifications:
 
 1. **Table Operations**
+
    - `CREATE_TABLE` - New table creation
    - `DROP_TABLE` - Table deletion
    - `RENAME_TABLE` - Table renaming
 
 2. **Column Operations**
+
    - `ADD_COLUMN` - New column addition
    - `DROP_COLUMN` - Column removal
    - `RENAME_COLUMN` - Column renaming
 
 3. **View Operations**
+
    - `CREATE_VIEW` - View creation
    - `DROP_VIEW` - View deletion
    - `UPDATE_VIEW` - View modification
 
 4. **Index Operations**
+
    - `CREATE_INDEX` - Index creation
    - `DROP_INDEX` - Index removal
 
@@ -314,18 +318,21 @@ Changes should be self-documenting:
 ### Common Issues
 
 1. **Change Order Violations**
+
    ```
    Error: Cannot add column to non-existent table
    Solution: Ensure changes are applied in correct order
    ```
 
 2. **Duplicate Changes**
+
    ```
    Error: Table already exists
    Solution: Check if change was already applied
    ```
 
 3. **Incompatible Changes**
+
    ```
    Error: Cannot merge - branches have diverged
    Solution: Rebase or recreate branch from latest main

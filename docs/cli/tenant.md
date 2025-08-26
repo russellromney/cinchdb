@@ -73,6 +73,7 @@ cinch tenant delete old_customer --force
 ```
 
 ### Warning
+
 - **Permanently deletes all tenant data**
 - Cannot delete the `main` tenant
 - Cannot be undone

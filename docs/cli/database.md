@@ -63,6 +63,7 @@ cinch db delete staging --force
 ```
 
 ### Warning
+
 - **This permanently deletes all branches, tenants, and data**
 - Cannot delete the active database
 - Cannot be undone

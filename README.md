@@ -12,7 +12,11 @@ Because it's so lightweight and its only dependencies are pydantic, requests, an
 
 
 ```bash
-uv pip install cinchdb
+# Recommended: Install with uv (faster, better dependency resolution)
+uv add cinchdb
+
+# Or with pip
+pip install cinchdb
 
 # Initialize project
 cinch init 

@@ -13,6 +13,10 @@ A Git-like SQLite database management system with branching and multi-tenancy.
 ## Installation
 
 ```bash
+# Recommended: Install with uv (faster, better dependency resolution)
+uv add cinchdb
+
+# Or with pip
 pip install cinchdb
 ```
 

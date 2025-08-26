@@ -45,12 +45,15 @@ cinch db create logs        # Application logs
 ```
 
 ### When to Create Multiple Databases
+
 ✅ **Good reasons:**
+
 - **Different services** - User service vs Order service
 - **Data lifecycle** - Transactional vs analytical data
 - **Access patterns** - High-frequency vs archive data
 
 ⚠️ **Avoid if:**
+
 - **Tables are related** - Orders belong with Users
 - **Need joins** - Can't join across databases easily
 
@@ -67,12 +70,14 @@ cinch branch merge-into-main add-payments
 
 ### When to Create Branches
 ✅ **Always branch for:**
+
 - **New features** - Adding tables/columns
 - **Schema refactoring** - Changing existing structure  
 - **Breaking changes** - Removing/renaming things
 - **Experiments** - Testing schema ideas
 
 ⚠️ **Stay on main for:**
+
 - **Data operations** - INSERT/UPDATE/DELETE queries
 - **Simple additions** - Adding basic indexes
 
@@ -91,6 +96,7 @@ add-payments/   ← Feature branch
 ```
 
 **Atomic Merges**: Either all changes apply or none do
+
 - No partial states
 - No rollback needed
 - Changes apply to ALL tenants simultaneously
@@ -110,12 +116,14 @@ cinch query "SELECT COUNT(*) FROM users" --tenant customer_b  # 892 users
 
 ### When to Use Multi-Tenancy
 ✅ **Perfect for:**
+
 - **SaaS applications** - Customer data isolation
 - **B2B platforms** - Company-specific data
 - **Compliance** - Data must be isolated by law
 - **Performance** - Queries scan less data
 
 ⚠️ **Not ideal for:**
+
 - **Simple apps** - Single tenant is simpler
 - **Cross-tenant analytics** - Need shared reporting
 - **Tiny datasets** - Overhead not worth it
@@ -178,6 +186,7 @@ cinch branch merge-into-main add-inventory
 ### When to Use Each
 
 **CLI** - Good for:
+
 - **Schema changes** - Creating tables, branches
 - **Data exploration** - Quick queries, debugging
 - **DevOps tasks** - Migrations, deployment scripts  
@@ -189,6 +198,7 @@ cinch query "SELECT COUNT(*) FROM products"
 ```
 
 **Python SDK** - Good for:
+
 - **Application code** - Your main app logic
 - **Complex operations** - Bulk inserts, transactions
 - **Integration** - With web frameworks, APIs

@@ -19,12 +19,14 @@ cinch branch merge-into-main add-payments  # Atomic merge
 ## When to Use Branches
 
 ### ✅ **Always Use Branches For:**
+
 - **New features** - Adding tables, columns, indexes
 - **Schema refactoring** - Renaming, restructuring  
 - **Breaking changes** - Removing columns, changing types
 - **Experiments** - Testing schema ideas before committing
 
 ### ⚠️ **Usually Stay on Main For:**
+
 - **Data-only changes** - INSERT, UPDATE, DELETE queries
 - **Minor tweaks** - Adding simple indexes, views
 - **Emergency fixes** - Quick data corrections

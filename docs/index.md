@@ -55,6 +55,10 @@ cinch codegen generate python models/
 ## Installation
 
 ```bash
+# Recommended: Install with uv (faster)
+uv add cinchdb
+
+# Or with pip
 pip install cinchdb
 ```
 

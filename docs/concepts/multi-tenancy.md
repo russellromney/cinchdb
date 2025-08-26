@@ -17,6 +17,7 @@ cinch query "SELECT COUNT(*) FROM users" --tenant customer_b  # → 892 users
 ## When to Use Multi-Tenancy
 
 ### ✅ **Perfect For:**
+
 - **SaaS applications** - Separate customer data
 - **B2B platforms** - Company-specific data isolation  
 - **Compliance requirements** - Data must be isolated
@@ -24,6 +25,7 @@ cinch query "SELECT COUNT(*) FROM users" --tenant customer_b  # → 892 users
 - **Performance-critical apps** - Faster queries with smaller datasets
 
 ### ⚠️ **Consider Alternatives For:**
+
 - **Simple apps** - Single tenant might be enough
 - **Shared data needs** - Cross-tenant reporting/analytics  
 - **Very small datasets** - Multi-tenancy overhead not worth it

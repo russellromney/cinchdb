@@ -94,6 +94,7 @@ cinch column delete users old_field --force
 ```
 
 ### Notes
+
 - Cannot delete protected columns (id, created_at, updated_at)
 - **Permanently deletes all data in the column**
 - Cannot be undone

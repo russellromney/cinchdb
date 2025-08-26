@@ -14,6 +14,7 @@ from cinchdb.cli.commands import (
     view,
     codegen,
     remote,
+    index,
 )
 
 app = typer.Typer(
@@ -42,6 +43,7 @@ app.add_typer(tenant.app, name="tenant", help="Tenant management commands")
 app.add_typer(table.app, name="table", help="Table management commands")
 app.add_typer(column.app, name="column", help="Column management commands")
 app.add_typer(view.app, name="view", help="View management commands")
+app.add_typer(index.app, name="index", help="Index management commands")
 app.add_typer(codegen.app, name="codegen", help="Code generation commands")
 app.add_typer(remote.app, name="remote", help="Remote instance management")
 

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from cinchdb.managers.tenant import TenantManager
     from cinchdb.managers.codegen import CodegenManager
     from cinchdb.managers.merge_manager import MergeManager
+    from cinchdb.managers.index import IndexManager
 
 
 class CinchDB:
@@ -108,6 +109,7 @@ class CinchDB:
         self._tenant_manager: Optional["TenantManager"] = None
         self._codegen_manager: Optional["CodegenManager"] = None
         self._merge_manager: Optional["MergeManager"] = None
+        self._index_manager: Optional["IndexManager"] = None
 
     @property
     def session(self):
@@ -303,6 +305,21 @@ class CinchDB:
             self._merge_manager = MergeManager(self.project_dir, self.database)
         return self._merge_manager
 
+    @property
+    def indexes(self) -> "IndexManager":
+        """Access index operations (local only)."""
+        if not self.is_local:
+            raise RuntimeError(
+                "Direct manager access not available for remote connections"
+            )
+        if self._index_manager is None:
+            from cinchdb.managers.index import IndexManager
+
+            self._index_manager = IndexManager(
+                self.project_dir, self.database, self.branch
+            )
+        return self._index_manager
+
     # Convenience methods for common operations
 
     def query(
@@ -459,6 +476,52 @@ class CinchDB:
         else:
             # Remote delete
             self._make_request("DELETE", f"/tables/{table}/data/{id}")
+
+    def create_index(
+        self,
+        table: str,
+        columns: List[str],
+        name: Optional[str] = None,
+        unique: bool = False,
+    ) -> str:
+        """Create an index on a table at the branch level.
+        
+        Indexes are created for the current branch and apply to all tenants.
+
+        Args:
+            table: Table name
+            columns: List of column names to index
+            name: Optional index name (auto-generated if not provided)
+            unique: Whether to create a unique index
+
+        Returns:
+            str: Name of the created index
+
+        Examples:
+            # Simple index on one column
+            db.create_index("users", ["email"])
+            
+            # Unique compound index
+            db.create_index("orders", ["user_id", "order_number"], unique=True)
+            
+            # Named index
+            db.create_index("products", ["category", "price"], name="idx_category_price")
+        """
+        if self.is_local:
+            return self.indexes.create_index(table, columns, name, unique)
+        else:
+            # Remote index creation
+            result = self._make_request(
+                "POST",
+                "/indexes",
+                json={
+                    "table": table,
+                    "columns": columns,
+                    "name": name,
+                    "unique": unique,
+                },
+            )
+            return result.get("name")
 
     def list_changes(self) -> List["Change"]:
         """List all changes for the current branch.

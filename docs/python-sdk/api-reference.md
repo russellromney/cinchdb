@@ -25,6 +25,7 @@ This document provides a comprehensive reference for all classes, methods, and f
   - [TenantManager](#tenantmanager)
   - [CodegenManager](#codegenmanager)
   - [MergeManager](#mergemanager)
+  - [IndexManager](#indexmanager)
 - [Exceptions](#exceptions)
 
 ## Connection Functions
@@ -328,6 +329,40 @@ delete(table: str, id: str) -> None
 **Example:**
 ```python
 db.delete("users", "user-id-123")
+```
+
+#### create_index()
+
+Create an index on a table.
+
+```python
+create_index(
+    table: str, 
+    columns: List[str], 
+    name: Optional[str] = None, 
+    unique: bool = False
+) -> str
+```
+
+**Parameters:**
+- `table` (str): Table name
+- `columns` (List[str]): List of column names to index
+- `name` (str, optional): Custom index name (auto-generated if not provided)
+- `unique` (bool, optional): Whether to create a unique index. Default: False
+
+**Returns:**
+- `str`: Name of the created index
+
+**Example:**
+```python
+# Simple index
+db.create_index("users", ["email"])
+
+# Unique compound index
+db.create_index("orders", ["user_id", "order_number"], unique=True)
+
+# Named index
+db.create_index("products", ["category", "price"], name="idx_category_price")
 ```
 
 ### Context Manager
@@ -1020,6 +1055,95 @@ merge(
 
 **Returns:**
 - `MergeResult`: Result of merge operation
+
+### IndexManager
+
+Manages database indexes for improved query performance at the branch level.
+
+Accessed via: `db.indexes`
+
+**Note:** Indexes are created at the branch level and automatically apply to all tenants within that branch.
+
+#### create_index()
+
+Create an index on a table.
+
+```python
+create_index(
+    table: str,
+    columns: List[str],
+    name: Optional[str] = None,
+    unique: bool = False,
+    if_not_exists: bool = True
+) -> str
+```
+
+**Parameters:**
+- `table` (str): Table name
+- `columns` (List[str]): Column names to index
+- `name` (str, optional): Index name (auto-generated if not provided)
+- `unique` (bool): Whether to create a unique index
+- `if_not_exists` (bool): Use IF NOT EXISTS clause
+
+**Returns:**
+- `str`: Name of created index
+
+#### drop_index()
+
+Drop an index.
+
+```python
+drop_index(name: str, if_exists: bool = True) -> None
+```
+
+**Parameters:**
+- `name` (str): Index name
+- `if_exists` (bool): Use IF EXISTS clause
+
+#### list_indexes()
+
+List indexes for a table or all tables.
+
+```python
+list_indexes(table: Optional[str] = None) -> List[Dict[str, Any]]
+```
+
+**Parameters:**
+- `table` (str, optional): Filter by table name
+
+**Returns:**
+- `List[Dict]`: List of index information
+
+#### get_index_info()
+
+Get detailed information about an index.
+
+```python
+get_index_info(name: str) -> Dict[str, Any]
+```
+
+**Parameters:**
+- `name` (str): Index name
+
+**Returns:**
+- `Dict`: Index details including columns, uniqueness, and SQL
+
+**Example:**
+```python
+# Create indexes
+db.indexes.create_index("users", ["email"], unique=True)
+db.indexes.create_index("orders", ["user_id", "created_at"])
+
+# List indexes
+all_indexes = db.indexes.list_indexes()
+user_indexes = db.indexes.list_indexes("users")
+
+# Get index info
+info = db.indexes.get_index_info("idx_users_email")
+
+# Drop index
+db.indexes.drop_index("old_index")
+```
 
 ## Exceptions
 

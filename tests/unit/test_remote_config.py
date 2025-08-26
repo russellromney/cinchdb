@@ -1,8 +1,5 @@
 """Tests for remote configuration functionality."""
 
-import pytest
-from pathlib import Path
-import tempfile
 
 from cinchdb.config import Config, ProjectConfig, RemoteConfig
 

@@ -1,7 +1,6 @@
 """Test lazy tenant creation functionality."""
 
 import tempfile
-import json
 from pathlib import Path
 import pytest
 

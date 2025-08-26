@@ -3,7 +3,6 @@
 import threading
 from pathlib import Path
 from typing import Optional, Dict
-from weakref import WeakValueDictionary
 
 from cinchdb.infrastructure.metadata_db import MetadataDB
 

@@ -3,7 +3,6 @@
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import sqlite3
-import json
 from datetime import datetime, timezone
 import uuid
 

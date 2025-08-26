@@ -6,7 +6,6 @@ from typing import List, Dict, Any, Optional, Type, TypeVar, Union
 from pydantic import BaseModel, ValidationError
 
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.utils import validate_query_safe
 from cinchdb.managers.tenant import TenantManager
 

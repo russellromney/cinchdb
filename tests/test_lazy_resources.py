@@ -2,13 +2,12 @@
 
 import pytest
 import tempfile
-import uuid
 from pathlib import Path
 from cinchdb.core.initializer import ProjectInitializer, init_project
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.infrastructure.metadata_db import MetadataDB
-from cinchdb.core.path_utils import list_databases, list_branches, list_tenants
+from cinchdb.core.path_utils import list_databases, list_branches
 
 
 @pytest.fixture

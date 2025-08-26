@@ -5,7 +5,6 @@ from pathlib import Path
 import tempfile
 import shutil
 from cinchdb.managers.branch import BranchManager
-from cinchdb.config import Config
 
 
 class TestBranchManager:

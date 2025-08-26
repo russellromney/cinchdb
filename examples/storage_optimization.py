@@ -78,7 +78,7 @@ def optimize_project_storage(project_dir: Path, dry_run: bool = False):
                     total_errors += len(results['errors'])
                     
                 if not results['optimized'] and not results['errors']:
-                    logger.info(f"    No tenants needed optimization")
+                    logger.info("    No tenants needed optimization")
     
     logger.info(f"Optimization complete. Optimized: {total_optimized}, Errors: {total_errors}")
     return total_optimized, total_errors

@@ -2,12 +2,10 @@
 
 import pytest
 from pathlib import Path
-import tempfile
 from unittest.mock import patch, MagicMock
 
 from cinchdb.config import Config, ProjectConfig, RemoteConfig
 from cinchdb.cli.utils import get_cinchdb_instance
-from cinchdb.core.database import CinchDB
 
 
 class TestRemoteCLIUtils:

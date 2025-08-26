@@ -169,11 +169,11 @@ def index_info(
         print(f"Partial: [blue]{'Yes' if info.get('partial') else 'No'}[/blue]")
         
         if info.get('sql'):
-            print(f"\nSQL Definition:")
+            print("\nSQL Definition:")
             print(f"[dim]{info['sql']}[/dim]")
             
         if info.get('columns_info'):
-            print(f"\nColumn Details:")
+            print("\nColumn Details:")
             for col in info['columns_info']:
                 print(f"  - Position {col['position']}: {col['column_name']}")
                 

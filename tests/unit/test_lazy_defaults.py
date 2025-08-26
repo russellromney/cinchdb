@@ -1,9 +1,7 @@
 """Test that lazy is the default for database and tenant creation."""
 
 import tempfile
-import json
 from pathlib import Path
-import pytest
 
 from cinchdb.core.initializer import init_project, init_database, ProjectInitializer
 from cinchdb.managers.tenant import TenantManager

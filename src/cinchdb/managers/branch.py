@@ -4,7 +4,7 @@ import json
 import shutil
 import uuid
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime, timezone
 
 from cinchdb.models import Branch

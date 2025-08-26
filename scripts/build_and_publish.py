@@ -65,7 +65,7 @@ def create_source_distribution():
                 temp_project / "src",
                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"),
             )
-            print(f"  Copied: src/")
+            print("  Copied: src/")
 
         # Create a minimal .gitignore to exclude unwanted files
         gitignore_content = """

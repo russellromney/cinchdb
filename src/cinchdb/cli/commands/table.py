@@ -277,14 +277,14 @@ def info(
         col_table.add_column("Name", style="cyan")
         col_table.add_column("Type", style="green")
         col_table.add_column("Nullable", style="yellow")
-        col_table.add_column("Primary Key", style="red")
+        col_table.add_column("Unique", style="red")
         col_table.add_column("Default", style="blue")
 
         for col in table.columns:
             nullable = "Yes" if col.nullable else "No"
-            pk = "Yes" if col.primary_key else "No"
+            unique = "Yes" if col.unique else "No"
             default = col.default or "-"
-            col_table.add_row(col.name, col.type, nullable, pk, default)
+            col_table.add_row(col.name, col.type, nullable, unique, default)
 
         console.print(col_table)
 

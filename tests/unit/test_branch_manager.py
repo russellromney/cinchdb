@@ -17,9 +17,10 @@ class TestBranchManager:
         temp = tempfile.mkdtemp()
         project_dir = Path(temp)
 
-        # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        # Initialize project with proper database and branch setup
+        from cinchdb.core.initializer import ProjectInitializer
+        initializer = ProjectInitializer(project_dir)
+        initializer.init_project(database_name="main", branch_name="main")
 
         yield project_dir
         shutil.rmtree(temp)
@@ -68,34 +69,23 @@ class TestBranchManager:
         assert sorted([b.name for b in branches]) == ["feature", "main"]
 
     def test_create_branch_copies_tenants(self, branch_manager, temp_project):
-        """Test that creating a branch copies all tenants."""
-        # Create an additional tenant in main
-        main_tenants = (
-            temp_project
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "tenants"
-        )
-        (main_tenants / "customer1.db").touch()
+        """Test that creating a branch copies all tenant metadata."""
+        # Create an additional materialized tenant in main branch using TenantManager
+        from cinchdb.managers.tenant import TenantManager
+        main_tenant_mgr = TenantManager(temp_project, "main", "main")
+        main_tenant_mgr.create_tenant("customer1", lazy=False)
 
         # Create branch
         branch_manager.create_branch("main", "feature")
 
-        # Check tenants were copied
-        feature_tenants = (
-            temp_project
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "feature"
-            / "tenants"
-        )
-        assert (feature_tenants / "main.db").exists()
-        assert (feature_tenants / "customer1.db").exists()
+        # Check tenant metadata was copied (tenants will be lazy in new branch)
+        feature_tenant_mgr = TenantManager(temp_project, "main", "feature")
+        feature_tenants = feature_tenant_mgr.list_tenants()
+        tenant_names = [t.name for t in feature_tenants if not t.name.startswith("__")]
+        
+        # Should have copied both main and customer1 tenants (as lazy)
+        assert "main" in tenant_names
+        assert "customer1" in tenant_names
 
     def test_create_branch_duplicate_fails(self, branch_manager):
         """Test creating a branch with duplicate name fails."""

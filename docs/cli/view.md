@@ -262,11 +262,6 @@ cinch query "
 ## Remote Operations
 
 ```bash
-# Create view on remote
-cinch view create active_users "SELECT * FROM users WHERE active = true" --remote production
-
-# List remote views
-cinch view list --remote production
 ```
 
 ## Next Steps

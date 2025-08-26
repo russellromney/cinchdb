@@ -13,7 +13,6 @@ from cinchdb.cli.commands import (
     column,
     view,
     codegen,
-    remote,
     index,
 )
 
@@ -45,7 +44,6 @@ app.add_typer(column.app, name="column", help="Column management commands")
 app.add_typer(view.app, name="view", help="View management commands")
 app.add_typer(index.app, name="index", help="Index management commands")
 app.add_typer(codegen.app, name="codegen", help="Code generation commands")
-app.add_typer(remote.app, name="remote", help="Remote instance management")
 
 
 # Add query as direct command instead of subtyper
@@ -59,15 +57,11 @@ def query(
     limit: Optional[int] = typer.Option(
         None, "--limit", "-l", help="Limit number of rows"
     ),
-    local: bool = typer.Option(False, "--local", "-L", help="Force local connection"),
-    remote: Optional[str] = typer.Option(
-        None, "--remote", "-r", help="Use specific remote alias"
-    ),
 ):
     """Execute a SQL query."""
     from cinchdb.cli.commands.query import execute_query
 
-    execute_query(sql, tenant, format, limit, force_local=local, remote_alias=remote)
+    execute_query(sql, tenant, format, limit)
 
 
 @app.command()

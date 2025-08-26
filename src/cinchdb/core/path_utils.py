@@ -1,7 +1,7 @@
 """Path utilities for CinchDB."""
 
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 def get_project_root(start_path: Path) -> Path:
@@ -73,7 +73,7 @@ def get_tenant_path(
 def get_tenant_db_path(
     project_root: Path, database: str, branch: str, tenant: str
 ) -> Path:
-    """Get path to tenant database file.
+    """Get path to tenant database file using hash-based sharding.
 
     Args:
         project_root: Project root directory
@@ -82,9 +82,19 @@ def get_tenant_db_path(
         tenant: Tenant name
 
     Returns:
-        Path to tenant database file
+        Path to tenant database file in sharded directory structure
     """
-    return get_tenant_path(project_root, database, branch, tenant) / f"{tenant}.db"
+    import hashlib
+    
+    # Calculate shard using SHA256 hash (same as TenantManager)
+    hash_val = hashlib.sha256(tenant.encode('utf-8')).hexdigest()
+    shard = hash_val[:2]
+    
+    # Build sharded path: /tenants/{shard}/{tenant}.db
+    tenants_dir = get_tenant_path(project_root, database, branch, tenant)
+    shard_dir = tenants_dir / shard
+    
+    return shard_dir / f"{tenant}.db"
 
 
 def ensure_directory(path: Path) -> None:
@@ -105,20 +115,14 @@ def list_databases(project_root: Path) -> List[str]:
     Returns:
         List of database names
     """
-    db_dir = project_root / ".cinchdb" / "databases"
-    if not db_dir.exists():
+    metadata_db_path = project_root / ".cinchdb" / "metadata.db"
+    if not metadata_db_path.exists():
         return []
-
-    databases = set()
-    for item in db_dir.iterdir():
-        if item.is_dir():
-            databases.add(item.name)
-        elif item.is_file() and item.suffix == ".meta" and item.name.startswith("."):
-            # Lazy database metadata files are named .{database_name}.meta
-            database_name = item.stem[1:]  # Remove leading dot
-            databases.add(database_name)
     
-    return sorted(list(databases))
+    from cinchdb.infrastructure.metadata_db import MetadataDB
+    with MetadataDB(project_root) as metadata_db:
+        db_records = metadata_db.list_databases()
+        return sorted(record['name'] for record in db_records)
 
 
 def list_branches(project_root: Path, database: str) -> List[str]:
@@ -131,11 +135,17 @@ def list_branches(project_root: Path, database: str) -> List[str]:
     Returns:
         List of branch names
     """
-    branches_dir = get_database_path(project_root, database) / "branches"
-    if not branches_dir.exists():
+    metadata_db_path = project_root / ".cinchdb" / "metadata.db"
+    if not metadata_db_path.exists():
         return []
-
-    return sorted([b.name for b in branches_dir.iterdir() if b.is_dir()])
+    
+    from cinchdb.infrastructure.metadata_db import MetadataDB
+    with MetadataDB(project_root) as metadata_db:
+        db_info = metadata_db.get_database(database)
+        if not db_info:
+            return []
+        branch_records = metadata_db.list_branches(db_info['id'])
+        return sorted(record['name'] for record in branch_records)
 
 
 def list_tenants(project_root: Path, database: str, branch: str) -> List[str]:
@@ -149,19 +159,17 @@ def list_tenants(project_root: Path, database: str, branch: str) -> List[str]:
     Returns:
         List of tenant names
     """
-    tenants_dir = get_branch_path(project_root, database, branch) / "tenants"
-    if not tenants_dir.exists():
+    metadata_db_path = project_root / ".cinchdb" / "metadata.db"
+    if not metadata_db_path.exists():
         return []
-
-    # List both .db files and .meta files for lazy tenants
-    tenants = set()
-    for f in tenants_dir.iterdir():
-        if f.is_file():
-            if f.suffix == ".db":
-                tenants.add(f.stem)
-            elif f.suffix == ".meta" and f.name.startswith("."):
-                # Lazy tenant metadata files are named .{tenant_name}.meta
-                tenant_name = f.stem[1:]  # Remove leading dot
-                tenants.add(tenant_name)
-
-    return sorted(list(tenants))
+    
+    from cinchdb.infrastructure.metadata_db import MetadataDB
+    with MetadataDB(project_root) as metadata_db:
+        db_info = metadata_db.get_database(database)
+        if not db_info:
+            return []
+        branch_info = metadata_db.get_branch(db_info['id'], branch)
+        if not branch_info:
+            return []
+        tenant_records = metadata_db.list_tenants(branch_info['id'])
+        return sorted(record['name'] for record in tenant_records)

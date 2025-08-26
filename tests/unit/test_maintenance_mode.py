@@ -34,13 +34,17 @@ class TestMaintenanceMode:
 
     def setup_method(self):
         """Set up test environment."""
-        self.test_dir = Path("test_maintenance_mode")
+        import tempfile
+        from cinchdb.core.initializer import init_project
+        
+        # Use temporary directory for tests
+        self.test_dir = Path(tempfile.mkdtemp())
         self.project_root = self.test_dir / "project"
         self.database = "test_db"
         self.branch = "main"
 
-        # Create project structure
-        self.project_root.mkdir(parents=True, exist_ok=True)
+        # Initialize CinchDB project properly
+        init_project(self.project_root, database_name=self.database, branch_name=self.branch)
 
         # Initialize managers
         self.table_manager = TableManager(self.project_root, self.database, self.branch)

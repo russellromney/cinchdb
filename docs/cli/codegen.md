@@ -292,11 +292,6 @@ git diff generated/
 Generate from remote databases:
 
 ```bash
-# Generate from remote
-cinch codegen generate python --remote production
-
-# Override for local
-cinch codegen generate typescript --local
 ```
 
 ## Customization Options
@@ -330,5 +325,5 @@ cinch codegen generate typescript --local
 ## Next Steps
 
 - [Python SDK](../python-sdk/index.md) - Use generated models
-- [API Reference](../api/endpoints.md) - Remote API integration
+- [Python SDK API Reference](../python-sdk/api-reference.md) - Complete API documentation
 - [Branching](../concepts/branching.md) - Multi-branch development

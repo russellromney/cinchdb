@@ -1,394 +1,245 @@
 # Query Guide
 
-Execute SQL queries and work with data using the Python SDK.
+Execute SQL queries with the Python SDK.
 
-## Basic Queries
+## Problem → Solution
 
-### SELECT Queries
+**Problem**: Need to safely execute SQL queries and work with results in Python  
+**Solution**: CinchDB's `query()` method handles parameterization, results, and transactions
+
+## Quick Reference
+
+| Operation | Method | Example |
+|-----------|--------|---------|
+| SELECT | `db.query()` | `db.query("SELECT * FROM users")` |
+| INSERT | `db.insert()` | `db.insert("users", {"name": "Alice"})` |
+| UPDATE | `db.update()` | `db.update("users", user_id, {"name": "Bob"})` |
+| DELETE | `db.delete()` | `db.delete("users", user_id)` |
+
+## Safe Parameterized Queries
+
+**Always use parameters** to prevent SQL injection:
+
 ```python
-# Simple select
-users = db.query("SELECT * FROM users")
+# ✅ Safe
+user = db.query("SELECT * FROM users WHERE email = ?", ["alice@example.com"])
+users = db.query("SELECT * FROM users WHERE age > ? AND active = ?", [18, True])
 
-# With conditions
-active_users = db.query("SELECT * FROM users WHERE active = true")
-
-# Specific columns
-emails = db.query("SELECT email FROM users")
+# ❌ Dangerous - never do this
+user = db.query(f"SELECT * FROM users WHERE email = '{email}'")  # SQL injection risk
 ```
 
-### Parameterized Queries
-Always use parameters to prevent SQL injection:
+## Working with Results
 
 ```python
-# Safe parameterized query
-user = db.query(
-    "SELECT * FROM users WHERE email = ?", 
-    ["alice@example.com"]
-)
-
-# Multiple parameters
-users = db.query(
-    "SELECT * FROM users WHERE age > ? AND active = ?",
-    [18, True]
-)
-
-# Named parameters (not supported - use positional)
-# Use multiple ? placeholders instead
-```
-
-## Query Results
-
-### Result Format
-Query results are returned as list of dictionaries:
-
-```python
+# Results are list of dictionaries
 users = db.query("SELECT id, name, email FROM users")
-# Returns: [
-#   {"id": "123", "name": "Alice", "email": "alice@example.com"},
-#   {"id": "456", "name": "Bob", "email": "bob@example.com"}
-# ]
+# Returns: [{"id": "123", "name": "Alice", "email": "alice@example.com"}, ...]
 
-# Access results
+# Iterate results
 for user in users:
     print(f"{user['name']}: {user['email']}")
 
-# Single result
-first_user = users[0] if users else None
-```
+# Handle empty results
+user = db.query("SELECT * FROM users WHERE id = ?", [user_id])
+if not user:
+    raise ValueError("User not found")
 
-### Empty Results
-```python
-results = db.query("SELECT * FROM users WHERE age > ?", [200])
-if not results:
-    print("No users found")
+# Single result
+first_user = user[0] if user else None
 ```
 
 ## INSERT Operations
 
-### Basic Insert
 ```python
-# Insert returns the created record with generated fields
-user = db.insert("users", {
-    "name": "Alice",
-    "email": "alice@example.com",
-    "active": True
-})
-
+# Single insert - returns created record with generated fields
+user = db.insert("users", {"name": "Alice", "email": "alice@example.com", "active": True})
 print(f"Created user: {user['id']}")
-print(f"Created at: {user['created_at']}")
-```
 
-### Batch Insert
-```python
-# Insert multiple records at once using star expansion
+# Batch insert using star expansion
 users = db.insert("users",
     {"name": "Alice", "email": "alice@example.com"},
     {"name": "Bob", "email": "bob@example.com"},
     {"name": "Charlie", "email": "charlie@example.com"}
 )
-# Returns a list of created records
 
-# Or with a list using star expansion
-users_data = [
-    {"name": "Alice", "email": "alice@example.com"},
-    {"name": "Bob", "email": "bob@example.com"},
-    {"name": "Charlie", "email": "charlie@example.com"}
-]
+# From a list
+users_data = [{"name": "Alice", "email": "alice@example.com"}, {"name": "Bob", "email": "bob@example.com"}]
 inserted_users = db.insert("users", *users_data)
-
-# Each record includes generated fields (id, created_at, updated_at)
-for user in inserted_users:
-    print(f"Created user {user['name']} with ID: {user['id']}")
 ```
 
 ## UPDATE Operations
 
-### Update by ID
 ```python
-# Update specific record
-updated = db.update("users", user_id, {
-    "name": "Alice Smith",
-    "active": False
-})
-
+# Update by ID
+updated = db.update("users", user_id, {"name": "Alice Smith", "active": False})
 print(f"Updated at: {updated['updated_at']}")
-```
 
-### Update with Conditions
-```python
-# For conditional updates, iterate through matching records
-users_to_update = db.query(
-    "SELECT id FROM users WHERE last_login < ?",
-    ["2024-01-01"]
-)
-for user in users_to_update:
+# Conditional updates - query then update
+users_to_deactivate = db.query("SELECT id FROM users WHERE last_login < ?", ["2024-01-01"])
+for user in users_to_deactivate:
     db.update("users", user["id"], {"active": False})
 
-# For bulk updates with calculations, fetch and update individually
-products = db.query(
-    "SELECT id, price FROM products WHERE category = ?",
-    ["electronics"]
-)
+# Bulk updates with calculations
+products = db.query("SELECT id, price FROM products WHERE category = ?", ["electronics"])
 for product in products:
     db.update("products", product["id"], {"price": product["price"] * 1.1})
 ```
 
 ## DELETE Operations
 
-### Delete by ID
 ```python
-# Delete specific record
+# Delete by ID
 db.delete("users", user_id)
-```
 
-### Delete with Conditions
-```python
-# For conditional deletes, fetch matching records first
-old_sessions = db.query(
-    "SELECT id FROM sessions WHERE created_at < datetime('now', '-7 days')"
-)
+# Conditional deletes - query then delete
+old_sessions = db.query("SELECT id FROM sessions WHERE created_at < datetime('now', '-7 days')")
 for session in old_sessions:
     db.delete("sessions", session["id"])
 
 # Delete with multiple conditions
-inactive_users = db.query(
-    "SELECT id FROM users WHERE active = ? AND last_login < ?",
-    [False, "2023-01-01"]
-)
+inactive_users = db.query("SELECT id FROM users WHERE active = ? AND last_login < ?", [False, "2023-01-01"])
 for user in inactive_users:
     db.delete("users", user["id"])
 ```
 
 ## Advanced Queries
 
-### Joins
 ```python
-# Inner join
+# Joins
 user_orders = db.query("""
-    SELECT u.name, o.order_number, o.total
-    FROM users u
-    INNER JOIN orders o ON u.id = o.user_id
-    WHERE u.active = ?
+    SELECT u.name, o.order_number, o.total FROM users u
+    INNER JOIN orders o ON u.id = o.user_id WHERE u.active = ?
 """, [True])
 
-# Left join
-all_users_orders = db.query("""
-    SELECT u.name, COUNT(o.id) as order_count
-    FROM users u
-    LEFT JOIN orders o ON u.id = o.user_id
-    GROUP BY u.id
-""")
-```
+# Aggregations
+total_users = db.query("SELECT COUNT(*) as total FROM users")[0]["total"]
+order_stats = db.query("""
+    SELECT COUNT(*) as orders, SUM(total) as revenue, AVG(total) as avg_order
+    FROM orders WHERE status = ?
+""", ["completed"])[0]
 
-### Aggregations
-```python
-# Count
-result = db.query("SELECT COUNT(*) as total FROM users")
-total_users = result[0]["total"]
-
-# Sum and average
-stats = db.query("""
-    SELECT 
-        COUNT(*) as order_count,
-        SUM(total) as revenue,
-        AVG(total) as avg_order
-    FROM orders
-    WHERE status = ?
-""", ["completed"])
-
-# Group by
+# Group by with joins
 category_sales = db.query("""
-    SELECT 
-        p.category,
-        COUNT(DISTINCT o.id) as orders,
-        SUM(oi.quantity) as units_sold,
-        SUM(oi.total_price) as revenue
+    SELECT p.category, COUNT(DISTINCT o.id) as orders, SUM(oi.total_price) as revenue
     FROM order_items oi
     JOIN products p ON oi.product_id = p.id
     JOIN orders o ON oi.order_id = o.id
-    WHERE o.status = ?
-    GROUP BY p.category
-    ORDER BY revenue DESC
+    WHERE o.status = ? GROUP BY p.category ORDER BY revenue DESC
 """, ["completed"])
-```
 
-### Subqueries
-```python
-# Subquery in WHERE
+# Subqueries
 high_value_users = db.query("""
-    SELECT * FROM users
-    WHERE id IN (
-        SELECT user_id FROM orders
-        GROUP BY user_id
-        HAVING SUM(total) > ?
+    SELECT * FROM users WHERE id IN (
+        SELECT user_id FROM orders GROUP BY user_id HAVING SUM(total) > ?
     )
 """, [1000])
-
-# Subquery in SELECT
-user_stats = db.query("""
-    SELECT 
-        u.*,
-        (SELECT COUNT(*) FROM orders WHERE user_id = u.id) as order_count,
-        (SELECT SUM(total) FROM orders WHERE user_id = u.id) as lifetime_value
-    FROM users u
-""")
 ```
 
 ## Working with Dates
 
-### Date Functions
 ```python
-# Current timestamp
-db.insert("events", {
-    "name": "User Login",
-    "timestamp": "datetime('now')"  # SQLite function
-})
+# Current timestamp in SQLite
+db.insert("events", {"name": "User Login", "timestamp": "datetime('now')"})
 
 # Date filtering
-recent = db.query("""
-    SELECT * FROM users
-    WHERE created_at > datetime('now', '-30 days')
-""")
+recent_users = db.query("SELECT * FROM users WHERE created_at > datetime('now', '-30 days')")
 
-# Date formatting
-formatted = db.query("""
-    SELECT 
-        name,
-        strftime('%Y-%m-%d', created_at) as signup_date
-    FROM users
-""")
-```
+# Date formatting  
+formatted_dates = db.query("SELECT name, strftime('%Y-%m-%d', created_at) as signup_date FROM users")
 
-### Date Calculations
-```python
-# Days since signup
-user_age = db.query("""
-    SELECT 
-        name,
-        julianday('now') - julianday(created_at) as days_since_signup
-    FROM users
-""")
-
-# Group by month
-monthly = db.query("""
-    SELECT 
-        strftime('%Y-%m', created_at) as month,
-        COUNT(*) as signups
-    FROM users
-    GROUP BY month
-    ORDER BY month DESC
-""")
+# Date calculations
+user_age = db.query("SELECT name, julianday('now') - julianday(created_at) as days_since_signup FROM users")
+monthly_signups = db.query("SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as signups FROM users GROUP BY month")
 ```
 
 ## Transactions
 
-### Automatic Transactions
-Individual operations (insert, update, delete) are automatically wrapped in transactions.
+**Individual operations** (insert, update, delete) are automatically wrapped in transactions.
 
-### Complex Operations
 ```python
-# For operations requiring multiple steps, use the API methods
+# Multi-step operations rely on individual operation atomicity
 try:
-    # Create user and profile
     user = db.insert("users", {"name": "Alice"})
-    profile = db.insert("profiles", {"user_id": user["id"], "bio": "..."})
+    profile = db.insert("profiles", {"user_id": user["id"], "bio": "Software Developer"})
     
-    # Update stats
+    # Update counters
     stats = db.query("SELECT * FROM stats WHERE id = 1")[0]
     db.update("stats", stats["id"], {"user_count": stats["user_count"] + 1})
-    
 except Exception as e:
     print(f"Operation failed: {e}")
     raise
+
+# Note: Full transaction rollback is not currently supported
 ```
 
-## Query Optimization
+## Performance Tips
 
-### Use Indexes
+| Technique | Example |
+|-----------|----------|
+| Use indexes | Create indexes on frequently queried columns |
+| Limit results | `LIMIT 10` instead of fetching all rows |
+| Select specific columns | `SELECT id, name` instead of `SELECT *` |
+| Use parameters | Always use `?` placeholders |
+
 ```python
-# Create indexes through table management
-# Indexes should be created when defining tables or through schema migrations
-# For frequently queried columns, consider adding indexes at table creation time
-
-# Check query plan (read-only operation)
-plan = db.query("EXPLAIN QUERY PLAN SELECT * FROM users WHERE email = ?", ["test@example.com"])
-```
-
-### Limit Results
-```python
-# Always limit when you don't need all results
-recent_orders = db.query("""
-    SELECT * FROM orders
-    ORDER BY created_at DESC
-    LIMIT 10
-""")
-
 # Pagination
-page = 2
-per_page = 20
+page, per_page = 2, 20
 offset = (page - 1) * per_page
+results = db.query("SELECT * FROM products ORDER BY name LIMIT ? OFFSET ?", [per_page, offset])
 
-results = db.query("""
-    SELECT * FROM products
-    ORDER BY name
-    LIMIT ? OFFSET ?
-""", [per_page, offset])
-```
+# Check query plan
+plan = db.query("EXPLAIN QUERY PLAN SELECT * FROM users WHERE email = ?", ["test@example.com"])
 
-### Select Only Needed Columns
-```python
-# Bad - selects all columns
-users = db.query("SELECT * FROM users")
-
-# Good - selects only needed columns
+# ✅ Good - specific columns
 users = db.query("SELECT id, name, email FROM users")
+
+# ❌ Bad - all columns
+users = db.query("SELECT * FROM users")
 ```
 
 ## Error Handling
 
 ```python
+# Handle query errors
 try:
     result = db.query("SELECT * FROM users WHERE id = ?", [user_id])
 except Exception as e:
     print(f"Query failed: {e}")
-    
-# Check for no results
+    raise
+
+# Handle empty results
 user = db.query("SELECT * FROM users WHERE id = ?", [user_id])
 if not user:
     raise ValueError("User not found")
 ```
 
-## Views and CTEs
+## Advanced Features
 
-### Query Views
 ```python
 # Views work like tables
 active_users = db.query("SELECT * FROM active_users_view")
-```
 
-### Common Table Expressions (CTEs)
-```python
-results = db.query("""
+# Common Table Expressions (CTEs)
+high_value_customers = db.query("""
     WITH user_orders AS (
         SELECT user_id, COUNT(*) as order_count, SUM(total) as total_spent
-        FROM orders
-        GROUP BY user_id
+        FROM orders GROUP BY user_id
     )
     SELECT u.name, uo.order_count, uo.total_spent
-    FROM users u
-    JOIN user_orders uo ON u.id = uo.user_id
+    FROM users u JOIN user_orders uo ON u.id = uo.user_id
     WHERE uo.order_count > ?
 """, [5])
 ```
 
 ## Best Practices
 
-1. **Always Use Parameters** - Never concatenate SQL strings
-2. **Handle Empty Results** - Check if results exist before accessing
-3. **Use Transactions** - For multi-step operations
-4. **Limit Results** - Don't fetch more data than needed
-5. **Create Indexes** - For frequently queried columns
-6. **Close Connections** - Use context managers
+- **Always use parameters** - Prevent SQL injection with `?` placeholders
+- **Handle empty results** - Check `if not results:` before accessing
+- **Limit results** - Use `LIMIT` to avoid fetching unnecessary data  
+- **Select specific columns** - Avoid `SELECT *` in production
+- **Create indexes** - Index frequently queried columns
+- **Use proper error handling** - Catch and handle database exceptions
 
 ## Next Steps
 

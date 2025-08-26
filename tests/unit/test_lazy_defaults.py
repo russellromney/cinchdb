@@ -8,6 +8,7 @@ import pytest
 from cinchdb.core.initializer import init_project, init_database, ProjectInitializer
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.core.path_utils import get_database_path, get_tenant_db_path
+from cinchdb.infrastructure.metadata_db import MetadataDB
 
 
 def test_database_default_is_lazy():
@@ -22,17 +23,15 @@ def test_database_default_is_lazy():
         # Create database without specifying lazy parameter
         init_database(project_dir, "test-db")
         
-        # Should be lazy (only metadata file exists)
+        # Should be lazy (directory should not exist)
         db_path = get_database_path(project_dir, "test-db")
-        meta_file = project_dir / ".cinchdb" / "databases" / ".test-db.meta"
-        
         assert not db_path.exists()  # Directory should not exist
-        assert meta_file.exists()  # Metadata should exist
         
-        # Verify metadata indicates it's lazy
-        with open(meta_file) as f:
-            metadata = json.load(f)
-        assert metadata["lazy"] is True
+        # Check metadata database
+        metadata_db = MetadataDB(project_dir)
+        db_info = metadata_db.get_database("test-db")
+        assert db_info is not None
+        assert not db_info["materialized"]  # Should be lazy (0 in SQLite)
 
 
 def test_database_explicit_eager():
@@ -49,11 +48,14 @@ def test_database_explicit_eager():
         
         # Should be eager (directory structure exists)
         db_path = get_database_path(project_dir, "eager-db")
-        meta_file = project_dir / ".cinchdb" / "databases" / ".eager-db.meta"
-        
         assert db_path.exists()  # Directory should exist
-        assert not meta_file.exists()  # No metadata file for eager databases
         assert (db_path / "branches" / "main").exists()
+        
+        # Check metadata database
+        metadata_db = MetadataDB(project_dir)
+        db_info = metadata_db.get_database("eager-db")
+        assert db_info is not None
+        assert db_info["materialized"]  # Should be materialized (1 in SQLite)
 
 
 def test_tenant_default_is_lazy():
@@ -71,17 +73,18 @@ def test_tenant_default_is_lazy():
         # Create tenant without specifying lazy parameter
         tenant = tenant_manager.create_tenant("test-tenant")
         
-        # Should be lazy (only metadata file exists)
+        # Should be lazy (database file should not exist)
         tenant_db = get_tenant_db_path(project_dir, "test-db", "main", "test-tenant")
-        tenant_meta = project_dir / ".cinchdb" / "databases" / "test-db" / "branches" / "main" / "tenants" / ".test-tenant.meta"
-        
         assert not tenant_db.exists()  # Database file should not exist
-        assert tenant_meta.exists()  # Metadata should exist
         
-        # Verify metadata indicates it's lazy
-        with open(tenant_meta) as f:
-            metadata = json.load(f)
-        assert metadata["lazy"] is True
+        # Check metadata database
+        metadata_db = MetadataDB(project_dir)
+        db_info = metadata_db.get_database("test-db")
+        branches = metadata_db.list_branches(db_info["id"])
+        main_branch = next(b for b in branches if b["name"] == "main")
+        tenants = metadata_db.list_tenants(main_branch["id"])
+        test_tenant = next(t for t in tenants if t["name"] == "test-tenant")
+        assert not test_tenant["materialized"]  # Should be lazy
 
 
 def test_tenant_explicit_eager():
@@ -101,10 +104,16 @@ def test_tenant_explicit_eager():
         
         # Should be eager (database file exists)
         tenant_db = get_tenant_db_path(project_dir, "test-db", "main", "eager-tenant")
-        tenant_meta = project_dir / ".cinchdb" / "databases" / "test-db" / "branches" / "main" / "tenants" / ".eager-tenant.meta"
-        
         assert tenant_db.exists()  # Database file should exist
-        assert not tenant_meta.exists()  # No metadata for eager tenants
+        
+        # Check metadata database
+        metadata_db = MetadataDB(project_dir)
+        db_info = metadata_db.get_database("test-db")
+        branches = metadata_db.list_branches(db_info["id"])
+        main_branch = next(b for b in branches if b["name"] == "main")
+        tenants = metadata_db.list_tenants(main_branch["id"])
+        eager_tenant = next(t for t in tenants if t["name"] == "eager-tenant")
+        assert eager_tenant["materialized"]  # Should be materialized
 
 
 def test_mixed_lazy_eager_defaults():
@@ -123,15 +132,24 @@ def test_mixed_lazy_eager_defaults():
         
         # Check default-lazy
         assert not (project_dir / ".cinchdb" / "databases" / "default-lazy").exists()
-        assert (project_dir / ".cinchdb" / "databases" / ".default-lazy.meta").exists()
         
         # Check explicit-eager
         assert (project_dir / ".cinchdb" / "databases" / "explicit-eager").exists()
-        assert not (project_dir / ".cinchdb" / "databases" / ".explicit-eager.meta").exists()
         
         # Check explicit-lazy
         assert not (project_dir / ".cinchdb" / "databases" / "explicit-lazy").exists()
-        assert (project_dir / ".cinchdb" / "databases" / ".explicit-lazy.meta").exists()
+        
+        # Verify in metadata database
+        metadata_db = MetadataDB(project_dir)
+        
+        default_lazy = metadata_db.get_database("default-lazy")
+        assert not default_lazy["materialized"]
+        
+        explicit_eager = metadata_db.get_database("explicit-eager")
+        assert explicit_eager["materialized"]
+        
+        explicit_lazy = metadata_db.get_database("explicit-lazy")
+        assert not explicit_lazy["materialized"]
 
 
 def test_initializer_method_defaults():
@@ -150,4 +168,9 @@ def test_initializer_method_defaults():
         
         # Should be lazy by default
         assert not (project_dir / ".cinchdb" / "databases" / "from-initializer").exists()
-        assert (project_dir / ".cinchdb" / "databases" / ".from-initializer.meta").exists()
+        
+        # Check metadata database
+        metadata_db = MetadataDB(project_dir)
+        db_info = metadata_db.get_database("from-initializer")
+        assert db_info is not None
+        assert not db_info["materialized"]  # Should be lazy by default

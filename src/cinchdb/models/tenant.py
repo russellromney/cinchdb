@@ -19,9 +19,11 @@ class Tenant(CinchDBBaseModel):
     @classmethod
     def validate_name_field(cls, v: str) -> str:
         """Validate tenant name meets naming requirements."""
-        validate_name(v, "tenant")
+        # Allow __empty__ as a special system tenant
+        if v != "__empty__":
+            validate_name(v, "tenant")
         return v
 
     def can_delete(self) -> bool:
         """Check if this tenant can be deleted."""
-        return self.name != "main" and not self.is_main
+        return self.name not in ["main", "__empty__"] and not self.is_main

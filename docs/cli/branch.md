@@ -37,9 +37,18 @@ cinch branch create BRANCH_NAME
 ```bash
 # Create from current branch
 cinch branch create feature.add-comments
+```
+```
+✓ Created branch 'feature.add-comments' from 'main'
+✓ Copied 3 tables and 5 tenants to new branch
+```
 
+```bash
 # Create from specific branch
 cinch branch create hotfix.fix-bug --from main
+```
+```
+✓ Created branch 'hotfix.fix-bug' from 'main'
 ```
 
 ### Notes
@@ -220,6 +229,23 @@ cinch branch merge feature.products main
 4. **Review Changes** - Always review before merging to main
 5. **Clean Up** - Delete merged branches to keep list manageable
 
+## Troubleshooting
+
+### "Branch already exists"
+**Problem**: `cinch branch create feature.users` fails with "Branch already exists"
+**Solution**: Use `cinch branch list` to check existing branches, choose a different name
+
+### "Cannot merge: conflicts detected"
+**Problem**: Merge fails with schema conflicts
+**Solution**: 
+1. Review changes: `cinch branch changes feature.branch`
+2. Check target: `cinch branch changes main`
+3. Resolve manually or recreate branch from updated main
+
+### "Cannot delete active branch"
+**Problem**: Trying to delete the currently active branch
+**Solution**: Switch first: `cinch branch switch main`, then delete
+
 ## Protection Rules
 
 - The `main` branch cannot be deleted
@@ -231,15 +257,12 @@ cinch branch merge feature.products main
 Branch commands work with remote connections:
 
 ```bash
-# List remote branches
-cinch branch list --remote production
-
-# Create branch on remote
-cinch branch create feature.new --remote production
 ```
 
 ## Next Steps
 
 - [Table Commands](table.md) - Create tables in branches
-- [Merge Concepts](../concepts/branching.md) - Understanding merge behavior
+- [Column Commands](column.md) - Modify schemas in branches
+- [Schema Branching Concepts](../concepts/branching.md) - Deep dive into branching theory
 - [Change Tracking](../concepts/change-tracking.md) - How changes are tracked
+- [Schema Branching Tutorial](../tutorials/schema-branching.md) - End-to-end workflow example

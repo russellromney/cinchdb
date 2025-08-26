@@ -68,7 +68,7 @@ class TestModels:
         # Check id column properties
         id_col = next(col for col in table.columns if col.name == "id")
         assert id_col.type == "TEXT"
-        assert id_col.primary_key
+        # id is always the primary key (no primary_key field needed)
         assert not id_col.nullable
 
     def test_table_creation_with_custom_columns(self):

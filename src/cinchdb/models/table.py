@@ -50,9 +50,6 @@ class Column(BaseModel):
     default: Optional[str] = Field(
         default=None, description="Default value SQL expression"
     )
-    primary_key: bool = Field(
-        default=False, description="Whether this is a primary key"
-    )
     unique: bool = Field(default=False, description="Whether values must be unique")
     foreign_key: Optional[ForeignKeyRef] = Field(
         default=None, description="Foreign key constraint specification"
@@ -81,7 +78,6 @@ class Table(CinchDBBaseModel):
                     name="id",
                     type="TEXT",
                     nullable=False,
-                    primary_key=True,
                     unique=True,
                 ),
             )

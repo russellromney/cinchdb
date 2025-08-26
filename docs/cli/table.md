@@ -59,13 +59,28 @@ name:type[:nullable][:fk=table[.column][:action]]
 ```bash
 # Simple table
 cinch table create users name:TEXT email:TEXT
+```
+```
+✓ Created table 'users' with 5 columns (id, name, email, created_at, updated_at)
+```
 
+```bash
 # With nullable columns
 cinch table create posts title:TEXT content:TEXT:nullable author:TEXT:nullable
+```
+```
+✓ Created table 'posts' with 6 columns (id, title, content, author, created_at, updated_at)
+```
 
+```bash
 # With foreign key (references id column by default)
 cinch table create posts title:TEXT content:TEXT author_id:TEXT:fk=users
+```
+```
+✓ Created table 'posts' with foreign key constraint: author_id → users(id)
+```
 
+```bash
 # With foreign key to specific column
 cinch table create posts title:TEXT author_email:TEXT:fk=users.email
 
@@ -270,6 +285,20 @@ cinch table create post_tags \
    - Default to RESTRICT to prevent accidental data loss
    - Name foreign key columns clearly: `user_id`, `product_id`
 
+## Troubleshooting
+
+### "Table already exists"
+**Problem**: `cinch table create users` fails with "Table already exists"
+**Solution**: Use `cinch table list` to check, or `cinch table info users` for details
+
+### "Foreign key constraint failed"
+**Problem**: Creating table with foreign key to non-existent table
+**Solution**: Create parent table first: `cinch table create users name:TEXT`, then child table
+
+### "Cannot create table: Invalid column syntax"
+**Problem**: Wrong column format in table creation
+**Solution**: Use format `name:TYPE[:nullable][:fk=table]`, e.g. `user_id:TEXT:fk=users`
+
 ## Protected Names
 
 These column names are reserved:
@@ -280,15 +309,12 @@ These column names are reserved:
 ## Remote Operations
 
 ```bash
-# Create table on remote
-cinch table create products name:TEXT price:REAL --remote production
-
-# List remote tables
-cinch table list --remote production
 ```
 
 ## Next Steps
 
 - [Column Commands](column.md) - Manage table columns
-- [Query Command](query.md) - Work with table data
+- [Query Command](query.md) - Work with table data  
 - [View Commands](view.md) - Create virtual tables
+- [Schema Branching](../concepts/branching.md) - Safe table changes with branches
+- [Multi-Tenancy](../concepts/multi-tenancy.md) - How tables work with tenants

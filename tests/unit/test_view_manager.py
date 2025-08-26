@@ -246,9 +246,9 @@ class TestViewModel:
         from cinchdb.managers.tenant import TenantManager
         from cinchdb.managers.change_applier import ChangeApplier
 
-        # Create additional tenant
+        # Create additional tenant (non-lazy so it gets schema changes)
         tenant_mgr = TenantManager(temp_project, "main", "main")
-        tenant_mgr.create_tenant("tenant2")
+        tenant_mgr.create_tenant("tenant2", lazy=False)
 
         # Create view (this automatically applies to all tenants)
         managers["view"].create_view("user_summary", "SELECT id, name FROM users")

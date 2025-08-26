@@ -15,6 +15,7 @@ theme:
     - navigation.top
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
     - content.code.annotate
   palette:
@@ -36,7 +37,9 @@ theme:
         name: Switch to light mode
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+      lang: en
   - mkdocstrings:
       handlers:
         python:
@@ -73,7 +76,6 @@ nav:
     - View: cli/view.md
     - Query: cli/query.md
     - Tenant: cli/tenant.md
-    - Remote: cli/remote.md
     - Codegen: cli/codegen.md
   - Python SDK:
     - Overview: python-sdk/index.md
@@ -90,7 +92,6 @@ nav:
     - Branching: concepts/branching.md
     - Multi-Tenancy: concepts/multi-tenancy.md
     - Change Tracking: concepts/change-tracking.md
-    - Remote Access: concepts/remote-access.md
 
 extra:
   social:

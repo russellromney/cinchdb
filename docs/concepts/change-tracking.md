@@ -359,5 +359,4 @@ def debug_changes(branch_name):
 ## Next Steps
 
 - [Branching Concepts](branching.md)
-- [Remote Access](remote-access.md)
 - [CLI Branch Commands](../cli/branch.md)

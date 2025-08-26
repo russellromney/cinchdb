@@ -34,7 +34,7 @@ Every table automatically includes:
 
 ```bash
 # Insert data
-cinch query "INSERT INTO users (name, email, age) VALUES ('Alice', 'alice@example.com', 30)"
+cinch insert users --data '{"name": "Alice", "email": "alice@example.com", "age": 30}'
 
 # Query data
 cinch query "SELECT * FROM users"
@@ -56,7 +56,7 @@ cinch table create products name:TEXT price:REAL category:TEXT
 cinch branch switch main
 
 # Merge changes
-cinch branch merge add-products
+cinch branch merge-into-main add-products
 ```
 
 ## Multi-Tenant Operations
@@ -69,7 +69,7 @@ cinch tenant create customer_a
 cinch query "SELECT * FROM users" --tenant customer_a
 
 # Insert data for a specific tenant
-cinch query "INSERT INTO users (name, email) VALUES ('Bob', 'bob@customer-a.com')" --tenant customer_a
+cinch insert users --tenant customer_a --data '{"name": "Bob", "email": "bob@customer-a.com"}'
 ```
 
 ## Python SDK Usage
@@ -130,19 +130,6 @@ all_users = models.User.get_all()
 models.User.update(user["id"], age=31)
 ```
 
-## Remote Access
-
-```bash
-# Connect to a remote CinchDB instance
-cinch remote add production --url https://your-cinchdb-server.com --key YOUR_API_KEY
-cinch remote use production
-
-# Now all commands work remotely
-cinch query "SELECT * FROM users"
-
-# Switch back to local
-cinch remote clear
-```
 
 ## Next Steps
 

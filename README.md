@@ -31,10 +31,7 @@ cinch branch merge-into-main feature
 cinch tenant create customer_a
 cinch query "SELECT * FROM users" --tenant customer_a
 
-# Coming soon 
-# Connect to remote CinchDB instance
-cinch remote add production https://your-cinchdb-server.com your-api-key
-cinch remote use production
+# Future: Remote connectivity planned for production deployment
 
 # Autogenerate Python SDK from database
 cinch codegen generate python cinchdb_models/
@@ -48,9 +45,7 @@ CinchDB combines SQLite with Git-like workflows for database schema management:
 - **Multi-tenant isolation** - shared schema, isolated data per tenant
 - **Automatic change tracking** - all schema changes tracked and mergeable
 - **Safe structure changes** - change merges happen atomically with zero rollback risk (seriously)
-- **Remote connectivity** - Connect to hosted CinchDB instances
-- **Type-safe SDK** - Python and TypeScript SDKs with full type safety
-- **Remote-capable** - coming soon - CLI and SDK can connect to remote instances
+- **Type-safe Python SDK** - Python SDK with full type safety
 - **SDK generation from database schema** - Generate a typesafe SDK from your database models for CRUD operations
 
 ## Installation
@@ -122,37 +117,11 @@ results = db.insert("posts", *post_list)
 db.update("posts", post_id, {"content": "Updated content"})
 ```
 
-### Remote Connection
-
-Coming soon.
-
-```python
-# Connect to remote instance
-db = cinchdb.connect("myapp", url="https://your-cinchdb-server.com", api_key="your-api-key")
-
-# Same interface as local
-results = db.query("SELECT * FROM users")
-user_id = db.insert("users", {"username": "alice", "email": "alice@example.com"})
-```
-
-## Remote Access - coming soon 
-
-Connect to a remote CinchDB instance:
-
-```bash
-cinch remote add production https://your-cinchdb-server.com your-api-key
-cinch remote use production
-# Now all commands will use the remote instance
-```
-
-Interactive docs at `/docs`, health check at `/health`.
 
 ## Architecture
 
-- **Python SDK**: Core functionality (local + remote)
-- **CLI**: Full-featured command-line interface  
-- **Remote Access**: Connect to hosted CinchDB instances
-- **TypeScript SDK**: Browser and Node.js client
+- **Python SDK**: Core functionality for local development
+- **CLI**: Full-featured command-line interface
 
 ## Development
 

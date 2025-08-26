@@ -1,7 +1,6 @@
 """Test edge cases and interactions between lazy databases and tenants."""
 
 import tempfile
-import json
 from pathlib import Path
 import pytest
 
@@ -9,6 +8,7 @@ from cinchdb.core.initializer import init_project, init_database, ProjectInitial
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.core.path_utils import list_databases, list_tenants
 from cinchdb.core.database import CinchDB
+from cinchdb.infrastructure.metadata_db import MetadataDB
 
 
 def test_lazy_database_with_lazy_tenants():
@@ -35,12 +35,20 @@ def test_lazy_database_with_lazy_tenants():
         db_path = project_dir / ".cinchdb" / "databases" / "lazy-db"
         assert db_path.exists()
         
-        # Check that tenant is lazy
-        tenant_db = db_path / "branches" / "main" / "tenants" / "lazy_tenant.db"
+        # Check that tenant is lazy (no physical .db file)
+        tenant_db = db_path / "branches" / "main" / "tenants" / "lazy-tenant.db"
         assert not tenant_db.exists()
         
-        tenant_meta = db_path / "branches" / "main" / "tenants" / ".lazy-tenant.meta"
-        assert tenant_meta.exists()
+        # Check tenant is in metadata database
+        with MetadataDB(project_dir) as metadata_db:
+            db_info = metadata_db.get_database("lazy-db")
+            assert db_info is not None
+            branches = metadata_db.list_branches(db_info['id'])
+            main_branch = next(b for b in branches if b['name'] == 'main')
+            tenants = metadata_db.list_tenants(main_branch['id'])
+            lazy_tenant = next((t for t in tenants if t['name'] == 'lazy-tenant'), None)
+            assert lazy_tenant is not None
+            assert not lazy_tenant['materialized']
 
 
 def test_mixed_lazy_and_eager_databases():
@@ -69,15 +77,22 @@ def test_mixed_lazy_and_eager_databases():
         assert (project_dir / ".cinchdb" / "databases" / "main").exists()
         assert (project_dir / ".cinchdb" / "databases" / "eager-db").exists()
         
-        # Verify lazy databases have only metadata
+        # Verify lazy databases don't have physical directories
         assert not (project_dir / ".cinchdb" / "databases" / "lazy-db1").exists()
         assert not (project_dir / ".cinchdb" / "databases" / "lazy-db2").exists()
-        assert (project_dir / ".cinchdb" / "databases" / ".lazy-db1.meta").exists()
-        assert (project_dir / ".cinchdb" / "databases" / ".lazy-db2.meta").exists()
+        
+        # Verify lazy databases exist in metadata
+        with MetadataDB(project_dir) as metadata_db:
+            lazy_db1 = metadata_db.get_database("lazy-db1")
+            lazy_db2 = metadata_db.get_database("lazy-db2")
+            assert lazy_db1 is not None
+            assert lazy_db2 is not None
+            assert not lazy_db1['materialized']
+            assert not lazy_db2['materialized']
 
 
 def test_lazy_database_deletion_cleanup():
-    """Test that deleting a lazy database removes metadata file."""
+    """Test that deleting a lazy database removes metadata entry."""
     
     with tempfile.TemporaryDirectory() as tmpdir:
         project_dir = Path(tmpdir)
@@ -87,11 +102,15 @@ def test_lazy_database_deletion_cleanup():
         
         # Create lazy database
         init_database(project_dir, database_name="lazy-db", lazy=True)
-        meta_file = project_dir / ".cinchdb" / "databases" / ".lazy-db.meta"
-        assert meta_file.exists()
         
-        # Delete metadata file (simulating database deletion)
-        meta_file.unlink()
+        # Verify database exists in metadata
+        with MetadataDB(project_dir) as metadata_db:
+            db_info = metadata_db.get_database("lazy-db")
+            assert db_info is not None
+            assert not db_info['materialized']  # Should be lazy
+            
+            # Delete from metadata
+            metadata_db.delete_database(db_info['id'])
         
         # Database should no longer appear in list
         databases = list_databases(project_dir)
@@ -112,22 +131,21 @@ def test_lazy_database_with_description():
         init_database(project_dir, "test-db", description=description, lazy=True)
         
         # Check metadata contains description
-        meta_file = project_dir / ".cinchdb" / "databases" / ".test-db.meta"
-        with open(meta_file) as f:
-            metadata = json.load(f)
+        with MetadataDB(project_dir) as metadata_db:
+            db_info = metadata_db.get_database("test-db")
+            assert db_info is not None
+            assert db_info['description'] == description
+            assert not db_info['materialized']  # lazy = not materialized
+            
+        # Access database to auto-materialize it
+        db = CinchDB(database="test-db", project_dir=project_dir)
         
-        assert metadata["description"] == description
-        
-        # Materialize and verify description is preserved
-        initializer = ProjectInitializer(project_dir)
-        initializer.materialize_database("test-db")
-        
-        # Description should be in branch metadata
-        branch_meta = project_dir / ".cinchdb" / "databases" / "test-db" / "branches" / "main" / "metadata.json"
-        with open(branch_meta) as f:
-            branch_data = json.load(f)
-        
-        assert branch_data["description"] == description
+        # Verify it's now materialized but description is preserved
+        with MetadataDB(project_dir) as metadata_db:
+            db_info = metadata_db.get_database("test-db")
+            assert db_info is not None
+            assert db_info['description'] == description
+            assert db_info['materialized']  # now materialized
 
 
 def test_concurrent_access_to_lazy_database():
@@ -154,11 +172,11 @@ def test_concurrent_access_to_lazy_database():
         db_path = project_dir / ".cinchdb" / "databases" / "lazy-db"
         assert db_path.exists()
         
-        # Metadata should be updated
-        meta_file = project_dir / ".cinchdb" / "databases" / ".lazy-db.meta"
-        with open(meta_file) as f:
-            metadata = json.load(f)
-        assert metadata["lazy"] is False
+        # Metadata should be updated to show it's materialized
+        with MetadataDB(project_dir) as metadata_db:
+            db_info = metadata_db.get_database("lazy-db")
+            assert db_info is not None
+            assert db_info['materialized']  # Now materialized
 
 
 def test_lazy_database_error_handling():
@@ -217,9 +235,10 @@ def test_lazy_tenant_in_lazy_database_lifecycle():
         tenant_manager.create_tenant("tenant1", lazy=True)
         tenant_manager.create_tenant("tenant2", lazy=True)
         
-        # List tenants (should include both lazy tenants and main)
+        # List tenants (should include both lazy tenants, main, and __empty__)
         tenants = list_tenants(project_dir, "lazy-db", "main")
-        assert len(tenants) == 3
+        assert len(tenants) == 4  # __empty__, main, tenant1, tenant2
+        assert "__empty__" in tenants
         assert "main" in tenants
         assert "tenant1" in tenants
         assert "tenant2" in tenants
@@ -227,11 +246,25 @@ def test_lazy_tenant_in_lazy_database_lifecycle():
         # Materialize one tenant
         tenant_manager.materialize_tenant("tenant1")
         
-        # Check states
-        tenants_dir = project_dir / ".cinchdb" / "databases" / "lazy-db" / "branches" / "main" / "tenants"
-        assert (tenants_dir / "tenant1.db").exists()  # Materialized
-        assert not (tenants_dir / "tenant2.db").exists()  # Still lazy
-        assert (tenants_dir / ".tenant2.meta").exists()  # Has metadata
+        # Check states using sharded paths
+        from cinchdb.core.path_utils import get_tenant_db_path
+        tenant1_path = get_tenant_db_path(project_dir, "lazy-db", "main", "tenant1")
+        tenant2_path = get_tenant_db_path(project_dir, "lazy-db", "main", "tenant2")
+        assert tenant1_path.exists()  # Materialized
+        assert not tenant2_path.exists()  # Still lazy
+        
+        # Check metadata state
+        with MetadataDB(project_dir) as metadata_db:
+            db_info = metadata_db.get_database("lazy-db")
+            branches = metadata_db.list_branches(db_info['id'])
+            main_branch = next(b for b in branches if b['name'] == 'main')
+            tenants = metadata_db.list_tenants(main_branch['id'])
+            
+            tenant1_info = next(t for t in tenants if t['name'] == 'tenant1')
+            assert tenant1_info['materialized']  # Should be materialized
+            
+            tenant2_info = next(t for t in tenants if t['name'] == 'tenant2')
+            assert not tenant2_info['materialized']  # Still lazy
         
         # Delete lazy tenant
         tenant_manager.delete_tenant("tenant2")
@@ -240,3 +273,5 @@ def test_lazy_tenant_in_lazy_database_lifecycle():
         tenants = list_tenants(project_dir, "lazy-db", "main")
         assert "tenant2" not in tenants
         assert "tenant1" in tenants
+        assert "__empty__" in tenants  # System tenant still exists
+        assert "main" in tenants

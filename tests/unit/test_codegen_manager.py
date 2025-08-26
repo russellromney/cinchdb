@@ -236,7 +236,7 @@ class TestCodegenManager:
         assert "default=None" in field
 
         # ID field (special case - now Optional for CRUD operations)
-        col = Column(name="id", type="TEXT", nullable=False, primary_key=True)
+        col = Column(name="id", type="TEXT", nullable=False)
         field = codegen_manager._generate_python_field(col)
         assert "id: Optional[str]" in field
         assert "default=None" in field

@@ -34,8 +34,9 @@ class TestRemoteCLIUtils:
 
         return tmp_path
 
+    @patch("cinchdb.cli.utils.CinchDB")
     @patch("cinchdb.cli.utils.get_config_with_data")
-    def test_get_cinchdb_instance_local(self, mock_get_config):
+    def test_get_cinchdb_instance_local(self, mock_get_config, mock_cinchdb):
         """Test getting local CinchDB instance."""
         # Mock config data
         config = MagicMock()
@@ -47,6 +48,14 @@ class TestRemoteCLIUtils:
         config_data.remotes = {}
 
         mock_get_config.return_value = (config, config_data)
+        
+        # Mock CinchDB instance
+        mock_db = MagicMock()
+        mock_db.is_local = True
+        mock_db.project_dir = Path("/test/project")
+        mock_db.database = "testdb"
+        mock_db.branch = "main"
+        mock_cinchdb.return_value = mock_db
 
         # Get instance
         db = get_cinchdb_instance()
@@ -56,6 +65,14 @@ class TestRemoteCLIUtils:
         assert db.project_dir == Path("/test/project")
         assert db.database == "testdb"
         assert db.branch == "main"
+        
+        # Verify CinchDB was created with correct params
+        mock_cinchdb.assert_called_once_with(
+            database="testdb",
+            branch="main",
+            tenant="main",
+            project_dir=Path("/test/project")
+        )
 
     @patch("cinchdb.cli.utils.get_config_with_data")
     def test_get_cinchdb_instance_remote_active(self, mock_get_config):
@@ -83,8 +100,9 @@ class TestRemoteCLIUtils:
         assert db.database == "testdb"
         assert db.branch == "main"
 
+    @patch("cinchdb.cli.utils.CinchDB")
     @patch("cinchdb.cli.utils.get_config_with_data")
-    def test_get_cinchdb_instance_force_local(self, mock_get_config):
+    def test_get_cinchdb_instance_force_local(self, mock_get_config, mock_cinchdb):
         """Test forcing local connection even with active remote."""
         # Mock config data
         config = MagicMock()
@@ -98,6 +116,12 @@ class TestRemoteCLIUtils:
         }
 
         mock_get_config.return_value = (config, config_data)
+        
+        # Mock CinchDB instance
+        mock_db = MagicMock()
+        mock_db.is_local = True
+        mock_db.project_dir = Path("/test/project")
+        mock_cinchdb.return_value = mock_db
 
         # Get instance with force_local
         db = get_cinchdb_instance(force_local=True)
@@ -133,8 +157,9 @@ class TestRemoteCLIUtils:
         assert db.api_url == "https://staging.example.com"
         assert db.api_key == "staging-key"
 
+    @patch("cinchdb.cli.utils.CinchDB")
     @patch("cinchdb.cli.utils.get_config_with_data")
-    def test_get_cinchdb_instance_custom_params(self, mock_get_config):
+    def test_get_cinchdb_instance_custom_params(self, mock_get_config, mock_cinchdb):
         """Test with custom database/branch/tenant parameters."""
         # Mock config data
         config = MagicMock()
@@ -146,6 +171,13 @@ class TestRemoteCLIUtils:
         config_data.remotes = {}
 
         mock_get_config.return_value = (config, config_data)
+        
+        # Mock CinchDB instance
+        mock_db = MagicMock()
+        mock_db.database = "customdb"
+        mock_db.branch = "feature"
+        mock_db.tenant = "tenant1"
+        mock_cinchdb.return_value = mock_db
 
         # Get instance with custom params
         db = get_cinchdb_instance(

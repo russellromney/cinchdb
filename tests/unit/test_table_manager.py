@@ -27,6 +27,11 @@ class TestTableManager:
         config.init_project()
 
         yield project_dir
+        
+        # Clean up connection pool
+        from cinchdb.infrastructure.metadata_connection_pool import MetadataConnectionPool
+        MetadataConnectionPool.close_all()
+        
         shutil.rmtree(temp)
 
     @pytest.fixture
@@ -130,7 +135,7 @@ class TestTableManager:
 
         id_col = next(c for c in table.columns if c.name == "id")
         assert id_col.type == "TEXT"
-        assert id_col.primary_key
+        # id is always the primary key (no primary_key field needed)
 
     def test_get_table_not_exists(self, table_manager):
         """Test getting non-existent table."""
@@ -272,9 +277,9 @@ class TestTableManager:
         """Test that table changes are tracked and can be applied to all tenants."""
         from cinchdb.managers.tenant import TenantManager
 
-        # Create additional tenant first
+        # Create additional tenant first (non-lazy so it gets schema changes)
         tenant_mgr = TenantManager(temp_project, "main", "main")
-        tenant_mgr.create_tenant("tenant2")
+        tenant_mgr.create_tenant("tenant2", lazy=False)
 
         # Create table (this automatically applies to all tenants)
         columns = [Column(name="data", type="TEXT")]

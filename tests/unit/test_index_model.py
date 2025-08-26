@@ -45,13 +45,19 @@ class TestTableCreationWithIndexes:
     def temp_project(self):
         """Create a temporary project directory."""
         temp_dir = tempfile.mkdtemp()
-        yield Path(temp_dir)
+        project_dir = Path(temp_dir)
+        
+        # Initialize project properly
+        from cinchdb.core.initializer import init_project
+        init_project(project_dir, database_name="test_db", branch_name="main")
+        
+        yield project_dir
         shutil.rmtree(temp_dir)
     
     @pytest.fixture
     def table_manager(self, temp_project):
         """Create a TableManager for testing."""
-        return TableManager(temp_project, "test_db", "main")
+        return TableManager(temp_project, "test_db", "main", "main")
     
     def test_create_table_with_single_index(self, table_manager):
         """Test creating a table with a single index."""
@@ -158,7 +164,13 @@ class TestCinchDBIndexIntegration:
     def temp_project(self):
         """Create a temporary project directory."""
         temp_dir = tempfile.mkdtemp()
-        yield Path(temp_dir)
+        project_dir = Path(temp_dir)
+        
+        # Initialize project properly
+        from cinchdb.core.initializer import init_project
+        init_project(project_dir, database_name="test_db", branch_name="main")
+        
+        yield project_dir
         shutil.rmtree(temp_dir)
     
     @pytest.fixture
@@ -239,13 +251,19 @@ class TestIndexModelValidation:
     def temp_project(self):
         """Create a temporary project directory."""
         temp_dir = tempfile.mkdtemp()
-        yield Path(temp_dir)
+        project_dir = Path(temp_dir)
+        
+        # Initialize project properly
+        from cinchdb.core.initializer import init_project
+        init_project(project_dir, database_name="test_db", branch_name="main")
+        
+        yield project_dir
         shutil.rmtree(temp_dir)
     
     @pytest.fixture
     def table_manager(self, temp_project):
         """Create a TableManager for testing."""
-        return TableManager(temp_project, "test_db", "main")
+        return TableManager(temp_project, "test_db", "main", "main")
     
     def test_index_validation_through_table_creation(self, table_manager):
         """Test that Index model validation works through table creation."""

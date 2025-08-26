@@ -1,162 +1,217 @@
 # Core Concepts
 
-Understanding CinchDB's key concepts will help you use it effectively.
+**Understanding Projects, Databases, Branches, and Tenants**
+
+## Mental Model: **Git for Databases**
+
+CinchDB works like Git, but for database schemas:
+
+| Git Concept | CinchDB Equivalent | Purpose |
+|-------------|-------------------|----------|
+| Repository | Project | Contains all your databases |
+| Branch | Schema Branch | Isolated schema changes |
+| File | Table/Column | Database schema elements |
+| Merge | Schema Merge | Apply changes safely |
 
 ## Projects
 
-A CinchDB project is a directory containing your databases. It's created with `cinch init` and contains:
+**A project = your application's data layer**
+
+```bash
+cinch init myapp  # Creates .cinchdb/ directory
+```
 
 ```
-.cinchdb/
-├── config.toml          # Project configuration
-└── databases/           # Your databases
-    └── main/           # Default database
-        └── branches/   # Database branches
-            └── main/   # Default branch
+myapp/
+├── .cinchdb/
+│   ├── config.toml
+│   └── databases/
+└── your-app-code/
 ```
+
+### When to Use Projects
+- **One per application** - Each app gets its own project
+- **Separate environments** - Different projects for dev/staging/prod
+- **Team boundaries** - Different projects for different teams
 
 ## Databases
 
-Each project can have multiple databases. Think of a database as a completely separate application or service.
+**Multiple logical databases within a project**
 
 ```bash
-# Create a new database
-cinch db create analytics
-
-# Switch active database
-cinch db use analytics
-
-# List all databases
-cinch db list
+cinch db create main        # Core app data
+cinch db create analytics   # Reporting data  
+cinch db create logs        # Application logs
 ```
 
-## Branches
+### When to Create Multiple Databases
+✅ **Good reasons:**
+- **Different services** - User service vs Order service
+- **Data lifecycle** - Transactional vs analytical data
+- **Access patterns** - High-frequency vs archive data
 
-Branches allow you to make isolated schema changes, similar to Git branches for code.
+⚠️ **Avoid if:**
+- **Tables are related** - Orders belong with Users
+- **Need joins** - Can't join across databases easily
 
-Key principles:
-- Each branch has its own schema
-- Changes are tracked per branch
-- You can merge branches
-- The `main` branch is protected (merge-only)
+## Schema Branches
+
+**Git branches for database schema changes**
 
 ```bash
-# Create and switch to a new branch
-cinch branch create feature.add-users
-cinch branch switch feature.add-users
-
-# Make changes
-cinch table create users name:TEXT
-
-# Merge back to main
+cinch branch create add-payments --switch
+cinch table create payments user_id:TEXT amount:REAL
 cinch branch switch main
-cinch branch merge feature.add-users
+cinch branch merge-into-main add-payments
 ```
 
-## Tables and Columns
+### When to Create Branches
+✅ **Always branch for:**
+- **New features** - Adding tables/columns
+- **Schema refactoring** - Changing existing structure  
+- **Breaking changes** - Removing/renaming things
+- **Experiments** - Testing schema ideas
 
-Tables are created with automatic fields:
+⚠️ **Stay on main for:**
+- **Data operations** - INSERT/UPDATE/DELETE queries
+- **Simple additions** - Adding basic indexes
 
-```bash
-cinch table create posts title:TEXT content:TEXT
+### Key Branch Concepts
+
+**Complete Isolation**: Each branch copies all schema + data
+```
+main/           ← Production schema
+├── users.db    ← 10K users
+└── orders.db   ← 50K orders
+
+add-payments/   ← Feature branch  
+├── users.db    ← Copy of 10K users
+├── orders.db   ← Copy of 50K orders  
+└── payments.db ← New payments table
 ```
 
-This creates:
-- `id` - UUID primary key
-- `title` - TEXT column
-- `content` - TEXT column  
-- `created_at` - Timestamp
-- `updated_at` - Timestamp
-
-Column types:
-- `TEXT` - String data
-- `INTEGER` - Whole numbers
-- `REAL` - Decimal numbers
-- `BOOLEAN` - True/false
-- `BLOB` - Binary data
-
-## Views
-
-Views are saved SQL queries that act like virtual tables:
-
-```bash
-# Create a view
-cinch view create active_users "SELECT * FROM users WHERE active = true"
-
-# Query the view
-cinch query "SELECT * FROM active_users"
-```
+**Atomic Merges**: Either all changes apply or none do
+- No partial states
+- No rollback needed
+- Changes apply to ALL tenants simultaneously
 
 ## Multi-Tenancy
 
-CinchDB supports complete data isolation between tenants while sharing the same schema:
+**Separate customer data, shared schema**
 
 ```bash
-# Create tenants
 cinch tenant create customer_a
 cinch tenant create customer_b
 
-# Work with tenant data
-cinch query "INSERT INTO users ..." --tenant customer_a
-cinch query "SELECT * FROM users" --tenant customer_a
+# Same schema, different data
+cinch query "SELECT COUNT(*) FROM users" --tenant customer_a  # 1,250 users
+cinch query "SELECT COUNT(*) FROM users" --tenant customer_b  # 892 users
 ```
 
-Key points:
-- Each tenant has separate SQLite database files
-- Schema changes apply to all tenants
-- Default tenant is "main"
+### When to Use Multi-Tenancy
+✅ **Perfect for:**
+- **SaaS applications** - Customer data isolation
+- **B2B platforms** - Company-specific data
+- **Compliance** - Data must be isolated by law
+- **Performance** - Queries scan less data
 
-## Change Tracking
+⚠️ **Not ideal for:**
+- **Simple apps** - Single tenant is simpler
+- **Cross-tenant analytics** - Need shared reporting
+- **Tiny datasets** - Overhead not worth it
 
-Every schema modification is tracked:
-- Table creation/deletion
-- Column additions/removals
-- View changes
+### Tenant Performance Benefits
 
-Changes are stored in JSON files and used for:
-- Merging branches
-- Applying changes to all tenants
-- Schema history
+**Query speed = data_size ÷ tenant_count**
 
-## Remote Access
+```
+Traditional: SELECT * FROM users WHERE tenant_id = 'acme'
+→ Scans 1M users, filters to 10K
 
-CinchDB can work locally or connect to a remote API:
+Multi-tenant: SELECT * FROM users --tenant acme  
+→ Scans 10K users directly (100x faster!)
+```
+
+## How They Work Together
+
+### Complete Hierarchy
+```
+Project: myapp
+└── Database: main
+    ├── Branch: main
+    │   ├── Tenant: main (default)
+    │   ├── Tenant: customer_a  
+    │   └── Tenant: customer_b
+    └── Branch: add-payments
+        ├── Tenant: main (copy)
+        ├── Tenant: customer_a (copy)
+        └── Tenant: customer_b (copy)
+```
+
+### Development Workflow
+```bash
+# 1. Start with project
+cinch init ecommerce && cd ecommerce
+
+# 2. Create feature branch
+cinch branch create add-inventory --switch
+
+# 3. Make schema changes
+cinch table create inventory product_id:TEXT quantity:INTEGER
+cinch table create warehouse_locations name:TEXT address:TEXT
+
+# 4. Test with different tenants
+cinch query "INSERT INTO inventory VALUES ('prod-123', 50)" --tenant customer_a
+cinch query "INSERT INTO inventory VALUES ('prod-456', 25)" --tenant customer_b
+
+# 5. Verify schema works
+cinch query "SELECT * FROM inventory" --tenant customer_a  # Only customer_a's data
+cinch query "SELECT * FROM inventory" --tenant customer_b  # Only customer_b's data
+
+# 6. Merge when ready (applies to ALL tenants on main)
+cinch branch switch main
+cinch branch merge-into-main add-inventory
+```
+
+## CLI vs Python SDK
+
+### When to Use Each
+
+**CLI** - Good for:
+- **Schema changes** - Creating tables, branches
+- **Data exploration** - Quick queries, debugging
+- **DevOps tasks** - Migrations, deployment scripts  
+- **Learning** - Interactive exploration
 
 ```bash
-# Add a remote server
-cinch remote add prod --url https://api.example.com --key YOUR_KEY
-
-# Use remote connection
-cinch remote use prod
-
-# All commands now execute remotely
-cinch query "SELECT * FROM users"
+cinch table create products name:TEXT price:REAL
+cinch query "SELECT COUNT(*) FROM products"
 ```
 
-## Connection Modes
+**Python SDK** - Good for:
+- **Application code** - Your main app logic
+- **Complex operations** - Bulk inserts, transactions
+- **Integration** - With web frameworks, APIs
+- **Type safety** - Full IDE support and validation
 
-CinchDB operates in two modes:
+```python
+db = cinchdb.connect("myapp", tenant="customer_a")
+products = db.query("SELECT * FROM products WHERE price > ?", [100])
+```
 
-### Local Mode
-- Direct SQLite file access
-- Full control over database files
-- No network required
+## Glossary
 
-### Remote Mode  
-- API-based access
-- Authentication via API keys
-- Suitable for production deployments
-
-## Best Practices
-
-1. **Branch for Features** - Create a branch for each feature or schema change
-2. **Test on Branches** - Verify changes before merging to main
-3. **Use Tenants for Isolation** - Keep customer data separate
-4. **Track Changes** - Review changes before merging
-5. **Backup Before Major Operations** - Especially before merges
+**Project** - Top-level container for all databases (like Git repo)  
+**Database** - Logical collection of related tables (like schema)  
+**Branch** - Isolated copy of schema for development (like Git branch)  
+**Tenant** - Separate data space with shared schema (like customer)  
+**Schema** - Table structure, columns, indexes (not data)  
+**Materialized** - Physically created on disk with actual data  
+**Merge** - Apply branch changes to target branch atomically
 
 ## Next Steps
 
-- [CLI Reference](../cli/index.md) - Detailed command documentation
-- [Branching Guide](../concepts/branching.md) - Deep dive into branching
-- [Multi-Tenancy Guide](../concepts/multi-tenancy.md) - Advanced tenant management
+- [Quick Start Guide](quickstart.md) - Build your first project
+- [Schema Branching](../concepts/branching.md) - Deep dive into branches  
+- [Multi-Tenancy](../concepts/multi-tenancy.md) - Deep dive into tenants
+- [CLI Reference](../cli/index.md) - All available commands

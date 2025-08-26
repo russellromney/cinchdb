@@ -15,6 +15,8 @@ from cinchdb.core.path_utils import (
     list_branches,
     list_tenants,
 )
+from cinchdb.infrastructure.metadata_db import MetadataDB
+import uuid
 
 
 class TestPathUtils:
@@ -72,8 +74,13 @@ class TestPathUtils:
         assert tenant_path == expected
 
     def test_get_tenant_db_path(self, temp_project):
-        """Test getting tenant database file path."""
+        """Test getting tenant database file path with hash-based sharding."""
         db_path = get_tenant_db_path(temp_project, "test_db", "main", "customer1")
+        # Calculate expected shard for "customer1" (should be "de")
+        import hashlib
+        hash_val = hashlib.sha256("customer1".encode('utf-8')).hexdigest()
+        expected_shard = hash_val[:2]
+        
         expected = (
             temp_project
             / ".cinchdb"
@@ -82,6 +89,7 @@ class TestPathUtils:
             / "branches"
             / "main"
             / "tenants"
+            / expected_shard
             / "customer1.db"
         )
         assert db_path == expected
@@ -104,16 +112,16 @@ class TestPathUtils:
 
     def test_list_databases(self, temp_project):
         """Test listing databases."""
+        # Initialize metadata database
+        metadata_db = MetadataDB(temp_project)
+        
         # Initially empty
         assert list_databases(temp_project) == []
 
-        # Create some databases
-        db_base = temp_project / ".cinchdb" / "databases"
-        db_base.mkdir(parents=True)
-
-        (db_base / "db1").mkdir()
-        (db_base / "db2").mkdir()
-        (db_base / "db3").mkdir()
+        # Create some databases in metadata
+        metadata_db.create_database(str(uuid.uuid4()), "db1", "Database 1")
+        metadata_db.create_database(str(uuid.uuid4()), "db2", "Database 2")
+        metadata_db.create_database(str(uuid.uuid4()), "db3", "Database 3")
 
         # List them
         dbs = list_databases(temp_project)
@@ -121,39 +129,44 @@ class TestPathUtils:
 
     def test_list_branches(self, temp_project):
         """Test listing branches."""
-        # Create database structure
-        db_path = get_database_path(temp_project, "test_db")
-        branches_path = db_path / "branches"
-        branches_path.mkdir(parents=True)
-
+        # Initialize metadata database
+        metadata_db = MetadataDB(temp_project)
+        
+        # Create database in metadata
+        db_id = str(uuid.uuid4())
+        metadata_db.create_database(db_id, "test_db", "Test Database")
+        
         # Initially empty
         assert list_branches(temp_project, "test_db") == []
-
-        # Create branches
-        (branches_path / "main").mkdir()
-        (branches_path / "feature1").mkdir()
-        (branches_path / "feature2").mkdir()
-
+        
+        # Create some branches in metadata
+        metadata_db.create_branch(str(uuid.uuid4()), db_id, "main")
+        metadata_db.create_branch(str(uuid.uuid4()), db_id, "feature1")
+        metadata_db.create_branch(str(uuid.uuid4()), db_id, "feature2")
+        
         # List them
         branches = list_branches(temp_project, "test_db")
         assert sorted(branches) == ["feature1", "feature2", "main"]
 
     def test_list_tenants(self, temp_project):
         """Test listing tenants."""
-        # Create branch structure
-        branch_path = get_branch_path(temp_project, "test_db", "main")
-        tenants_path = branch_path / "tenants"
-        tenants_path.mkdir(parents=True)
-
+        # Initialize metadata database
+        metadata_db = MetadataDB(temp_project)
+        
+        # Create database and branch in metadata
+        db_id = str(uuid.uuid4())
+        metadata_db.create_database(db_id, "test_db", "Test Database")
+        branch_id = str(uuid.uuid4())
+        metadata_db.create_branch(branch_id, db_id, "main")
+        
         # Initially empty
         assert list_tenants(temp_project, "test_db", "main") == []
-
-        # Create tenant files
-        (tenants_path / "main.db").touch()
-        (tenants_path / "customer1.db").touch()
-        (tenants_path / "customer2.db").touch()
-        (tenants_path / "customer1.db-wal").touch()  # Should be ignored
-
+        
+        # Create some tenants in metadata
+        metadata_db.create_tenant(str(uuid.uuid4()), branch_id, "main")
+        metadata_db.create_tenant(str(uuid.uuid4()), branch_id, "customer1")
+        metadata_db.create_tenant(str(uuid.uuid4()), branch_id, "customer2")
+        
         # List them
         tenants = list_tenants(temp_project, "test_db", "main")
         assert sorted(tenants) == ["customer1", "customer2", "main"]

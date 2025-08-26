@@ -6,7 +6,6 @@ This document provides a comprehensive reference for all classes, methods, and f
 
 - [Connection Functions](#connection-functions)
   - [connect()](#connect)
-  - [connect_api()](#connect_api)
 - [CinchDB Class](#cinchdb-class)
   - [Constructor](#constructor)
   - [Properties](#properties)
@@ -70,48 +69,10 @@ from pathlib import Path
 db = connect("mydb", project_dir=Path("/path/to/project"))
 ```
 
-### connect_api()
-
-Connect to a remote CinchDB API.
-
-```python
-connect_api(
-    api_url: str,
-    api_key: str,
-    database: str,
-    branch: str = "main",
-    tenant: str = "main"
-) -> CinchDB
-```
-
-**Parameters:**
-- `api_url` (str): Base URL of the CinchDB API
-- `api_key` (str): API authentication key
-- `database` (str): Database name
-- `branch` (str, optional): Branch name. Default: "main"
-- `tenant` (str, optional): Tenant name. Default: "main"
-
-**Returns:**
-- `CinchDB`: Connection instance for remote API
-
-**Example:**
-```python
-from cinchdb import connect_api
-
-# Connect to remote API
-db = connect_api("https://api.example.com", "your-api-key", "mydb")
-
-# Connect to specific branch
-db = connect_api("https://api.example.com", "your-api-key", "mydb", "dev")
-
-# Use with context manager
-with connect_api("https://api.example.com", "key", "mydb") as db:
-    results = db.query("SELECT * FROM users")
-```
 
 ## CinchDB Class
 
-Unified interface for CinchDB operations, supporting both local and remote connections.
+Unified interface for CinchDB operations for local connections.
 
 ### Constructor
 
@@ -131,11 +92,9 @@ CinchDB(
 - `branch` (str, optional): Branch name. Default: "main"
 - `tenant` (str, optional): Tenant name. Default: "main"
 - `project_dir` (Path, optional): Path to project directory for local connection
-- `api_url` (str, optional): Base URL for remote API connection
-- `api_key` (str, optional): API key for remote connection
 
 **Raises:**
-- `ValueError`: If neither local nor remote connection parameters are provided
+- `ValueError`: If project directory is not provided or found
 
 **Example:**
 ```python
@@ -144,14 +103,6 @@ from pathlib import Path
 
 # Local connection
 db = CinchDB(project_dir="/path/to/project", database="mydb", branch="dev")
-
-# Remote connection
-db = CinchDB(
-    api_url="https://api.example.com",
-    api_key="your-api-key",
-    database="mydb",
-    branch="dev"
-)
 ```
 
 ### Properties
@@ -162,7 +113,7 @@ db = CinchDB(
 is_local: bool
 ```
 
-Returns `True` if this is a local connection, `False` for remote connections.
+Returns `True` for local connections (always `True` in current implementation).
 
 #### database
 
@@ -395,7 +346,6 @@ Column(
     type: ColumnType,
     nullable: bool = True,
     default: Optional[str] = None,
-    primary_key: bool = False,
     unique: bool = False
 )
 ```
@@ -405,8 +355,9 @@ Column(
 - `type` (ColumnType): SQLite column type. One of: "TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC"
 - `nullable` (bool, optional): Whether column allows NULL values. Default: True
 - `default` (str, optional): Default value SQL expression
-- `primary_key` (bool, optional): Whether this is a primary key. Default: False
 - `unique` (bool, optional): Whether values must be unique. Default: False
+
+**Note:** CinchDB automatically creates an `id` column as the primary key for all tables. Users cannot specify custom primary keys.
 
 **Example:**
 ```python

@@ -1,328 +1,172 @@
-# Branching Concepts
+# Schema Branching
 
-Understanding CinchDB's branching system for schema management.
+**Branch database schemas like Git branches. Test changes safely, merge atomically.**
 
 ## What is Schema Branching?
 
-Schema branching brings version control concepts to database schema management. Like Git branches for code, CinchDB branches allow you to:
+**Problem**: Database schema changes are risky. One mistake breaks production.
 
-- Isolate schema changes
-- Test modifications safely
-- Collaborate without conflicts
-- Merge changes when ready
+**Solution**: Branch schemas like code. Test changes in isolation, merge when ready.
+
+```bash
+cinch branch create add-payments --switch
+cinch table create payments user_id:TEXT amount:REAL status:TEXT
+# Test thoroughly...
+cinch branch switch main  
+cinch branch merge-into-main add-payments  # Atomic merge
+```
+
+## When to Use Branches
+
+### ✅ **Always Use Branches For:**
+- **New features** - Adding tables, columns, indexes
+- **Schema refactoring** - Renaming, restructuring  
+- **Breaking changes** - Removing columns, changing types
+- **Experiments** - Testing schema ideas before committing
+
+### ⚠️ **Usually Stay on Main For:**
+- **Data-only changes** - INSERT, UPDATE, DELETE queries
+- **Minor tweaks** - Adding simple indexes, views
+- **Emergency fixes** - Quick data corrections
 
 ## How Branching Works
 
-### Branch Structure
+### Key Concept: **Complete Isolation**
 
-Each branch maintains:
-- Complete schema definition
-- Change history
-- All tenant databases
-- Independent data
-
-A key benefit: schema merges happen atomically with **zero rollback risk**. Either all changes apply successfully to all tenants, or none do.
+Each branch is a **complete copy** of your database:
+- Full schema definition
+- All tenant data
+- Independent change history
 
 ```
-.cinchdb/databases/myapp/branches/
-├── main/
-│   ├── metadata.json     # Branch metadata
-│   ├── changes.json      # Change history
-│   └── tenants/          # Tenant databases
-│       ├── main.db
-│       └── customer_a.db
-└── feature-branch/
-    ├── metadata.json
-    ├── changes.json
-    └── tenants/
-        ├── main.db       # Copy of main's data
-        └── customer_a.db # Copy of customer_a's data
+myapp/
+├── main/           ← Production branch
+│   ├── main.db     ← Default tenant
+│   └── customer_a.db  
+└── add-payments/   ← Feature branch  
+    ├── main.db     ← Copy of main's data
+    └── customer_a.db ← Copy of customer_a's data
 ```
 
-### Creating Branches
+### Mental Model: **Git for Databases**
 
-When you create a branch:
-1. Directory structure is copied
-2. All tenant databases are duplicated
-3. Change tracking starts fresh
-4. Schema matches source exactly
+| Git Concept | CinchDB Equivalent |
+|-------------|-------------------|
+| `git branch feature` | `cinch branch create feature` |
+| `git checkout feature` | `cinch branch switch feature` |
+| `git merge feature` | `cinch branch merge-into-main feature` |
+| Files + history | Schema + data + change history |
 
+## Branch Operations
+
+### Create & Switch
 ```bash
-cinch branch create feature.new-schema
+# Create new branch from main
+cinch branch create user-profiles
+
+# Create and switch immediately  
+cinch branch create user-profiles --switch
+
+# Create from specific branch
+cinch branch create hotfix --from production
 ```
 
-This creates an exact copy, allowing independent development.
-
-## Change Tracking
-
-### What's Tracked
-
-CinchDB tracks all schema modifications:
-- Table creation/deletion
-- Column additions/removals/renames
-- View creation/updates/deletion
-- Index creation/deletion
-
-### Change Format
-
-Changes are stored in `changes.json`:
-```json
-[
-  {
-    "id": "change_123",
-    "timestamp": "2024-01-15T10:30:00Z",
-    "type": "CREATE_TABLE",
-    "details": {
-      "table": "users",
-      "columns": [
-        {"name": "id", "type": "TEXT"},
-        {"name": "email", "type": "TEXT"}
-      ]
-    }
-  },
-  {
-    "id": "change_124",
-    "timestamp": "2024-01-15T10:31:00Z",
-    "type": "ADD_COLUMN",
-    "details": {
-      "table": "users",
-      "column": {"name": "phone", "type": "TEXT", "nullable": true}
-    }
-  }
-]
+### Make Changes
+```bash
+# All operations work on current branch
+cinch table create profiles user_id:TEXT bio:TEXT avatar_url:TEXT
+cinch column add users profile_completed:BOOLEAN
+cinch query "INSERT INTO profiles (user_id, bio) VALUES ('user-123', 'Software developer')"
 ```
 
-### Change Order
+### Merge Back
+```bash
+cinch branch switch main
+cinch branch merge-into-main user-profiles
 
-Changes are applied in chronological order. This ensures:
-- Reproducible schema evolution
-- Consistent merge behavior
-- Predictable results
+# Branch is automatically deleted after successful merge
+```
 
-## Merging
+## Safe Merging
 
-### Merge Rules
+### Zero Rollback Risk
 
-CinchDB enforces these merge rules:
-
-1. **Main Branch Protection** - Cannot modify main directly
-2. **Linear History** - Target must have all source changes
-3. **No Conflicts** - Changes must be compatible
-4. **All Tenants** - Changes apply to every tenant
+CinchDB merges are **atomic across all tenants**:
+- Either ALL tenants get the changes
+- Or NO tenants get the changes  
+- No partial state, no rollback needed
 
 ### Merge Process
-
-When merging `feature` into `main`:
-
-1. **Validation**
-   - Check main has all feature's parent changes
-   - Verify no conflicting modifications
-   - Ensure changes are applicable
-
-2. **Application**
-   - Apply each change to main
-   - Update all tenant databases
-   - Record in change history
-
-3. **Completion**
-   - Update branch metadata
-   - Log merge operation
-   - Branch can be deleted
-
-### Example Merge
-
-```bash
-# On feature branch
-cinch table create products name:TEXT price:REAL
-
-# Switch to main
-cinch branch switch main
-
-# Merge feature
-cinch branch merge feature.products main
-```
-
-## Conflict Prevention
-
-CinchDB prevents conflicts through:
-
-### 1. Linear History Requirement
-
-Branches must share a common ancestor:
-```
-main: A → B → C
-feature: A → B → D → E
-
-✓ Can merge feature→main (main has A,B)
-✗ Cannot merge if main adds F (diverged)
-```
-
-### 2. Operation Ordering
-
-Changes are atomic and ordered:
-- Each change has unique ID
-- Timestamp ensures order
-- No parallel modifications
-
-### 3. Schema Validation
-
-Before merge, CinchDB validates:
-- Tables don't already exist
-- Columns don't conflict
-- Types are compatible
-
-## Working with Branches
-
-### Development Workflow
-
-1. **Create Feature Branch**
-   ```bash
-   cinch branch create feature.user-profiles
-   ```
-
-2. **Make Changes**
-   ```bash
-   cinch table create profiles user_id:TEXT bio:TEXT
-   ```
-
-3. **Test Thoroughly**
-   ```bash
-   cinch query "INSERT INTO profiles ..." 
-   cinch query "SELECT * FROM profiles"
-   ```
-
-4. **Merge When Ready**
-   ```bash
-   cinch branch merge feature.user-profiles main
-   ```
-
-### Parallel Development
-
-Multiple developers can work simultaneously:
-
-```
-Developer A: main → feature.auth → implements auth tables
-Developer B: main → feature.billing → implements billing tables
-
-Both can merge to main independently (no conflicts)
-```
-
-### Long-Running Branches
-
-For major features:
-
-```bash
-# Create long-running branch
-cinch branch create release.v2
-
-# Periodically sync with main
-cinch branch merge main release.v2
-
-# Continue development
-cinch table create v2_features ...
-
-# Eventually merge back
-cinch branch merge release.v2 main
-```
+1. **Analyze changes** - Compare schemas between branches
+2. **Validate safety** - Check for conflicts, breaking changes  
+3. **Apply atomically** - Execute all changes as single transaction
+4. **Update all tenants** - Changes apply to every tenant database
+5. **Clean up** - Delete source branch, update change history
 
 ## Best Practices
 
-### 1. Branch Naming
-
-Use descriptive, consistent names:
-- `feature.` - New functionality
-- `bugfix.` - Fixing issues
-- `refactor.` - Schema improvements
-- `experiment.` - Trying ideas
-- `release.` - Version preparation
-
-### 2. Small, Focused Changes
-
-Keep branches focused:
+### Branch Naming
 ```bash
-# Good - single purpose
-feature.add-user-avatars
-feature.optimize-indexes
+# Feature branches
+cinch branch create feature/add-payments
+cinch branch create feature/user-authentication  
 
-# Bad - too broad
-feature.big-update
-feature.everything
+# Bug fixes
+cinch branch create fix/login-validation
+cinch branch create hotfix/critical-bug-123
+
+# Experiments  
+cinch branch create experiment/new-schema
 ```
 
-### 3. Regular Merging
+### Development Workflow
+```bash
+# 1. Start feature
+cinch branch create feature/orders --switch
 
-Merge completed work promptly:
-- Reduces divergence
-- Avoids conflicts
-- Shares improvements
+# 2. Develop iteratively
+cinch table create orders user_id:TEXT total:REAL
+cinch query "INSERT INTO orders (user_id, total) VALUES ('test-user', 29.99)"
+cinch query "SELECT * FROM orders" # Test it works
 
-### 4. Testing Before Merge
+# 3. More changes
+cinch table create order_items order_id:TEXT product_id:TEXT quantity:INTEGER
+cinch create_index orders ["user_id", "created_at"]
 
-Always test on branch:
-```python
-# Automated tests
-def test_branch_schema(branch_name):
-    db = cinchdb.connect("myapp", branch=branch_name)
-    
-    # Verify schema
-    tables = db.query("SELECT name FROM sqlite_master WHERE type='table'")
-    assert "expected_table" in [t["name"] for t in tables]
-    
-    # Test operations
-    db.insert("expected_table", test_data)
-    results = db.query("SELECT * FROM expected_table")
-    assert len(results) > 0
+# 4. Final testing
+cinch query "SELECT o.*, COUNT(oi.id) FROM orders o LEFT JOIN order_items oi ON o.id = oi.order_id GROUP BY o.id"
+
+# 5. Merge when confident
+cinch branch switch main
+cinch branch merge-into-main feature/orders
 ```
 
-## Advanced Concepts
+### Multi-Developer Teams
+- **One branch per feature** - Avoid conflicts
+- **Short-lived branches** - Merge frequently  
+- **Test before merging** - Use sample data to verify
+- **Coordinate breaking changes** - Discuss schema changes as a team
 
-### Branch Metadata
+## Troubleshooting
 
-Each branch tracks:
-```json
-{
-  "name": "feature.new-schema",
-  "created_at": "2024-01-15T10:00:00Z",
-  "created_from": "main",
-  "last_change": "2024-01-15T11:00:00Z",
-  "change_count": 5
-}
-```
+**"Branch merge failed"** → Schema conflict. Check what changed on main since you branched.
 
-### Change Application
+**"Too much disk space"** → Branches duplicate all data. Delete unused branches.
 
-Changes are applied using SQL:
-```python
-def apply_change(db, change):
-    if change["type"] == "CREATE_TABLE":
-        columns = []
-        for col in change["details"]["columns"]:
-            columns.append(f"{col['name']} {col['type']}")
-        
-        sql = f"CREATE TABLE {change['details']['table']} ({', '.join(columns)})"
-        db.execute(sql)
-    
-    elif change["type"] == "ADD_COLUMN":
-        sql = f"ALTER TABLE {change['details']['table']} ADD COLUMN {change['details']['column']['name']} {change['details']['column']['type']}"
-        db.execute(sql)
-```
+**"Changes not showing"** → Make sure you're on the right branch: `cinch branch list`
 
-## Limitations
+## Comparison: Traditional vs CinchDB
 
-### 1. No Concurrent Merges
-Only one merge at a time to ensure consistency.
-
-### 2. No Cherry-Picking
-Must merge all changes - cannot select specific ones.
-
-### 3. Limited Rollback
-After merge, changes are permanent. Plan carefully.
-
-### 4. Schema Only
-Branches track schema, not data modifications.
+| Traditional Migrations | CinchDB Branches |
+|----------------------|------------------|
+| Write migration scripts | Make changes directly |
+| Risk of rollback needed | Zero rollback risk |
+| Hard to test safely | Complete isolation |
+| One-way only | Can merge, branch, re-branch |
+| Manual conflict resolution | Automatic conflict detection |
 
 ## Next Steps
 
-- [Multi-Tenancy Concepts](multi-tenancy.md)
-- [Change Tracking](change-tracking.md)
-- [Schema Branching Tutorial](../tutorials/schema-branching.md)
+- [Multi-Tenancy](multi-tenancy.md) - How branches work with tenants
+- [Change Tracking](change-tracking.md) - Understanding change history
+- [CLI Branch Commands](../cli/branch.md) - Complete command reference

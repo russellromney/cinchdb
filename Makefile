@@ -48,27 +48,26 @@ install-dev:
 
 install-all: install install-dev
 	cd sdk/typescript && npm install
-	cd docs && npm install
 
 # Development targets
 dev: dev-docs
 	@echo "Starting CinchDB development environment..."
 
 dev-docs:
-	cd docs && npm run dev
+	uv run mkdocs serve
 
 # Python-specific targets
 test-python:
 	uv run pytest tests/
 
 test-unit:
-	uv run pytest tests/unit/ -v
+	uv run pytest -vv tests/unit/ -v
 
 test-python-integration:
-	uv run pytest tests/integration/ -v
+	uv run pytest -vv tests/integration/ -v
 
 coverage:
-	uv run pytest --cov=cinchdb --cov-report=html --cov-report=term tests/
+	uv run pytest -vv --cov=cinchdb --cov-report=html --cov-report=term tests/
 
 lint-python:
 	uv run ruff check src/ tests/
@@ -95,7 +94,7 @@ build-ts:
 
 # Documentation targets
 build-docs:
-	cd docs && npm run build
+	uv run mkdocs build
 
 # Integration tests (alias for test-python-integration)
 test-integration: test-python-integration
@@ -125,8 +124,7 @@ clean:
 	find . -type f -name ".coverage" -delete
 	rm -rf htmlcov/
 	rm -rf sdk/typescript/dist/
-	rm -rf docs/.next/
-	rm -rf docs/out/
+	rm -rf site/
 
 # Main targets
 all: lint typecheck test

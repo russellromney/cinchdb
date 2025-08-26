@@ -153,8 +153,7 @@ class ColumnManager:
         col_defs = []
         for col in new_columns:
             col_def = f"{col.name} {col.type}"
-            if col.primary_key:
-                col_def += " PRIMARY KEY"
+            # Primary keys are handled at table creation, not as a column attribute
             if not col.nullable:
                 col_def += " NOT NULL"
             if col.default is not None:
@@ -326,7 +325,6 @@ class ColumnManager:
                     type=col.type,
                     nullable=col.nullable,
                     default=col.default,
-                    primary_key=col.primary_key,
                     unique=col.unique,
                 )
                 new_columns.append(new_col)
@@ -339,8 +337,7 @@ class ColumnManager:
         col_defs = []
         for col in new_columns:
             col_def = f"{col.name} {col.type}"
-            if col.primary_key:
-                col_def += " PRIMARY KEY"
+            # Primary keys are handled at table creation, not as a column attribute
             if not col.nullable:
                 col_def += " NOT NULL"
             if col.default is not None:
@@ -397,7 +394,6 @@ class ColumnManager:
                     type=col.type,
                     nullable=col.nullable,
                     default=col.default,
-                    primary_key=col.primary_key,
                     unique=col.unique,
                 )
                 new_columns.append(new_col)
@@ -410,8 +406,7 @@ class ColumnManager:
         col_defs = []
         for col in new_columns:
             col_def = f"{col.name} {col.type}"
-            if col.primary_key:
-                col_def += " PRIMARY KEY"
+            # Primary keys are handled at table creation, not as a column attribute
             if not col.nullable:
                 col_def += " NOT NULL"
             if col.default is not None:
@@ -512,8 +507,7 @@ class ColumnManager:
         col_defs = []
         for col in existing_columns:
             col_def = f"{col.name} {col.type}"
-            if col.primary_key:
-                col_def += " PRIMARY KEY"
+            # Primary keys are handled at table creation, not as a column attribute
             # Apply nullable change to target column
             if col.name == column_name:
                 if not nullable:

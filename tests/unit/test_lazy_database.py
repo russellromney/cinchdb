@@ -8,6 +8,7 @@ import pytest
 from cinchdb.core.initializer import init_project, init_database, ProjectInitializer
 from cinchdb.core.path_utils import list_databases, get_database_path
 from cinchdb.core.database import CinchDB, connect
+from cinchdb.infrastructure.metadata_db import MetadataDB
 
 
 def test_lazy_database_creation():
@@ -22,16 +23,16 @@ def test_lazy_database_creation():
         # Create lazy database
         init_database(project_dir, database_name="lazy-db", lazy=True)
         
-        # Check that metadata file exists
-        meta_file = project_dir / ".cinchdb" / "databases" / ".lazy-db.meta"
-        assert meta_file.exists()
+        # Check that database is in metadata database
+        metadata_db = MetadataDB(project_dir)
+        db_info = metadata_db.get_database("lazy-db")
+        assert db_info is not None
+        assert db_info["name"] == "lazy-db"
+        assert not db_info["materialized"]  # Lazy database not materialized (0 in SQLite)
         
         # Check metadata content
-        with open(meta_file) as f:
-            metadata = json.load(f)
-        assert metadata["name"] == "lazy-db"
-        assert metadata["lazy"] is True
-        assert metadata["initial_branch"] == "main"
+        metadata = json.loads(db_info["metadata"]) if db_info["metadata"] else {}
+        assert metadata.get("initial_branch") == "main"
         
         # Check that database directory does NOT exist
         db_path = get_database_path(project_dir, "lazy-db")
@@ -70,16 +71,19 @@ def test_lazy_database_materialization():
         branch_path = db_path / "branches" / "dev"
         assert branch_path.exists()
         
-        # Check that main tenant was created
-        tenant_db = branch_path / "tenants" / "main.db"
-        assert tenant_db.exists()
+        # Check that tenants directory exists but no tenant files yet (lazy architecture)
+        tenants_dir = branch_path / "tenants"
+        assert tenants_dir.exists()
         
-        # Check that metadata was updated
-        meta_file = project_dir / ".cinchdb" / "databases" / ".lazy-db.meta"
-        with open(meta_file) as f:
-            metadata = json.load(f)
-        assert metadata["lazy"] is False
-        assert "materialized_at" in metadata
+        # Main tenant database should NOT exist until tables are added
+        from cinchdb.core.path_utils import get_tenant_db_path
+        main_tenant_path = get_tenant_db_path(project_dir, "lazy-db", "dev", "main")
+        assert not main_tenant_path.exists()  # Should be lazy until tables are added
+        
+        # Check that metadata was updated in database
+        metadata_db = MetadataDB(project_dir)
+        db_info = metadata_db.get_database("lazy-db")
+        assert db_info["materialized"]  # Now materialized (1 in SQLite)
 
 
 def test_auto_materialization_on_connect():
@@ -131,13 +135,16 @@ def test_lazy_vs_eager_database_size():
         
         # Create lazy database
         init_database(project_dir, database_name="lazy-db", lazy=True)
-        lazy_meta_file = project_dir / ".cinchdb" / "databases" / ".lazy-db.meta"
-        lazy_size = lazy_meta_file.stat().st_size
         
-        # Lazy database should be much smaller (metadata only)
-        assert lazy_size < 1024  # Less than 1KB
-        assert eager_size >= 4096  # At least 4KB (main.db alone is bigger)
-        assert lazy_size < eager_size / 4  # At least 4x smaller
+        # For lazy database, we now use metadata database (not .meta file)
+        # The lazy database info is stored in the metadata.db SQLite file
+        # which is shared by all databases. So we just check that no directory exists
+        lazy_db_path = get_database_path(project_dir, "lazy-db")
+        assert not lazy_db_path.exists()  # No directory for lazy database
+        
+        # Eager database should have actual files (even if small due to optimization)
+        assert eager_size > 0  # Should have some files
+        assert eager_size >= 100  # At least some meaningful content
 
 
 def test_duplicate_lazy_database_fails():
@@ -213,9 +220,9 @@ def test_lazy_database_with_custom_branch():
         init_database(project_dir, database_name="lazy-db", branch_name="develop", lazy=True)
         
         # Check metadata has correct branch
-        meta_file = project_dir / ".cinchdb" / "databases" / ".lazy-db.meta"
-        with open(meta_file) as f:
-            metadata = json.load(f)
+        metadata_db = MetadataDB(project_dir)
+        db_info = metadata_db.get_database("lazy-db")
+        metadata = json.loads(db_info["metadata"]) if db_info["metadata"] else {}
         assert metadata["initial_branch"] == "develop"
         
         # Materialize and verify branch is created

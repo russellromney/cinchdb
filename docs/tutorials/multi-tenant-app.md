@@ -1,274 +1,180 @@
-# Building a Multi-Tenant SaaS Application
+# Multi-Tenant SaaS Tutorial
 
-Learn how to build a multi-tenant SaaS application with CinchDB.
+Build a project management SaaS with isolated customer data and shared schema.
 
-## Overview
+## Problem → Solution
 
-We'll build a project management SaaS where each customer has isolated data but shares the same schema.
+**Problem**: Need to isolate customer data while maintaining identical schema across all customers  
+**Solution**: CinchDB tenants provide data isolation with automatic schema inheritance
 
-## Initial Setup
-
-### 1. Initialize Project
+## Quick Setup
 ```bash
 cinch init project_manager
 cd project_manager
 ```
 
-### 2. Create Schema
 ```bash
-# Create tables on a feature branch
+# Create schema on feature branch
 cinch branch create initial-schema
 cinch branch switch initial-schema
 
-# Users table
-cinch table create users \
-  email:TEXT \
-  name:TEXT \
-  role:TEXT \
-  active:BOOLEAN
+# Create tables
+cinch table create users email:TEXT name:TEXT role:TEXT active:BOOLEAN
+cinch table create projects name:TEXT description:TEXT? owner_id:TEXT status:TEXT
+cinch table create tasks project_id:TEXT title:TEXT description:TEXT? assignee_id:TEXT? status:TEXT priority:TEXT
 
-# Projects table  
-cinch table create projects \
-  name:TEXT \
-  description:TEXT? \
-  owner_id:TEXT \
-  status:TEXT
-
-# Tasks table
-cinch table create tasks \
-  project_id:TEXT \
-  title:TEXT \
-  description:TEXT? \
-  assignee_id:TEXT? \
-  status:TEXT \
-  priority:TEXT
-
-# Merge to main
+# Deploy schema
 cinch branch merge-into-main
 ```
 
 ## Customer Onboarding
 
-### CLI Approach
-```bash
-# Create tenant for new customer
-cinch tenant create acme_corp
+| Method | Use Case |
+|--------|----------|
+| CLI | Manual setup, debugging |
+| Python SDK | Automated onboarding, APIs |
 
-# Add initial admin user
-cinch query "INSERT INTO users (email, name, role, active) \
-  VALUES ('admin@acme.com', 'ACME Admin', 'admin', true)" \
-  --tenant acme_corp
+### CLI Onboarding
+```bash
+cinch tenant create acme_corp
+cinch insert users --tenant acme_corp --data '{"email": "admin@acme.com", "name": "ACME Admin", "role": "admin", "active": true}'
 ```
 
-### Python SDK Approach
+### SDK Onboarding
 ```python
 import cinchdb
-from datetime import datetime
 
-class CustomerOnboarding:
-    def __init__(self, db_name="project_manager"):
-        self.db = cinchdb.connect(db_name)
+def create_customer(company_name: str, admin_email: str):
+    db = cinchdb.connect("project_manager")
     
-    def create_customer(self, company_name: str, admin_email: str):
-        """Onboard a new customer."""
-        # Create tenant
-        tenant_name = company_name.lower().replace(" ", "_")
-        if self.db.is_local:
-            self.db.tenants.create_tenant(tenant_name)
-        
-        # Create new connection for tenant
-        tenant_db = cinchdb.connect(self.db.database, tenant=tenant_name)
-        
-        # Create admin user
-        admin = tenant_db.insert("users", {
-            "email": admin_email,
-            "name": f"{company_name} Admin",
-            "role": "admin",
-            "active": True
+    # Create isolated tenant
+    tenant_name = company_name.lower().replace(" ", "_")
+    db.tenants.create_tenant(tenant_name)
+    
+    # Connect to tenant
+    tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
+    
+    # Setup admin user and welcome project
+    admin = tenant_db.insert("users", {
+        "email": admin_email, "name": f"{company_name} Admin", 
+        "role": "admin", "active": True
+    })
+    
+    project = tenant_db.insert("projects", {
+        "name": "Getting Started", 
+        "description": "Welcome to ProjectManager!",
+        "owner_id": admin["id"], "status": "active"
+    })
+    
+    # Add sample tasks
+    sample_tasks = ["Invite team members", "Create your first project", "Customize settings"]
+    for task in sample_tasks:
+        tenant_db.insert("tasks", {
+            "project_id": project["id"], "title": task,
+            "assignee_id": admin["id"], "status": "todo", "priority": "medium"
         })
-        
-        # Create welcome project
-        project = tenant_db.insert("projects", {
-            "name": "Getting Started",
-            "description": "Welcome to ProjectManager!",
-            "owner_id": admin["id"],
-            "status": "active"
-        })
-        
-        # Add sample tasks
-        tasks = [
-            "Invite team members",
-            "Create your first project",
-            "Customize settings"
-        ]
-        
-        for i, task in enumerate(tasks):
-            tenant_db.insert("tasks", {
-                "project_id": project["id"],
-                "title": task,
-                "assignee_id": admin["id"],
-                "status": "todo",
-                "priority": "medium"
-            })
-        
-        return {
-            "tenant": tenant_name,
-            "admin_id": admin["id"],
-            "project_id": project["id"]
-        }
+    
+    return {"tenant": tenant_name, "admin_id": admin["id"], "project_id": project["id"]}
 
 # Usage
-onboarding = CustomerOnboarding()
-result = onboarding.create_customer("ACME Corp", "admin@acme.com")
+result = create_customer("ACME Corp", "admin@acme.com")
 print(f"Created tenant: {result['tenant']}")
 ```
 
 ## Multi-Tenant API
 
-### FastAPI Application
+**Key Pattern**: Validate tenant access before querying tenant-specific data
 ```python
-from fastapi import FastAPI, HTTPException, Depends
-from typing import Optional
+from fastapi import FastAPI, HTTPException, Depends, Header
 import cinchdb
 
 app = FastAPI()
 
-# Database connection
 def get_db():
     return cinchdb.connect("project_manager")
 
-# Tenant from header
-def get_tenant(tenant: str = Header(...)):
-    return tenant
-
-# User authentication (simplified)
 def get_current_user(token: str = Header(...)):
-    # Validate token and return user
+    # Validate token and return user info
     return {"id": "user-123", "tenant": "acme_corp"}
 
 @app.get("/projects")
-def list_projects(
-    tenant: str = Depends(get_tenant),
-    user: dict = Depends(get_current_user),
-    db = Depends(get_db)
-):
-    # Validate tenant access
+def list_projects(tenant: str = Header(...), user: dict = Depends(get_current_user), db = Depends(get_db)):
+    # Security: validate tenant access
     if user["tenant"] != tenant:
         raise HTTPException(403, "Access denied")
     
-    # Query tenant data
+    # Query tenant-isolated data
     tenant_db = cinchdb.connect(db.database, tenant=tenant)
-    projects = tenant_db.query(
-        "SELECT * FROM projects WHERE owner_id = ?",
-        [user["id"]]
-    )
-    
+    projects = tenant_db.query("SELECT * FROM projects WHERE owner_id = ?", [user["id"]])
     return {"projects": projects}
 
 @app.post("/projects")
-def create_project(
-    project: dict,
-    tenant: str = Depends(get_tenant),
-    user: dict = Depends(get_current_user),
-    db = Depends(get_db)
-):
+def create_project(project: dict, tenant: str = Header(...), user: dict = Depends(get_current_user), db = Depends(get_db)):
     tenant_db = cinchdb.connect(db.database, tenant=tenant)
-    
-    new_project = tenant_db.insert("projects", {
-        **project,
-        "owner_id": user["id"],
-        "status": "active"
-    })
-    
+    new_project = tenant_db.insert("projects", {**project, "owner_id": user["id"], "status": "active"})
     return new_project
 
 @app.get("/tasks/{project_id}")
-def list_tasks(
-    project_id: str,
-    tenant: str = Depends(get_tenant),
-    user: dict = Depends(get_current_user),
-    db = Depends(get_db)
-):
+def list_tasks(project_id: str, tenant: str = Header(...), user: dict = Depends(get_current_user), db = Depends(get_db)):
     tenant_db = cinchdb.connect(db.database, tenant=tenant)
     
-    # Verify project access
-    project = tenant_db.query(
-        "SELECT * FROM projects WHERE id = ? AND owner_id = ?",
-        [project_id, user["id"]]
-    )
-    
+    # Verify ownership
+    project = tenant_db.query("SELECT * FROM projects WHERE id = ? AND owner_id = ?", [project_id, user["id"]])
     if not project:
         raise HTTPException(404, "Project not found")
     
-    # Get tasks
-    tasks = tenant_db.query(
-        "SELECT * FROM tasks WHERE project_id = ?",
-        [project_id]
-    )
-    
+    tasks = tenant_db.query("SELECT * FROM tasks WHERE project_id = ?", [project_id])
     return {"tasks": tasks}
 ```
 
 ## Tenant Management
 
-### Admin Dashboard
+**Use Case**: Monitor usage, backup data, analyze tenant activity
 ```python
-class TenantAdmin:
-    def __init__(self):
-        self.db = cinchdb.connect("project_manager")
+import cinchdb
+import json
+
+def get_tenant_stats():
+    """Get statistics for all tenants."""
+    db = cinchdb.connect("project_manager")
+    # Get statistics for all tenants
     
-    def get_all_tenants_stats(self):
-        """Get statistics for all tenants."""
-        if not self.db.is_local:
-            raise RuntimeError("Admin functions require local access")
-        
-        tenants = self.db.tenants.list_tenants()
-        stats = []
-        
-        for tenant in tenants:
-            tenant_db = cinchdb.connect(self.db.database, tenant=tenant.name)
-            
-            # Get counts
-            users = tenant_db.query("SELECT COUNT(*) as count FROM users")[0]["count"]
-            projects = tenant_db.query("SELECT COUNT(*) as count FROM projects")[0]["count"]
-            tasks = tenant_db.query("SELECT COUNT(*) as count FROM tasks")[0]["count"]
-            
-            # Get activity
-            active_users = tenant_db.query("""
-                SELECT COUNT(DISTINCT assignee_id) as count 
-                FROM tasks 
-                WHERE updated_at > datetime('now', '-7 days')
-            """)[0]["count"]
-            
-            stats.append({
-                "tenant": tenant.name,
-                "users": users,
-                "projects": projects,
-                "tasks": tasks,
-                "active_users_7d": active_users,
-                "created_at": tenant.created_at
-            })
-        
-        return stats
+    tenants = db.tenants.list_tenants()
+    stats = []
     
-    def backup_tenant(self, tenant_name: str, backup_path: str):
-        """Backup tenant data."""
-        tenant_db = cinchdb.connect(self.db.database, tenant=tenant_name)
+    for tenant in tenants:
+        tenant_db = cinchdb.connect(db.database, tenant=tenant.name)
         
-        # Export all tables
-        backup_data = {}
-        tables = ["users", "projects", "tasks"]
+        # Collect metrics
+        users = tenant_db.query("SELECT COUNT(*) as count FROM users")[0]["count"]
+        projects = tenant_db.query("SELECT COUNT(*) as count FROM projects")[0]["count"]
+        tasks = tenant_db.query("SELECT COUNT(*) as count FROM tasks")[0]["count"]
         
-        for table in tables:
-            data = tenant_db.query(f"SELECT * FROM {table}")
-            backup_data[table] = data
+        active_users = tenant_db.query("""
+            SELECT COUNT(DISTINCT assignee_id) as count FROM tasks 
+            WHERE updated_at > datetime('now', '-7 days')
+        """)[0]["count"]
         
-        # Save to file
-        import json
-        with open(backup_path, "w") as f:
-            json.dump(backup_data, f, indent=2)
-        
-        return len(backup_data)
+        stats.append({
+            "tenant": tenant.name, "users": users, "projects": projects, 
+            "tasks": tasks, "active_users_7d": active_users, "created_at": tenant.created_at
+        })
+    
+    return stats
+
+def backup_tenant(tenant_name: str, backup_path: str):
+    """Export tenant data to JSON."""
+    tenant_db = cinchdb.connect("project_manager", tenant=tenant_name)
+    
+    # Export all tables
+    backup_data = {}
+    for table in ["users", "projects", "tasks"]:
+        backup_data[table] = tenant_db.query(f"SELECT * FROM {table}")
+    
+    with open(backup_path, "w") as f:
+        json.dump(backup_data, f, indent=2)
+    
+    return len(backup_data)
 ```
 
 ## Next Steps

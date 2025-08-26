@@ -75,42 +75,17 @@ def create(
 
     config, config_data = get_config_with_data()
 
-    # Create database directory structure
-    db_path = config.project_dir / ".cinchdb" / "databases" / name
-    if db_path.exists():
+    # Use the ProjectInitializer to create the database properly
+    from cinchdb.core.initializer import ProjectInitializer
+    
+    initializer = ProjectInitializer(config.project_dir)
+    
+    try:
+        # Create database using initializer (lazy by default)
+        initializer.init_database(name, description=description, lazy=True)
+    except FileExistsError:
         console.print(f"[red]❌ Database '{name}' already exists[/red]")
         raise typer.Exit(1)
-
-    # Create the database structure
-    db_path.mkdir(parents=True)
-    branches_dir = db_path / "branches"
-    branches_dir.mkdir()
-
-    # Create main branch
-    main_branch = branches_dir / "main"
-    main_branch.mkdir()
-
-    # Create main tenant
-    tenants_dir = main_branch / "tenants"
-    tenants_dir.mkdir()
-    main_tenant = tenants_dir / "main.db"
-    main_tenant.touch()
-
-    # Create branch metadata
-    import json
-    from datetime import datetime, timezone
-
-    metadata = {
-        "name": "main",
-        "parent": None,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    with open(main_branch / "metadata.json", "w") as f:
-        json.dump(metadata, f, indent=2)
-
-    # Create empty changes file
-    with open(main_branch / "changes.json", "w") as f:
-        json.dump([], f)
 
     console.print(f"[green]✅ Created database '{name}'[/green]")
 
@@ -134,11 +109,15 @@ def delete(
         raise typer.Exit(1)
 
     config, config_data = get_config_with_data()
-    db_path = config.project_dir / ".cinchdb" / "databases" / name
-
-    if not db_path.exists():
-        console.print(f"[red]❌ Database '{name}' does not exist[/red]")
-        raise typer.Exit(1)
+    
+    # Check if database exists in metadata
+    from cinchdb.infrastructure.metadata_db import MetadataDB
+    
+    with MetadataDB(config.project_dir) as metadata_db:
+        db_info = metadata_db.get_database(name)
+        if not db_info:
+            console.print(f"[red]❌ Database '{name}' does not exist[/red]")
+            raise typer.Exit(1)
 
     # Confirmation
     if not force:
@@ -147,10 +126,17 @@ def delete(
             console.print("[yellow]Cancelled[/yellow]")
             raise typer.Exit(0)
 
-    # Delete the database
+    # Delete the database from metadata and filesystem if materialized
     import shutil
-
-    shutil.rmtree(db_path)
+    
+    with MetadataDB(config.project_dir) as metadata_db:
+        # Delete from metadata
+        metadata_db.delete_database(db_info['id'])
+    
+    # Delete physical files if they exist
+    db_path = config.project_dir / ".cinchdb" / "databases" / name
+    if db_path.exists():
+        shutil.rmtree(db_path)
 
     # If this was the active database, switch to main
     if config_data.active_database == name:
@@ -168,31 +154,40 @@ def info(
     config, config_data = get_config_with_data()
     db_name = name or config_data.active_database
 
-    db_path = config.project_dir / ".cinchdb" / "databases" / db_name
-    if not db_path.exists():
-        console.print(f"[red]❌ Database '{db_name}' does not exist[/red]")
-        raise typer.Exit(1)
-
-    # Count branches
-    branches_path = db_path / "branches"
-    branch_count = len(list(branches_path.iterdir())) if branches_path.exists() else 0
+    # Check if database exists in metadata
+    from cinchdb.infrastructure.metadata_db import MetadataDB
+    
+    with MetadataDB(config.project_dir) as metadata_db:
+        db_info = metadata_db.get_database(db_name)
+        if not db_info:
+            console.print(f"[red]❌ Database '{db_name}' does not exist[/red]")
+            raise typer.Exit(1)
+        
+        # Get branch info from metadata
+        branches = metadata_db.list_branches(db_info['id'])
+        branch_count = len(branches)
 
     # Get active branch
     active_branch = config_data.active_branch
-
+    
     # Display info
     console.print(f"\n[bold]Database: {db_name}[/bold]")
-    console.print(f"Location: {db_path}")
+    console.print(f"Status: {'Materialized' if db_info.get('materialized') else 'Lazy (not materialized)'}")
     console.print(f"Branches: {branch_count}")
     console.print(f"Active Branch: {active_branch}")
     console.print(f"Protected: {'Yes' if db_name == 'main' else 'No'}")
+    
+    # Show description if present
+    if db_info.get('description'):
+        console.print(f"Description: {db_info['description']}")
 
     # List branches
     if branch_count > 0:
         console.print("\n[bold]Branches:[/bold]")
-        for branch_dir in sorted(branches_path.iterdir()):
-            if branch_dir.is_dir():
-                branch_name = branch_dir.name
+        with MetadataDB(config.project_dir) as metadata_db:
+            branches = metadata_db.list_branches(db_info['id'])
+            for branch in sorted(branches, key=lambda x: x['name']):
+                branch_name = branch['name']
                 is_active = " (active)" if branch_name == active_branch else ""
                 console.print(f"  - {branch_name}{is_active}")
 
@@ -208,11 +203,14 @@ def switch(
     name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
 
-    # Check if database exists
-    db_path = config.project_dir / ".cinchdb" / "databases" / name
-    if not db_path.exists():
-        console.print(f"[red]❌ Database '{name}' does not exist[/red]")
-        raise typer.Exit(1)
+    # Check if database exists in metadata
+    from cinchdb.infrastructure.metadata_db import MetadataDB
+    
+    with MetadataDB(config.project_dir) as metadata_db:
+        db_info = metadata_db.get_database(name)
+        if not db_info:
+            console.print(f"[red]❌ Database '{name}' does not exist[/red]")
+            raise typer.Exit(1)
 
     # Switch
     set_active_database(config, name)

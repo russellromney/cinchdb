@@ -51,7 +51,8 @@ class TestTenantManager:
         assert new_tenant.description == "Customer 1 data"
         assert not new_tenant.is_main
 
-        # Verify database file was created
+        # Verify database file was created in the correct shard directory
+        # customer1 hash = de
         db_path = (
             tenant_manager.project_root
             / ".cinchdb"
@@ -60,6 +61,7 @@ class TestTenantManager:
             / "branches"
             / "main"
             / "tenants"
+            / "de"  # shard directory
             / "customer1.db"
         )
         assert db_path.exists()
@@ -70,34 +72,27 @@ class TestTenantManager:
         assert sorted([t.name for t in tenants]) == ["customer1", "main"]
 
     def test_create_tenant_copies_schema(self, tenant_manager):
-        """Test that creating a tenant copies schema from main."""
-        # Create a table in main tenant first
-        main_db_path = (
-            tenant_manager.project_root
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "tenants"
-            / "main.db"
+        """Test that creating a tenant copies schema from __empty__ template."""
+        # Create a table using TableManager which will track the change
+        from cinchdb.managers.table import TableManager
+        from cinchdb.models import Column
+        
+        table_mgr = TableManager(
+            tenant_manager.project_root, 
+            tenant_manager.database, 
+            tenant_manager.branch,
+            "main"
         )
-
-        with DatabaseConnection(main_db_path) as conn:
-            conn.execute("""
-                CREATE TABLE users (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT
-                )
-            """)
-            conn.commit()
+        
+        # Create a table which will be added to __empty__ template
+        table_mgr.create_table("users", [
+            Column(name="name", type="TEXT", nullable=False)
+        ])
 
         # Create new eager tenant to test schema copying
         tenant_manager.create_tenant("customer1", lazy=False)
 
-        # Check schema was copied
+        # Check schema was copied (customer1 hash = de)
         customer_db_path = (
             tenant_manager.project_root
             / ".cinchdb"
@@ -106,6 +101,7 @@ class TestTenantManager:
             / "branches"
             / "main"
             / "tenants"
+            / "de"  # shard directory
             / "customer1.db"
         )
 
@@ -115,6 +111,15 @@ class TestTenantManager:
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
             )
             assert result.fetchone() is not None
+            
+            # Check it has the expected columns (id, name, created_at, updated_at)
+            cursor = conn.execute("PRAGMA table_info(users)")
+            columns = cursor.fetchall()
+            col_names = [col["name"] for col in columns]
+            assert "id" in col_names
+            assert "name" in col_names
+            assert "created_at" in col_names
+            assert "updated_at" in col_names
 
     def test_create_tenant_duplicate_fails(self, tenant_manager):
         """Test creating a tenant with duplicate name fails."""
@@ -137,7 +142,7 @@ class TestTenantManager:
         assert len(tenants) == 1
         assert tenants[0].name == "main"
 
-        # Database file should be gone
+        # Database file should be gone (customer1 hash = de)
         db_path = (
             tenant_manager.project_root
             / ".cinchdb"
@@ -146,6 +151,7 @@ class TestTenantManager:
             / "branches"
             / "main"
             / "tenants"
+            / "de"  # shard directory
             / "customer1.db"
         )
         assert not db_path.exists()
@@ -162,7 +168,7 @@ class TestTenantManager:
 
     def test_copy_tenant(self, tenant_manager):
         """Test copying a tenant."""
-        # Add some data to main tenant
+        # Add some data to main tenant (main hash = 0d)
         main_db_path = (
             tenant_manager.project_root
             / ".cinchdb"
@@ -171,6 +177,7 @@ class TestTenantManager:
             / "branches"
             / "main"
             / "tenants"
+            / "0d"  # shard directory
             / "main.db"
         )
 
@@ -189,7 +196,7 @@ class TestTenantManager:
 
         assert new_tenant.name == "customer1"
 
-        # Check data was copied
+        # Check data was copied (customer1 hash = de)
         customer_db_path = (
             tenant_manager.project_root
             / ".cinchdb"
@@ -198,6 +205,7 @@ class TestTenantManager:
             / "branches"
             / "main"
             / "tenants"
+            / "de"  # shard directory
             / "customer1.db"
         )
 
@@ -227,7 +235,7 @@ class TestTenantManager:
         assert "customer1" not in tenant_names
         assert "customer2" in tenant_names
 
-        # Check files were renamed
+        # Check files were renamed (customer1 hash = de, customer2 hash = c8)
         old_path = (
             tenant_manager.project_root
             / ".cinchdb"
@@ -236,6 +244,7 @@ class TestTenantManager:
             / "branches"
             / "main"
             / "tenants"
+            / "de"  # old shard directory
             / "customer1.db"
         )
         new_path = (
@@ -246,6 +255,7 @@ class TestTenantManager:
             / "branches"
             / "main"
             / "tenants"
+            / "c8"  # new shard directory
             / "customer2.db"
         )
         assert not old_path.exists()
@@ -265,16 +275,13 @@ class TestTenantManager:
 
     def test_get_tenant_connection(self, tenant_manager):
         """Test getting a database connection for a tenant."""
-        conn = tenant_manager.get_tenant_connection("main")
+        with tenant_manager.get_tenant_connection("main") as conn:
+            # Should be able to execute queries
+            conn.execute("CREATE TABLE test (id INTEGER)")
+            conn.commit()
 
-        # Should be able to execute queries
-        conn.execute("CREATE TABLE test (id INTEGER)")
-        conn.commit()
-
-        # Verify table exists
-        result = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='test'"
-        )
-        assert result.fetchone() is not None
-
-        conn.close()
+            # Verify table exists
+            result = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='test'"
+            )
+            assert result.fetchone() is not None

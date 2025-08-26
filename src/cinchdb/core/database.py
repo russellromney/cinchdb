@@ -119,12 +119,14 @@ class CinchDB:
         if not self.is_local:
             return
             
-        # Check if this is a lazy database
-        db_path = self.project_dir / ".cinchdb" / "databases" / self.database
-        db_meta_path = self.project_dir / ".cinchdb" / "databases" / f".{self.database}.meta"
+        # Check if this is a lazy database using metadata DB
+        from cinchdb.infrastructure.metadata_db import MetadataDB
         
-        # If database directory doesn't exist but metadata does, materialize it
-        if not db_path.exists() and db_meta_path.exists():
+        with MetadataDB(self.project_dir) as metadata_db:
+            db_info = metadata_db.get_database(self.database)
+        
+        if db_info and not db_info['materialized']:
+            # Database exists in metadata but not materialized
             from cinchdb.core.initializer import ProjectInitializer
             initializer = ProjectInitializer(self.project_dir)
             initializer.materialize_database(self.database)
@@ -579,6 +581,122 @@ class CinchDB:
                 changes.append(Change(**data))
             return changes
 
+    def optimize_tenant(self, tenant_name: str = None, force: bool = False) -> bool:
+        """Optimize a tenant's storage with VACUUM and page size adjustment.
+
+        Args:
+            tenant_name: Name of the tenant to optimize (default: current tenant)
+            force: If True, always perform optimization
+
+        Returns:
+            True if optimization was performed, False otherwise
+            
+        Examples:
+            # Optimize current tenant
+            db.optimize_tenant()
+            
+            # Optimize specific tenant
+            db.optimize_tenant("store_west")
+            
+            # Force optimization even if not needed
+            db.optimize_tenant(force=True)
+        """
+        if self.is_local:
+            tenant_to_optimize = tenant_name or self.tenant
+            return self.tenants.optimize_tenant_storage(tenant_to_optimize, force=force)
+        else:
+            raise NotImplementedError("Remote tenant optimization not implemented")
+
+    def get_tenant_size(self, tenant_name: str = None) -> dict:
+        """Get storage size information for a tenant.
+        
+        Args:
+            tenant_name: Name of tenant (default: current tenant)
+            
+        Returns:
+            Dictionary with size information:
+            - name: Tenant name
+            - materialized: Whether tenant is materialized
+            - size_bytes: Size in bytes (0 if lazy)
+            - size_kb: Size in KB
+            - size_mb: Size in MB
+            - page_size: SQLite page size (if materialized)
+            - page_count: Number of pages (if materialized)
+            
+        Examples:
+            # Get size of current tenant
+            size = db.get_tenant_size()
+            print(f"Current tenant uses {size['size_mb']:.2f} MB")
+            
+            # Get size of specific tenant
+            size = db.get_tenant_size("store_west")
+            if size['materialized']:
+                print(f"Page size: {size['page_size']} bytes")
+        """
+        if self.is_local:
+            tenant_to_check = tenant_name or self.tenant
+            return self.tenants.get_tenant_size(tenant_to_check)
+        else:
+            raise NotImplementedError("Remote tenant size query not implemented")
+    
+    def get_storage_info(self) -> dict:
+        """Get storage size information for all tenants in current branch.
+        
+        Returns:
+            Dictionary with:
+            - tenants: List of individual tenant size info (sorted by size)
+            - total_size_bytes: Total size of all materialized tenants
+            - total_size_mb: Total size in MB
+            - lazy_count: Number of lazy tenants
+            - materialized_count: Number of materialized tenants
+            
+        Examples:
+            # Get storage overview
+            info = db.get_storage_info()
+            print(f"Total storage: {info['total_size_mb']:.2f} MB")
+            print(f"Materialized tenants: {info['materialized_count']}")
+            print(f"Lazy tenants: {info['lazy_count']}")
+            
+            # List largest tenants
+            for tenant in info['tenants'][:5]:  # Top 5
+                if tenant['materialized']:
+                    print(f"{tenant['name']}: {tenant['size_mb']:.2f} MB")
+        """
+        if self.is_local:
+            return self.tenants.get_all_tenant_sizes()
+        else:
+            raise NotImplementedError("Remote storage info not implemented")
+    
+    def optimize_all_tenants(self, force: bool = False) -> dict:
+        """Optimize storage for all tenants in current branch.
+
+        This is designed to be called periodically to:
+        - Reclaim unused space with VACUUM
+        - Adjust page sizes as databases grow
+        - Keep small databases compact
+
+        Args:
+            force: If True, optimize all tenants regardless of size
+
+        Returns:
+            Dictionary with optimization results:
+            - optimized: List of tenant names that were optimized
+            - skipped: List of tenant names that were skipped
+            - errors: List of tuples (tenant_name, error_message)
+            
+        Examples:
+            # Run periodic optimization
+            results = db.optimize_all_tenants()
+            print(f"Optimized {len(results['optimized'])} tenants")
+            
+            # Force optimization of all tenants
+            results = db.optimize_all_tenants(force=True)
+        """
+        if self.is_local:
+            return self.tenants.optimize_all_tenants(force=force)
+        else:
+            raise NotImplementedError("Remote tenant optimization not implemented")
+
     def close(self):
         """Close any open connections."""
         if not self.is_local and self._session:
@@ -650,17 +768,6 @@ def connect_api(
 
     Returns:
         CinchDB connection instance for remote API
-
-    Examples:
-        # Connect to remote API
-        db = connect_api("https://api.example.com", "your-api-key", "mydb")
-
-        # Connect to specific branch
-        db = connect_api("https://api.example.com", "your-api-key", "mydb", "dev")
-
-        # Use with context manager
-        with connect_api("https://api.example.com", "key", "mydb") as db:
-            results = db.query("SELECT * FROM users")
     """
     return CinchDB(
         database=database,
@@ -669,3 +776,5 @@ def connect_api(
         api_url=api_url,
         api_key=api_key,
     )
+
+

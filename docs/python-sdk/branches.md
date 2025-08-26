@@ -1,92 +1,72 @@
 # Branch Operations
 
-Work with database branches using the Python SDK.
+Database branching with the Python SDK.
 
-## Working with Branches
+## Problem → Solution
 
-### Connect to Specific Branch
+**Problem**: Need to develop schema changes safely without breaking production  
+**Solution**: CinchDB branches isolate changes, enable testing, and allow safe merging
+
+## Quick Reference
+
+| Operation | Method | Example |
+|-----------|--------|---------|
+| Connect to branch | `cinchdb.connect()` | `cinchdb.connect("myapp", branch="dev")` |
+| List branches | `db.branches.list_branches()` | Local only |
+| Create branch | `db.branches.create_branch()` | Local only |
+| Merge branches | `db.merge.merge_branches()` | Local only |
+
+## Connecting to Branches
+
 ```python
-# Connect to specific branch
+# Connect to different branches
+main_db = cinchdb.connect("myapp", branch="main")
 dev_db = cinchdb.connect("myapp", branch="development")
-
-# Connect to multiple branches
-main_db = cinchdb.connect("myapp", branch="main")
-feature_db = cinchdb.connect("myapp", branch="feature.new-schema")
-```
-
-### Compare Branch Schemas
-```python
-# Work with multiple branches
-main_db = cinchdb.connect("myapp", branch="main")
 feature_db = cinchdb.connect("myapp", branch="feature.new-schema")
 
-# Compare schemas
-main_tables = main_db.query("SELECT name FROM sqlite_master WHERE type='table'")
-feature_tables = feature_db.query("SELECT name FROM sqlite_master WHERE type='table'")
-
-new_tables = set(t["name"] for t in feature_tables) - set(t["name"] for t in main_tables)
+# Compare schemas between branches
+main_tables = set(t["name"] for t in main_db.query("SELECT name FROM sqlite_master WHERE type='table'"))
+feature_tables = set(t["name"] for t in feature_db.query("SELECT name FROM sqlite_master WHERE type='table'"))
+new_tables = feature_tables - main_tables
 print(f"New tables in feature branch: {new_tables}")
 ```
 
-## Branch Management (Local Only)
+## Branch Management
 
-### List Branches
 ```python
 db = cinchdb.connect("myapp")
 
-if db.is_local:
-    branches = db.branches.list_branches()
-    for branch in branches:
-        print(f"Branch: {branch.name}")
-        print(f"Created: {branch.created_at}")
+# List all branches
+branches = db.branches.list_branches()
+for branch in branches:
+    print(f"Branch: {branch.name} (created: {branch.created_at})")
+
+# Create new branch
+db.branches.create_branch("feature.add-products")
+
+# Create from specific source
+db.branches.create_branch("hotfix.bug-123", source_branch="main")
+
+# Delete old branch (cannot delete main or active branch)
+db.branches.delete_branch("old-feature")
 ```
 
-### Create Branch
-```python
-if db.is_local:
-    # Create from current branch
-    db.branches.create_branch("feature.add-products")
-    
-    # Create from specific branch
-    db.branches.create_branch("hotfix.bug-123", source_branch="main")
-```
+## Tracking Changes
 
-### Delete Branch
-```python
-if db.is_local:
-    # Cannot delete main or active branch
-    db.branches.delete_branch("old-feature")
-```
-
-## Working with Branch Changes
-
-### Track Changes
 ```python
 # Make changes on feature branch
 feature_db = cinchdb.connect("myapp", branch="feature.new-schema")
-feature_db.create_table("products", [
-    Column(name="name", type="TEXT"),
-    Column(name="price", type="REAL")
-])
+feature_db.tables.create_table("products", [Column(name="name", type="TEXT"), Column(name="price", type="REAL")])
 
 # View changes
-if feature_db.is_local:
-    changes = feature_db.branches.get_branch_changes("feature.new-schema")
-    for change in changes:
-        print(f"Change: {change.type} - {change.description}")
-```
+changes = feature_db.branches.get_branch_changes("feature.new-schema")
+for change in changes:
+    print(f"{change.type}: {change.description}")
 
-### Compare Branches
-```python
+# Compare schemas between branches
 def compare_schemas(db1, db2):
-    """Compare schemas between two database connections."""
-    # Get tables from both branches
-    tables1 = set(row["name"] for row in db1.query(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    ))
-    tables2 = set(row["name"] for row in db2.query(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    ))
+    tables1 = set(row["name"] for row in db1.query("SELECT name FROM sqlite_master WHERE type='table'"))
+    tables2 = set(row["name"] for row in db2.query("SELECT name FROM sqlite_master WHERE type='table'"))
     
     return {
         "only_in_first": tables1 - tables2,
@@ -94,35 +74,29 @@ def compare_schemas(db1, db2):
         "in_both": tables1 & tables2
     }
 
-# Compare main and feature branch
+# Usage
 main_db = cinchdb.connect("myapp", branch="main")
 feature_db = cinchdb.connect("myapp", branch="feature.new")
 diff = compare_schemas(main_db, feature_db)
+print(f"New in feature: {diff['only_in_second']}")
 ```
 
-## Merging Branches (Local Only)
+## Merging Branches
 
-### Simple Merge
 ```python
-if db.is_local:
-    # Merge feature into main
-    db.merge.merge_branches("feature.add-users", "main")
-```
+# Simple merge
+db = cinchdb.connect("myapp")
+db.merge.merge_branches("feature.add-users", "main")
 
-### Merge Workflow
-```python
+# Safe merge with validation
 def safe_merge(db, source_branch: str, target_branch: str = "main"):
-    """Safely merge branches with validation."""
-    if not db.is_local:
-        raise RuntimeError("Merging requires local connection")
-    
+    """Safely merge with validation."""
     # Check if merge is possible
-    can_merge = db.merge.can_merge(source_branch, target_branch)
-    if not can_merge:
+    if not db.merge.can_merge(source_branch, target_branch):
         print("Cannot merge - branches have diverged")
         return False
     
-    # Review changes
+    # Review changes first
     changes = db.branches.get_branch_changes(source_branch)
     print(f"Changes to merge: {len(changes)}")
     for change in changes:
@@ -138,187 +112,136 @@ def safe_merge(db, source_branch: str, target_branch: str = "main"):
         return False
 ```
 
-## Branch Patterns
+## Common Workflows
 
 ### Feature Development
 ```python
-# 1. Create feature branch
+# Standard feature workflow
 db = cinchdb.connect("myapp")
-if db.is_local:
-    db.branches.create_branch("feature.shopping-cart")
+# 1. Create feature branch
+db.branches.create_branch("feature.shopping-cart")
 
-# 2. Connect to feature branch
+# 2. Make changes
 feature_db = cinchdb.connect("myapp", branch="feature.shopping-cart")
-
-# 3. Make changes
-feature_db.create_table("cart_items", [
+feature_db.tables.create_table("cart_items", [
     Column(name="user_id", type="TEXT"),
     Column(name="product_id", type="TEXT"),
     Column(name="quantity", type="INTEGER")
 ])
 
-# 4. Test changes
-test_data = feature_db.insert("cart_items", {
-    "user_id": "test-user",
-    "product_id": "test-product",
-    "quantity": 2
-})
+# 3. Test changes
+test_data = feature_db.insert("cart_items", {"user_id": "test-user", "product_id": "test-product", "quantity": 2})
 
-# 5. Merge when ready
-if db.is_local:
-    db.merge.merge_branches("feature.shopping-cart", "main")
+# 4. Merge when ready
+db.merge.merge_branches("feature.shopping-cart", "main")
 ```
 
 ### Hotfix Workflow
 ```python
-# 1. Create hotfix from main
-main_db = cinchdb.connect("myapp", branch="main")
-if main_db.is_local:
-    main_db.branches.create_branch("hotfix.critical-bug")
+# Quick production fix
+db = cinchdb.connect("myapp")
+# 1. Create hotfix branch
+db.branches.create_branch("hotfix.critical-bug", source_branch="main")
 
-# 2. Connect to hotfix branch
+# 2. Apply fix
 hotfix_db = cinchdb.connect("myapp", branch="hotfix.critical-bug")
+hotfix_db.tables.add_column("users", Column(name="email_verified", type="BOOLEAN", default=False))
 
-# 3. Apply fix
-hotfix_db.query("ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT false")
-
-# 4. Quick merge back
-if main_db.is_local:
-    main_db.merge.merge_branches("hotfix.critical-bug", "main")
+# 3. Merge immediately
+db.merge.merge_branches("hotfix.critical-bug", "main")
 ```
 
-### Experimental Features
+### Experimental Development
 ```python
-# Create experimental branch
+# Safe experimentation
 db = cinchdb.connect("myapp")
-if db.is_local:
-    db.branches.create_branch("experimental.new-feature")
+db.branches.create_branch("experimental.new-algorithm")
+exp_db = cinchdb.connect("myapp", branch="experimental.new-algorithm")
 
-# Connect to experimental branch
-exp_db = cinchdb.connect("myapp", branch="experimental.new-feature")
-
-# Try risky changes
 try:
-    exp_db.create_table("experimental_data", [...])
-    exp_db.query("CREATE TRIGGER ...")
-    
-    # Test thoroughly
+    # Try risky changes
+    exp_db.tables.create_table("experimental_data", [Column(name="result", type="TEXT")])
     results = exp_db.query("SELECT * FROM experimental_data")
     
-    if validate_results(results):
-        # Merge if successful
-        if db.is_local:
-            db.merge.merge_branches("experimental.new-feature", "main")
+    # Merge if successful, delete if not
+    if validate_experiment(results):
+        db.merge.merge_branches("experimental.new-algorithm", "main")
     else:
-        # Abandon if not working
-        if db.is_local:
-            db.branches.delete_branch("experimental.new-feature")
+        db.branches.delete_branch("experimental.new-algorithm")
 except Exception as e:
     print(f"Experiment failed: {e}")
-    # Branch can be deleted without affecting main
+    db.branches.delete_branch("experimental.new-algorithm")
 ```
 
-## Multi-Tenant Branches
+## Multi-Tenant Branching
 
-Branches apply to all tenants:
+**Schema changes apply to all tenants**: Branches affect schema, tenants isolate data.
 
 ```python
-# Create branch
+# Schema changes affect all tenants
 db = cinchdb.connect("myapp")
-if db.is_local:
-    db.branches.create_branch("feature.multi-tenant-update")
+db.branches.create_branch("feature.tenant-settings")
 
-# Connect to feature branch
-feature_db = cinchdb.connect("myapp", branch="feature.multi-tenant-update")
+# Make schema changes on branch
+feature_db = cinchdb.connect("myapp", branch="feature.tenant-settings")
+feature_db.tables.create_table("tenant_settings", [Column(name="key", type="TEXT"), Column(name="value", type="TEXT")])
 
-# Changes apply to all tenants
-feature_db.create_table("tenant_settings", [
-    Column(name="key", type="TEXT"),
-    Column(name="value", type="TEXT")
-])
-
-# Verify across tenants
+# Verify schema exists for all tenants on this branch
 for tenant in ["main", "customer_a", "customer_b"]:
-    tenant_db = cinchdb.connect("myapp", branch="feature.multi-tenant-update", tenant=tenant)
-    tables = tenant_db.query(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='tenant_settings'"
-    )
-    assert len(tables) == 1
+    tenant_db = cinchdb.connect("myapp", branch="feature.tenant-settings", tenant=tenant)
+    tables = tenant_db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='tenant_settings'")
+    assert len(tables) == 1  # Schema exists for all tenants
+    
+    # But data is isolated
+    tenant_db.insert("tenant_settings", {"key": f"theme_{tenant}", "value": "dark"})
 ```
 
 ## Best Practices
 
-### 1. Branch Naming
-```python
-# Good branch names
-"feature.user-authentication"
-"bugfix.login-error"
-"hotfix.security-patch"
-"release.v2.0"
-"experimental.new-algorithm"
+### Naming Convention
+- `feature.description` - New functionality
+- `bugfix.issue-name` - Bug fixes
+- `hotfix.urgent-fix` - Production emergencies
+- `release.v1.2.3` - Release preparation
+- `experimental.idea` - Risky experiments
 
-# Include ticket numbers
-"feature.PROJ-123-add-payments"
-"bugfix.BUG-456-fix-crash"
-```
+**Include ticket numbers**: `feature.PROJ-123-add-payments`
 
-### 2. Branch Lifecycle
+### Standard Lifecycle
 ```python
 def feature_lifecycle(db, feature_name: str, implement_func):
-    """Standard feature branch lifecycle."""
+    """Complete feature development lifecycle."""
     branch_name = f"feature.{feature_name}"
     
-    # Create branch
-    if db.is_local:
-        db.branches.create_branch(branch_name)
-    
-    # Connect to branch
+    # Create → Implement → Test → Merge → Clean up
+    db.branches.create_branch(branch_name)
     feature_db = cinchdb.connect(db.database, branch=branch_name)
     
     try:
-        # Implement feature
         implement_func(feature_db)
-        
-        # Test (you would add real tests here)
         print(f"Testing {feature_name}...")
         
         # Merge if successful
-        if db.is_local:
-            db.merge.merge_branches(branch_name, "main")
-            print(f"Merged {branch_name} to main")
-            
-            # Clean up
-            db.branches.delete_branch(branch_name)
+        db.merge.merge_branches(branch_name, "main")
+        db.branches.delete_branch(branch_name)
+        print(f"Feature {feature_name} completed")
     except Exception as e:
         print(f"Feature {feature_name} failed: {e}")
         # Branch remains for debugging
 ```
 
-### 3. Parallel Development
+### Parallel Development
+**Benefit**: Multiple developers work independently without conflicts.
+
 ```python
-# Multiple developers can work on separate branches
+# Team can work on separate features simultaneously
 branches = ["feature.auth", "feature.payments", "feature.shipping"]
 
 for branch in branches:
     branch_db = cinchdb.connect("myapp", branch=branch)
-    # Each developer works independently
-    # Merge when ready without conflicts
+    # Independent development, merge when ready
 ```
 
-## Remote Branch Operations
-
-With remote connections, use CLI or API:
-
-```python
-# Remote connections can connect to different branches
-remote_db = cinchdb.connect_api("myapp", branch="main", api_url="...", api_key="...")
-prod_db = cinchdb.connect_api("myapp", branch="production", api_url="...", api_key="...")
-staging_db = cinchdb.connect_api("myapp", branch="staging", api_url="...", api_key="...")
-
-# But cannot create/merge branches
-# Use CLI for remote branch management:
-# cinch branch create feature.new --remote production
-```
 
 ## Next Steps
 

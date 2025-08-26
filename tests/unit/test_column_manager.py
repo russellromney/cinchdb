@@ -204,7 +204,7 @@ class TestColumnManager:
         assert column.name == "name"
         assert column.type == "TEXT"
         assert not column.nullable
-        assert not column.primary_key
+        # primary_key field removed - id is always the primary key
 
     def test_get_column_info_not_exists(self, managers):
         """Test getting info for non-existent column."""

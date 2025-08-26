@@ -66,9 +66,11 @@ class TestChangeApplier:
         managers["applier"].apply_change(added_change.id)
 
         # Verify table exists in all tenants
+        # For lazy tenants, this will read from __empty__ which has the schema
         tenants = managers["tenant"].list_tenants()
         for tenant in tenants:
-            db_path = get_tenant_db_path(temp_project, "main", "main", tenant.name)
+            # Use tenant manager to get proper path (reads from __empty__ for lazy tenants)
+            db_path = managers["tenant"].get_tenant_db_path_for_operation(tenant.name, is_write=False)
             with DatabaseConnection(db_path) as conn:
                 # Check table exists
                 cursor = conn.execute(
@@ -386,7 +388,8 @@ class TestChangeApplierRollback:
         # Insert test data in each tenant
         tenants = tenant_mgr.list_tenants()
         for tenant in tenants:
-            db_path = get_tenant_db_path(temp_project, "main", "main", tenant.name)
+            # Use tenant manager to get connection (handles lazy tenants properly)
+            db_path = tenant_mgr.get_tenant_db_path_for_operation(tenant.name, is_write=True)
             with DatabaseConnection(db_path) as conn:
                 conn.execute(
                     "INSERT INTO base_table (id, data) VALUES (?, ?)",

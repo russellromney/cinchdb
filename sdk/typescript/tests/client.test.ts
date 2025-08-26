@@ -3,6 +3,7 @@
  */
 
 import { CinchDBClient } from '../src/client';
+import { DataRecord } from '../src/types';
 import axios from 'axios';
 
 // Mock axios
@@ -143,7 +144,7 @@ describe('CinchDBClient', () => {
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/tables/products/data', {
         data: { name: 'Test Product', price: 99.99 },
       });
-      expect(result.id).toBe('123');
+      expect((result as DataRecord).id).toBe('123');
     });
 
     it('should update a record', async () => {

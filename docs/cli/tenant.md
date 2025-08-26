@@ -126,7 +126,7 @@ cinch tenant copy main new_customer --no-data
 cinch query "SELECT * FROM users" --tenant acme_corp
 
 # Insert into tenant
-cinch query "INSERT INTO users (name, email) VALUES ('Alice', 'alice@acme.com')" --tenant acme_corp
+cinch insert users --tenant acme_corp --data '{"name": "Alice", "email": "alice@acme.com"}'
 ```
 
 ### Tenant-Specific Operations
@@ -148,7 +148,7 @@ cinch tenant create customer_001
 cinch tenant create customer_002
 
 # Customer-specific data
-cinch query "INSERT INTO settings (key, value) VALUES ('theme', 'dark')" --tenant customer_001
+cinch insert settings --tenant customer_001 --data '{"key": "theme", "value": "dark"}'
 ```
 
 ### Development/Testing
@@ -256,11 +256,6 @@ cinch query "SELECT * FROM users" --tenant customer_a --format csv > customer_a_
 ## Remote Operations
 
 ```bash
-# List remote tenants
-cinch tenant list --remote production
-
-# Create tenant on remote
-cinch tenant create new_customer --remote production
 ```
 
 ## Next Steps

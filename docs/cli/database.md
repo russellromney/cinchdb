@@ -115,38 +115,85 @@ cinch db info analytics
 - Number of tenants
 - Total size on disk
 
-## Common Workflows
+## Common Patterns
 
-### Multiple Environments
+### Environment Separation
 ```bash
-# Create databases for different environments
+# Mirror production structure in dev/staging
 cinch db create development
 cinch db create staging
 cinch db create production
 
-# Switch between them
-cinch db use development
+# Copy schema from prod to staging
+cinch db use production
+cinch branch create v2_schema
+# ... make changes ...
+cinch db use staging
+cinch branch create v2_schema
+cinch branch merge-into-main v2_schema
 ```
 
-### Project Organization
+### Service-Oriented Architecture
 ```bash
-# Create databases for different services
-cinch db create users_service
-cinch db create orders_service
-cinch db create analytics_service
+# Separate databases by domain
+cinch db create user_management
+cinch db create order_processing  
+cinch db create analytics_warehouse
+cinch db create notification_service
+
+# Switch context as needed
+cinch db use user_management
+cinch table create users email:TEXT username:TEXT
+cinch db use order_processing
+cinch table create orders user_id:INTEGER total:REAL
 ```
 
-### Remote Operations
-
-All database commands work with remote connections:
-
+### Feature Development Workflow
 ```bash
-# List remote databases
-cinch db list --remote production
+# Develop features in isolation
+cinch db create feature_experiments
+cinch db use feature_experiments
 
-# Create database on remote
-cinch db create analytics --remote production
+# Create feature branch
+cinch branch create new_user_onboarding
+cinch table create onboarding_steps step:TEXT completed:BOOLEAN
+
+# Test, then merge to main service
+cinch db use user_management
+cinch branch create new_user_onboarding
+# ... replicate changes ...
+cinch branch merge-into-main new_user_onboarding
 ```
+
+### Data Migration Pattern
+```bash
+# Safe migration approach
+cinch db create migration_staging
+cinch db use migration_staging
+
+# Test migration steps
+cinch query "INSERT INTO users (email) SELECT old_email FROM legacy_users"
+cinch query "UPDATE users SET username = SUBSTR(email, 1, INSTR(email, '@')-1)"
+
+# Apply to production when validated
+cinch db use production
+# ... run validated migration steps ...
+```
+
+### Analytics & Reporting
+```bash
+# Separate analytics from transactional data
+cinch db create analytics
+cinch db use analytics
+
+# Create aggregation tables
+cinch table create daily_stats date:TEXT revenue:REAL orders:INTEGER
+cinch table create user_metrics user_id:INTEGER last_active:TEXT orders_count:INTEGER
+
+# Populate from operational databases
+cinch query "INSERT INTO daily_stats SELECT DATE(created_at), SUM(total), COUNT(*) FROM production.orders GROUP BY DATE(created_at)"
+```
+
 
 ## Best Practices
 
@@ -160,3 +207,5 @@ cinch db create analytics --remote production
 - [Branch Commands](branch.md) - Manage branches within databases
 - [Table Commands](table.md) - Create and manage tables
 - [Tenant Commands](tenant.md) - Set up multi-tenancy
+- [Multi-Tenancy Concepts](../concepts/multi-tenancy.md) - Understanding tenant isolation
+- [Multi-Tenant Tutorial](../tutorials/multi-tenant-app.md) - Build a complete multi-tenant app

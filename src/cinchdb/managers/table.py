@@ -124,9 +124,9 @@ class TableManager:
                     fk_constraint += f" ON UPDATE {fk.on_update}"
                 foreign_key_constraints.append(fk_constraint)
 
-        # Build automatic columns
+        # Build automatic columns (id is always the primary key)
         auto_columns = [
-            Column(name="id", type="TEXT", primary_key=True, nullable=False),
+            Column(name="id", type="TEXT", nullable=False),
             Column(name="created_at", type="TEXT", nullable=False),
             Column(name="updated_at", type="TEXT", nullable=True),
         ]
@@ -139,13 +139,14 @@ class TableManager:
         for col in all_columns:
             col_def = f"{col.name} {col.type}"
 
-            if col.primary_key:
+            # id column is always the primary key
+            if col.name == "id":
                 col_def += " PRIMARY KEY"
             if not col.nullable:
                 col_def += " NOT NULL"
             if col.default is not None:
                 col_def += f" DEFAULT {col.default}"
-            if col.unique and not col.primary_key:
+            if col.unique and col.name != "id":  # id is already unique via PRIMARY KEY
                 col_def += " UNIQUE"
 
             sql_parts.append(col_def)
@@ -261,7 +262,7 @@ class TableManager:
                     type=col_type,
                     nullable=(row["notnull"] == 0),
                     default=row["dflt_value"],
-                    primary_key=(row["pk"] == 1),
+                    # Note: primary_key info not needed - 'id' is always the primary key
                     foreign_key=foreign_key,
                 )
                 columns.append(column)
@@ -339,7 +340,8 @@ class TableManager:
         for col in source.columns:
             col_def = f"{col.name} {col.type}"
 
-            if col.primary_key:
+            # id column is always the primary key
+            if col.name == "id":
                 col_def += " PRIMARY KEY"
             if not col.nullable:
                 col_def += " NOT NULL"

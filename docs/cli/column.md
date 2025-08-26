@@ -243,21 +243,63 @@ cinch column delete orders legacy_status
    - Backup before bulk column operations
    - Consider data migration needs
 
-## Constraints
+## Constraints & Limitations
 
-- Cannot modify column types after creation
-- Cannot add NOT NULL columns to tables with data (use nullable then alter-nullable)
-- Cannot use reserved names (id, created_at, updated_at)
-- Cannot modify nullable constraint on primary key columns
+### SQLite Constraints
+```bash
+# Primary key - automatically created
+cinch table create users email:TEXT  # 'id' column added automatically
+
+# Unique constraint
+cinch column add users username:TEXT  # Add column first
+cinch query "CREATE UNIQUE INDEX idx_username ON users(username)"  # Then add constraint
+
+# Foreign key relationship
+cinch column add orders user_id:INTEGER
+cinch query "CREATE INDEX idx_orders_user_id ON orders(user_id)"
+
+# Check constraints (data validation)
+cinch column add users age:INTEGER
+cinch query "ALTER TABLE users ADD CONSTRAINT check_age CHECK (age >= 0 AND age <= 150)"
+```
+
+### CinchDB Limitations
+- **Cannot modify column types** after creation
+- **Cannot add NOT NULL columns** to tables with data (use nullable then alter-nullable)
+- **Cannot use reserved names** (id, created_at, updated_at)
+- **Cannot modify nullable constraint** on primary key columns
+
+### Constraint Examples
+```bash
+# Email validation pattern
+cinch column add users email:TEXT
+cinch query "CREATE INDEX idx_users_email ON users(email)"
+
+# Price must be positive
+cinch column add products price:REAL
+cinch query "ALTER TABLE products ADD CONSTRAINT check_price CHECK (price > 0)"
+
+# Status must be valid
+cinch column add orders status:TEXT
+cinch query "ALTER TABLE orders ADD CONSTRAINT check_status CHECK (status IN ('pending', 'shipped', 'delivered'))"
+```
+
+### Working with Constraints
+```bash
+# Check existing constraints
+cinch query "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='users'"
+
+# Drop constraint (drop index)
+cinch query "DROP INDEX idx_username"
+
+# Modify constraint (recreate)
+cinch query "DROP INDEX idx_username"
+cinch query "CREATE UNIQUE INDEX idx_username ON users(LOWER(username))"
+```
 
 ## Remote Operations
 
 ```bash
-# Add column on remote
-cinch column add users phone:TEXT --remote production
-
-# List remote columns
-cinch column list users --remote production
 ```
 
 ## Next Steps

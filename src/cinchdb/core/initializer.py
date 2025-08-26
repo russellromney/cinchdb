@@ -1,12 +1,29 @@
 """Project initialization for CinchDB."""
 
+import hashlib
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.config import ProjectConfig
+from cinchdb.infrastructure.metadata_db import MetadataDB
+from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db
+
+
+def _calculate_shard(tenant_name: str) -> str:
+    """Calculate the shard directory for a tenant using SHA256 hash.
+    
+    Args:
+        tenant_name: Name of the tenant
+        
+    Returns:
+        Two-character hex string (e.g., "a0", "ff")
+    """
+    hash_val = hashlib.sha256(tenant_name.encode('utf-8')).hexdigest()
+    return hash_val[:2]
 
 
 class ProjectInitializer:
@@ -21,6 +38,14 @@ class ProjectInitializer:
         self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.config_dir = self.project_dir / ".cinchdb"
         self.config_path = self.config_dir / "config.toml"
+        self._metadata_db = None
+    
+    @property
+    def metadata_db(self) -> MetadataDB:
+        """Get metadata database connection (lazy-initialized from pool)."""
+        if self._metadata_db is None:
+            self._metadata_db = get_metadata_db(self.project_dir)
+        return self._metadata_db
 
     def init_project(
         self, database_name: str = "main", branch_name: str = "main"
@@ -54,9 +79,57 @@ class ProjectInitializer:
 
         # Save config
         self._save_config(config)
+        
+        # Add initial database to metadata (metadata_db property will auto-initialize)
+        database_id = str(uuid.uuid4())
+        self.metadata_db.create_database(
+            database_id, database_name, 
+            description="Initial database",
+            metadata={"initial_branch": branch_name}
+        )
+        
+        # Add initial branch to metadata
+        branch_id = str(uuid.uuid4())
+        self.metadata_db.create_branch(
+            branch_id, database_id, branch_name,
+            parent_branch=None,
+            schema_version="v1.0.0",
+            metadata={"created_at": datetime.now(timezone.utc).isoformat()}
+        )
 
-        # Create default database structure
-        self._create_database_structure(database_name, branch_name)
+        # Create default database structure (materialized by default for initial database)
+        self._create_database_structure(database_name, branch_name, create_tenant_files=True)
+        
+        # Mark as materialized since we created the structure
+        self.metadata_db.mark_database_materialized(database_id)
+        self.metadata_db.mark_branch_materialized(branch_id)
+        
+        # Also create main tenant in metadata
+        tenant_id = str(uuid.uuid4())
+        main_shard = _calculate_shard("main")
+        self.metadata_db.create_tenant(
+            tenant_id, branch_id, "main", main_shard,
+            metadata={"created_at": datetime.now(timezone.utc).isoformat()}
+        )
+        self.metadata_db.mark_tenant_materialized(tenant_id)
+        
+        # Create __empty__ tenant in metadata (for lazy tenant reads)
+        empty_tenant_id = str(uuid.uuid4())
+        empty_shard = _calculate_shard("__empty__")
+        self.metadata_db.create_tenant(
+            empty_tenant_id, branch_id, "__empty__", empty_shard,
+            metadata={
+                "system": True,
+                "description": "Template for lazy tenants",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+        )
+        self.metadata_db.mark_tenant_materialized(empty_tenant_id)
+        
+        # Create physical __empty__ tenant with schema from main
+        from cinchdb.managers.tenant import TenantManager
+        tenant_mgr = TenantManager(self.project_dir, database_name, branch_name)
+        tenant_mgr._ensure_empty_tenant()
 
         return config
 
@@ -87,38 +160,64 @@ class ProjectInitializer:
         
         if not self.config_path.exists():
             raise FileNotFoundError(f"No CinchDB project found at {self.config_dir}")
-
-        db_path = self.config_dir / "databases" / database_name
-        db_meta_path = self.config_dir / "databases" / f".{database_name}.meta"
         
-        # Check if database already exists (either as directory or metadata)
-        if db_path.exists() or db_meta_path.exists():
+        # Check if database already exists in metadata
+        existing_db = self.metadata_db.get_database(database_name)
+        if existing_db:
             raise FileExistsError(f"Database '{database_name}' already exists")
 
-        if lazy:
-            # Just create metadata file, don't create actual database structure
-            databases_dir = self.config_dir / "databases"
-            databases_dir.mkdir(parents=True, exist_ok=True)
-            
-            metadata = {
-                "name": database_name,
-                "description": description,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "initial_branch": branch_name,
-                "lazy": True
-            }
-            
-            with open(db_meta_path, 'w') as f:
-                json.dump(metadata, f, indent=2)
-        else:
-            # Create database structure
+        # Create database ID
+        database_id = str(uuid.uuid4())
+        
+        # Create database in metadata
+        metadata = {
+            "description": description,
+            "initial_branch": branch_name,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self.metadata_db.create_database(database_id, database_name, description, metadata)
+        
+        # Create initial branch in metadata
+        branch_id = str(uuid.uuid4())
+        self.metadata_db.create_branch(
+            branch_id, database_id, branch_name,
+            parent_branch=None,
+            schema_version="v1.0.0",
+            metadata={"created_at": datetime.now(timezone.utc).isoformat()}
+        )
+        
+        # Create main tenant entry in metadata (will be materialized if database is not lazy)
+        main_tenant_id = str(uuid.uuid4())
+        main_shard = _calculate_shard("main")
+        self.metadata_db.create_tenant(
+            main_tenant_id, branch_id, "main", main_shard,
+            metadata={"description": "Default tenant", "created_at": datetime.now(timezone.utc).isoformat()}
+        )
+        
+        # Create __empty__ tenant entry in metadata (lazy)
+        # This serves as a template for all lazy tenants in this branch
+        empty_tenant_id = str(uuid.uuid4())
+        empty_shard = _calculate_shard("__empty__")
+        self.metadata_db.create_tenant(
+            empty_tenant_id, branch_id, "__empty__", empty_shard,
+            metadata={"system": True, "description": "Template for lazy tenants"}
+        )
+
+        if not lazy:
+            # Create actual database structure
             self._create_database_structure(database_name, branch_name, description)
+            
+            # Mark as materialized
+            self.metadata_db.mark_database_materialized(database_id)
+            self.metadata_db.mark_branch_materialized(branch_id)
+            self.metadata_db.mark_tenant_materialized(main_tenant_id)
 
     def _create_database_structure(
         self,
         database_name: str,
         branch_name: str = "main",
         description: Optional[str] = None,
+        create_tenant_files: bool = False,
     ) -> None:
         """Create the directory structure for a database.
 
@@ -152,8 +251,12 @@ class ProjectInitializer:
         tenant_dir = branch_path / "tenants"
         tenant_dir.mkdir(exist_ok=True)
 
-        # Create and initialize main tenant database
-        self._init_tenant_database(tenant_dir / "main.db")
+        # Create main tenant database in sharded directory (only if requested)
+        if create_tenant_files:
+            main_shard = _calculate_shard("main")
+            main_shard_dir = tenant_dir / main_shard
+            main_shard_dir.mkdir(parents=True, exist_ok=True)
+            self._init_tenant_database(main_shard_dir / "main.db")
 
     def _init_tenant_database(self, db_path: Path) -> None:
         """Initialize a tenant database with proper PRAGMAs.
@@ -182,31 +285,36 @@ class ProjectInitializer:
         Raises:
             ValueError: If database doesn't exist or is already materialized
         """
-        db_path = self.config_dir / "databases" / database_name
-        db_meta_path = self.config_dir / "databases" / f".{database_name}.meta"
-        
-        # Check if already materialized
-        if db_path.exists():
-            return  # Already materialized
-            
-        # Check if metadata exists
-        if not db_meta_path.exists():
+        # Get database info from metadata
+        db_info = self.metadata_db.get_database(database_name)
+        if not db_info:
             raise ValueError(f"Database '{database_name}' does not exist")
             
-        # Load metadata
-        with open(db_meta_path, 'r') as f:
-            metadata = json.load(f)
+        # Check if already materialized
+        if db_info['materialized']:
+            return  # Already materialized
             
-        # Create the actual database structure
+        db_path = self.config_dir / "databases" / database_name
+        if db_path.exists():
+            # Mark as materialized in metadata if directory already exists
+            self.metadata_db.mark_database_materialized(db_info['id'])
+            return
+            
+        # Get metadata details
+        metadata = json.loads(db_info['metadata']) if db_info['metadata'] else {}
         branch_name = metadata.get("initial_branch", "main")
-        description = metadata.get("description")
-        self._create_database_structure(database_name, branch_name, description)
+        description = db_info.get('description')
         
-        # Update metadata to indicate it's no longer lazy
-        metadata['lazy'] = False
-        metadata['materialized_at'] = datetime.now(timezone.utc).isoformat()
-        with open(db_meta_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
+        # Create the actual database structure (no tenant files - those are created when tables are added)
+        self._create_database_structure(database_name, branch_name, description, create_tenant_files=False)
+        
+        # Mark database as materialized in metadata
+        self.metadata_db.mark_database_materialized(db_info['id'])
+        
+        # Also mark the initial branch as materialized
+        branch_info = self.metadata_db.get_branch(db_info['id'], branch_name)
+        if branch_info:
+            self.metadata_db.mark_branch_materialized(branch_info['id'])
 
     def _save_config(self, config: ProjectConfig) -> None:
         """Save configuration to disk.

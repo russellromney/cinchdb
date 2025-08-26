@@ -66,17 +66,17 @@ class TestEmptyTenant:
         with pytest.raises(ValueError, match="Cannot delete the reserved"):
             managers["tenant"].delete_tenant("__empty__")
 
-    def test_empty_tenant_created_on_first_lazy_read(self, managers, temp_project):
-        """Test that __empty__ tenant is created only when first lazy tenant is read."""
-        # Initially __empty__ should not exist
+    def test_empty_tenant_created_with_project(self, managers, temp_project):
+        """Test that __empty__ tenant is created when project is initialized."""
+        # __empty__ should exist after project initialization
         empty_db_path = get_tenant_db_path(temp_project, "main", "main", "__empty__")
-        assert not empty_db_path.exists()
+        assert empty_db_path.exists()
         
         # Create a lazy tenant
         managers["tenant"].create_tenant("lazy-tenant", lazy=True)
         
-        # __empty__ still shouldn't exist
-        assert not empty_db_path.exists()
+        # __empty__ should still exist
+        assert empty_db_path.exists()
         
         # Now perform a read operation on the lazy tenant
         query_mgr = QueryManager(temp_project, "main", "main", "lazy-tenant")
@@ -84,9 +84,7 @@ class TestEmptyTenant:
             "lazy-tenant", is_write=False
         )
         
-        # Now __empty__ should exist
-        assert empty_db_path.exists()
-        # And it should be the path returned for reads
+        # Read operations on lazy tenant should use __empty__ 
         assert db_path == empty_db_path
 
     def test_lazy_tenant_materialized_on_write(self, managers, temp_project):

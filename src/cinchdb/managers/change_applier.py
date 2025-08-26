@@ -64,6 +64,8 @@ class ChangeApplier:
     def apply_change(self, change_id: str) -> None:
         """Apply a single change to all tenants atomically with snapshot-based rollback.
 
+        For lazy tenants, skip applying changes - they will inherit changes from the __empty__ tenant later.
+
         Args:
             change_id: ID of the change to apply
 
@@ -81,20 +83,35 @@ class ChangeApplier:
             logger.info(f"Change {change_id} already applied")
             return
 
-        backup_dir = self._get_backup_dir(change.id)
-        tenants = self.tenant_manager.list_tenants()
+        # Ensure __empty__ tenant exists and is materialized
+        # This is critical for schema changes as it's the template for lazy tenants
+        self.tenant_manager._ensure_empty_tenant()
 
-        if not tenants:
-            # No tenants, just mark as applied
+        backup_dir = self._get_backup_dir(change.id)
+        # Include system tenants (like __empty__) when applying schema changes
+        all_tenants = self.tenant_manager.list_tenants(include_system=True)
+        
+        # Filter to only materialized tenants (those with actual .db files)
+        # Schema changes can only be applied to materialized tenants
+        # Lazy tenants will inherit the schema from __empty__ when materialized
+        materialized_tenants = []
+        for tenant in all_tenants:
+            # Always include __empty__ (schema template) or check if materialized
+            if tenant.name == "__empty__" or not self.tenant_manager.is_tenant_lazy(tenant.name):
+                materialized_tenants.append(tenant)
+        
+        if not materialized_tenants:
+            # No materialized tenants, just mark as applied
+            # The schema change will be in __empty__ for future lazy tenant materialization
             self.change_tracker.mark_change_applied(change_id)
             return
 
-        logger.info(f"Applying change {change_id} to {len(tenants)} tenants...")
+        logger.info(f"Applying change {change_id} to {len(materialized_tenants)} materialized tenants (out of {len(all_tenants)} total)...")
 
         try:
-            # Phase 1: Create snapshots
+            # Phase 1: Create snapshots (only for materialized tenants)
             logger.info("Creating database snapshots...")
-            self._create_snapshots(tenants, backup_dir)
+            self._create_snapshots(materialized_tenants, backup_dir)
 
             # Phase 2: Enter maintenance mode to block writes
             logger.info("Entering maintenance mode for schema update...")
@@ -104,7 +121,7 @@ class ChangeApplier:
                 # Track which tenants we've applied to
                 applied_tenants = []
 
-                for tenant in tenants:
+                for tenant in materialized_tenants:
                     try:
                         self._apply_change_to_tenant(change, tenant.name)
                         applied_tenants.append(tenant.name)
@@ -118,9 +135,6 @@ class ChangeApplier:
 
                 # Phase 3: Mark as applied
                 self.change_tracker.mark_change_applied(change_id)
-                
-                # Update __empty__ tenant with new schema
-                self.tenant_manager._update_empty_tenant_schema()
 
                 # Exit maintenance mode before cleanup
                 self._exit_maintenance_mode()
@@ -130,7 +144,7 @@ class ChangeApplier:
                 self._cleanup_snapshots(backup_dir)
 
                 logger.info(
-                    f"Schema update complete. Applied change {change_id} to {len(tenants)} tenants"
+                    f"Schema update complete. Applied change {change_id} to {len(materialized_tenants)} materialized tenants"
                 )
 
             except Exception:
@@ -139,12 +153,12 @@ class ChangeApplier:
                 raise
 
         except Exception as e:
-            # Rollback all tenants
+            # Rollback all materialized tenants
             logger.error(f"Change {change_id} failed: {e}")
-            logger.info("Rolling back all tenants to snapshot...")
+            logger.info("Rolling back all materialized tenants to snapshot...")
 
-            # Restore all tenants from snapshots
-            self._restore_all_snapshots(tenants, backup_dir)
+            # Restore all materialized tenants from snapshots
+            self._restore_all_snapshots(materialized_tenants, backup_dir)
 
             # Clean up backup directory
             self._cleanup_snapshots(backup_dir)

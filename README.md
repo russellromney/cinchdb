@@ -2,6 +2,10 @@
 
 **Git-like SQLite database management with branching and multi-tenancy**
 
+[![PyPI version](https://badge.fury.io/py/cinchdb.svg)](https://badge.fury.io/py/cinchdb)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+
 NOTE: CinchDB is in early alpha. This is project to test out an idea. Do not use this in production.
 
 CinchDB is for projects that need fast queries, isolated data per-tenant [or even per-user](https://turso.tech/blog/give-each-of-your-users-their-own-sqlite-database-b74445f4), and a branchable database that makes it easy to merge changes between branches.

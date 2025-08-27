@@ -1,5 +1,5 @@
 .PHONY: help install install-dev install-all dev test coverage lint format typecheck clean \
-        build-python build-ts build-docs \
+        build-python build-ts build-docs update-docs \
         dev-docs \
         test-python test-ts test-integration test-unit test-python-integration \
         all
@@ -35,6 +35,9 @@ help:
 	@echo "  make build-ts         - Build TypeScript SDK"
 	@echo "  make build-docs       - Build documentation site"
 	@echo "  make build-all        - Build everything"
+	@echo ""
+	@echo "Documentation:"
+	@echo "  make update-docs      - Update documentation with current version"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean            - Clean all build artifacts and caches"
@@ -101,6 +104,10 @@ build-ts:
 # Documentation targets
 build-docs:
 	uv run mkdocs build
+
+update-docs:
+	@echo "Updating documentation with current version..."
+	uv run python scripts/update_docs_version.py
 
 # Integration tests (alias for test-python-integration)
 test-integration: test-python-integration

@@ -264,6 +264,19 @@ def main():
         if response.lower() != "y":
             return 1
 
+    # Update documentation with current version
+    try:
+        print("\nUpdating documentation with current version...")
+        update_docs_script = script_dir / "update_docs_version.py"
+        if update_docs_script.exists():
+            run_command([sys.executable, str(update_docs_script)])
+            print("Documentation version update completed!")
+        else:
+            print(f"Warning: Documentation update script not found: {update_docs_script}")
+    except Exception as e:
+        print(f"Warning: Failed to update documentation: {e}")
+        # Continue with build process even if docs update fails
+
     # Publish if requested
     if args.publish or args.testpypi:
         repository = "testpypi" if args.testpypi else "pypi"

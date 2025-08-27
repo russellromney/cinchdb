@@ -278,18 +278,18 @@ class TenantManager:
                 with DatabaseConnection(empty_db_path):
                     pass  # Just initialize with PRAGMAs
             
-            # Optimize with small page size for empty template
+            # Set reasonable default page size for template
             # We need to rebuild the database with new page size
             temp_path = empty_db_path.with_suffix('.tmp')
             
-            # Create new database with 512-byte pages
+            # Create new database with 4KB pages (SQLite default, good balance for general use)
             vacuum_conn = sqlite3.connect(str(empty_db_path))
             vacuum_conn.isolation_level = None
-            vacuum_conn.execute("PRAGMA page_size = 512")
+            vacuum_conn.execute("PRAGMA page_size = 4096")
             vacuum_conn.execute(f"VACUUM INTO '{temp_path}'")
             vacuum_conn.close()
             
-            # Replace original with optimized version
+            # Replace original with default optimized version
             shutil.move(str(temp_path), str(empty_db_path))
             
             # Mark as materialized now that the file exists
@@ -350,150 +350,6 @@ class TenantManager:
                 if shm_path.exists():
                     shm_path.unlink()
 
-    def optimize_all_tenants(self, force: bool = False) -> dict:
-        """Optimize storage for all materialized tenants in the branch.
-        
-        This is designed to be called periodically (e.g., every minute) to:
-        - Reclaim unused space with VACUUM
-        - Adjust page sizes as databases grow
-        - Keep small databases compact
-        
-        Args:
-            force: If True, optimize all tenants regardless of size
-            
-        Returns:
-            Dictionary with optimization results:
-            - optimized: List of tenant names that were optimized
-            - skipped: List of tenant names that were skipped
-            - errors: List of tuples (tenant_name, error_message)
-        """
-        results = {
-            "optimized": [],
-            "skipped": [],
-            "errors": []
-        }
-        
-        # Ensure initialization
-        self._ensure_initialized()
-        
-        if not self.branch_id:
-            return results
-            
-        # Get all materialized tenants for this branch
-        tenants = self.metadata_db.list_tenants(self.branch_id, materialized_only=True)
-        
-        for tenant in tenants:
-            tenant_name = tenant['name']
-            
-            # Skip system tenants unless forced
-            if not force and tenant_name in ["main", self._empty_tenant_name]:
-                results["skipped"].append(tenant_name)
-                continue
-                
-            try:
-                optimized = self.optimize_tenant_storage(tenant_name, force=force)
-                if optimized:
-                    results["optimized"].append(tenant_name)
-                else:
-                    results["skipped"].append(tenant_name)
-            except Exception as e:
-                results["errors"].append((tenant_name, str(e)))
-                
-        return results
-    
-    def optimize_tenant_storage(self, tenant_name: str, force: bool = False) -> bool:
-        """Optimize tenant database storage with VACUUM and optional page size adjustment.
-        
-        This performs:
-        1. Always: VACUUM to reclaim unused space and defragment
-        2. If needed: Rebuild with optimal page size based on database size
-        
-        Args:
-            tenant_name: Name of tenant to optimize
-            force: If True, always perform VACUUM even if page size is optimal
-            
-        Returns:
-            True if optimization was performed, False if tenant doesn't exist
-        """
-        # Ensure initialization
-        self._ensure_initialized()
-        
-        if not self.branch_id:
-            return False
-            
-        # Skip system tenants
-        if tenant_name in ["main", self._empty_tenant_name]:
-            return False
-            
-        # Get tenant info
-        tenant_info = self.metadata_db.get_tenant(self.branch_id, tenant_name)
-        if not tenant_info or not tenant_info['materialized']:
-            return False
-            
-        db_path = get_tenant_db_path(
-            self.project_root, self.database, self.branch, tenant_name
-        )
-        
-        if not db_path.exists():
-            return False
-            
-        # Check current page size
-        conn = sqlite3.connect(str(db_path))
-        current_page_size = conn.execute("PRAGMA page_size").fetchone()[0]
-        conn.close()
-        
-        # Determine optimal page size
-        optimal_page_size = self._get_optimal_page_size(db_path)
-        
-        # Decide if we need to rebuild with new page size
-        needs_page_size_change = (current_page_size != optimal_page_size and 
-                                  db_path.stat().st_size > 1024 * 1024)  # Only if > 1MB
-        
-        if needs_page_size_change:
-            # Rebuild with new page size using VACUUM INTO
-            temp_path = db_path.with_suffix('.tmp')
-            conn = sqlite3.connect(str(db_path))
-            conn.isolation_level = None
-            conn.execute(f"PRAGMA page_size = {optimal_page_size}")
-            conn.execute(f"VACUUM INTO '{temp_path}'")
-            conn.close()
-            
-            # Replace original with optimized version
-            shutil.move(str(temp_path), str(db_path))
-            return True
-        elif force or current_page_size == 512:
-            # Just run regular VACUUM to defragment and reclaim space
-            # Always vacuum 512-byte page databases to keep them compact
-            conn = sqlite3.connect(str(db_path))
-            conn.isolation_level = None
-            conn.execute("VACUUM")
-            conn.close()
-            return True
-            
-        return False
-    
-    def _get_optimal_page_size(self, db_path: Path) -> int:
-        """Determine optimal page size based on database file size.
-        
-        Args:
-            db_path: Path to database file
-            
-        Returns:
-            Optimal page size in bytes
-        """
-        if not db_path.exists():
-            return 512  # Default for new/empty databases
-            
-        size_mb = db_path.stat().st_size / (1024 * 1024)
-        
-        if size_mb < 0.1:  # < 100KB
-            return 512
-        elif size_mb < 10:  # < 10MB
-            return 4096  # 4KB - good balance for small-medium DBs
-        elif size_mb < 100:  # < 100MB
-            return 8192  # 8KB - better for larger rows
-        else:  # >= 100MB
-            return 16384  # 16KB - optimal for bulk operations
     
     def materialize_tenant(self, tenant_name: str) -> None:
         """Materialize a lazy tenant into an actual database file.
@@ -898,3 +754,88 @@ class TenantManager:
         """
         db_path = self.get_tenant_db_path_for_operation(tenant_name, is_write)
         return DatabaseConnection(db_path)
+
+    def vacuum_tenant(self, tenant_name: str) -> dict:
+        """Run VACUUM operation on a specific tenant to reclaim space and optimize performance.
+        
+        This performs SQLite's VACUUM command which:
+        - Reclaims space from deleted records
+        - Defragments the database file
+        - Can improve query performance
+        - Rebuilds database statistics
+        
+        Args:
+            tenant_name: Name of the tenant to vacuum
+            
+        Returns:
+            Dictionary with vacuum results:
+            - success: Whether vacuum completed successfully
+            - tenant: Name of the tenant
+            - size_before: Size in bytes before vacuum
+            - size_after: Size in bytes after vacuum
+            - space_reclaimed: Bytes reclaimed by vacuum
+            - duration_seconds: Time taken for vacuum operation
+            
+        Raises:
+            ValueError: If tenant doesn't exist or is not materialized
+        """
+        import time
+        
+        # Ensure initialization
+        self._ensure_initialized()
+        
+        # Check if tenant exists
+        if tenant_name != self._empty_tenant_name:
+            if not self.branch_id:
+                raise ValueError(f"Branch '{self.branch}' not found")
+                
+            tenant_info = self.metadata_db.get_tenant(self.branch_id, tenant_name)
+            if not tenant_info:
+                raise ValueError(f"Tenant '{tenant_name}' does not exist")
+        
+        # Check if tenant is materialized
+        if self.is_tenant_lazy(tenant_name):
+            raise ValueError(f"Cannot vacuum lazy tenant '{tenant_name}'. Tenant must be materialized first.")
+        
+        # Get database path
+        db_path = self._get_sharded_tenant_db_path(tenant_name)
+        
+        if not db_path.exists():
+            raise ValueError(f"Database file for tenant '{tenant_name}' does not exist")
+        
+        # Get size before vacuum
+        size_before = db_path.stat().st_size
+        
+        # Perform vacuum operation
+        start_time = time.time()
+        success = False
+        error_message = None
+        
+        try:
+            with DatabaseConnection(db_path) as conn:
+                # Run VACUUM command
+                conn.execute("VACUUM")
+            success = True
+        except Exception as e:
+            error_message = str(e)
+        
+        duration = time.time() - start_time
+        
+        # Get size after vacuum
+        size_after = db_path.stat().st_size if db_path.exists() else 0
+        space_reclaimed = max(0, size_before - size_after)
+        
+        result = {
+            "success": success,
+            "tenant": tenant_name,
+            "size_before": size_before,
+            "size_after": size_after,
+            "space_reclaimed": space_reclaimed,
+            "space_reclaimed_mb": round(space_reclaimed / (1024 * 1024), 2),
+            "duration_seconds": round(duration, 2)
+        }
+        
+        if not success:
+            result["error"] = error_message
+        
+        return result

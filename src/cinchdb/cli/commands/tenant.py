@@ -188,3 +188,50 @@ def rename(
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)
+
+
+@app.command()
+def vacuum(
+    tenant_name: str = typer.Argument(..., help="Name of tenant to vacuum"),
+):
+    """Run VACUUM operation on a tenant to optimize storage and performance.
+    
+    VACUUM reclaims space from deleted records, defragments the database file,
+    and can improve query performance. This is especially useful after
+    deleting large amounts of data.
+    
+    Examples:
+        cinch tenant vacuum main
+        cinch tenant vacuum store_east
+    """
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    branch_name = config_data.active_branch
+
+    try:
+        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        
+        console.print(f"[yellow]🔧 Starting VACUUM operation on tenant '{tenant_name}'...[/yellow]")
+        
+        result = tenant_mgr.vacuum_tenant(tenant_name)
+        
+        if result['success']:
+            console.print("[green]✅ VACUUM completed successfully[/green]")
+            console.print(f"  Tenant: {result['tenant']}")
+            console.print(f"  Size before: {result['size_before']:,} bytes ({result['size_before'] / (1024*1024):.2f} MB)")
+            console.print(f"  Size after: {result['size_after']:,} bytes ({result['size_after'] / (1024*1024):.2f} MB)")
+            console.print(f"  Space reclaimed: {result['space_reclaimed']:,} bytes ({result['space_reclaimed_mb']} MB)")
+            console.print(f"  Duration: {result['duration_seconds']} seconds")
+            
+            if result['space_reclaimed'] > 0:
+                percent_saved = (result['space_reclaimed'] / result['size_before']) * 100
+                console.print(f"  [green]💾 Saved {percent_saved:.1f}% of space[/green]")
+            else:
+                console.print("  [blue]ℹ️  No space to reclaim (database was already optimized)[/blue]")
+        else:
+            console.print(f"[red]❌ VACUUM failed: {result.get('error', 'Unknown error')}[/red]")
+            raise typer.Exit(1)
+
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)

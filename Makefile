@@ -18,17 +18,17 @@ help:
 	@echo "  make dev-docs         - Run documentation site in development mode"
 	@echo ""
 	@echo "Testing:"
-	@echo "  make test             - Run all tests"
-	@echo "  make test-python      - Run all Python tests"
-	@echo "  make test-unit        - Run Python unit tests only"
+	@echo "  make test             - Run all tests (CinchDB + bdhcnic plugin)"
+	@echo "  make test-python      - Run all Python tests (CinchDB + bdhcnic plugin)"
+	@echo "  make test-unit        - Run Python unit tests (CinchDB + bdhcnic plugin)"
 	@echo "  make test-integration - Run Python integration tests only"
 	@echo "  make test-ts          - Run TypeScript SDK tests"
-	@echo "  make coverage         - Run tests with coverage report"
+	@echo "  make coverage         - Run tests with coverage report (both projects)"
 	@echo ""
 	@echo "Code Quality:"
-	@echo "  make lint             - Run linters on all code"
-	@echo "  make format           - Format all code"
-	@echo "  make typecheck        - Run type checking"
+	@echo "  make lint             - Run linters on all code (CinchDB + bdhcnic plugin)"
+	@echo "  make format           - Format all code (CinchDB + bdhcnic plugin)"
+	@echo "  make typecheck        - Run type checking (CinchDB + bdhcnic plugin)"
 	@echo ""
 	@echo "Building:"
 	@echo "  make build-python     - Build Python package"
@@ -59,24 +59,30 @@ dev-docs:
 # Python-specific targets
 test-python:
 	uv run pytest tests/
+	cd ../bdhcnic && uv run pytest tests/
 
 test-unit:
 	uv run pytest -vv tests/unit/ -v
+	cd ../bdhcnic && uv run pytest -vv tests/ -v
 
 test-python-integration:
 	uv run pytest -vv tests/integration/ -v
 
 coverage:
 	uv run pytest -vv --cov=cinchdb --cov-report=html --cov-report=term tests/
+	cd ../bdhcnic && uv run pytest -vv --cov=bdhcnic --cov-report=html --cov-report=term tests/
 
 lint-python:
 	uv run ruff check src/ tests/
+	cd ../bdhcnic && uv run ruff check src/ tests/
 
 format-python:
 	uv run ruff format src/ tests/
+	cd ../bdhcnic && uv run ruff format src/ tests/
 
 typecheck-python:
 	uv run mypy src/
+	cd ../bdhcnic && uv run mypy src/
 
 build-python:
 	uv build

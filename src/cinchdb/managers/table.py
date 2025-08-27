@@ -19,6 +19,9 @@ class TableManager:
 
     # Protected column names that users cannot use
     PROTECTED_COLUMNS = {"id", "created_at", "updated_at"}
+    
+    # Protected table name prefixes that users cannot use
+    PROTECTED_TABLE_PREFIXES = ("__", "sqlite_")
 
     def __init__(
         self, project_root: Path, database: str, branch: str, tenant: str = "main"
@@ -48,18 +51,24 @@ class TableManager:
         tables = []
 
         with DatabaseConnection(self.db_path) as conn:
-            # Get all user tables (exclude sqlite internal tables)
+            # Get all tables first, then filter in Python (more reliable than SQL LIKE)
             cursor = conn.execute(
                 """
                 SELECT name FROM sqlite_master 
                 WHERE type='table' 
-                AND name NOT LIKE 'sqlite_%'
                 ORDER BY name
                 """
             )
+            
+            # Filter out system tables and protected tables using Python
+            all_table_names = [row["name"] for row in cursor.fetchall()]
+            user_table_names = [
+                name for name in all_table_names 
+                if not name.startswith('sqlite_') and not name.startswith('__')
+            ]
 
-            for row in cursor.fetchall():
-                table = self.get_table(row["name"])
+            for table_name in user_table_names:
+                table = self.get_table(table_name)
                 tables.append(table)
 
         return tables
@@ -82,6 +91,14 @@ class TableManager:
         """
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
+        
+        # Validate table name doesn't use protected prefixes
+        for prefix in self.PROTECTED_TABLE_PREFIXES:
+            if table_name.startswith(prefix):
+                raise ValueError(
+                    f"Table name '{table_name}' is not allowed. "
+                    f"Table names cannot start with '{prefix}' as these are reserved for system use."
+                )
 
         # Validate table doesn't exist
         if self._table_exists(table_name):
@@ -325,6 +342,14 @@ class TableManager:
         """
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
+        
+        # Validate target table name doesn't use protected prefixes
+        for prefix in self.PROTECTED_TABLE_PREFIXES:
+            if target_table.startswith(prefix):
+                raise ValueError(
+                    f"Table name '{target_table}' is not allowed. "
+                    f"Table names cannot start with '{prefix}' as these are reserved for system use."
+                )
 
         if not self._table_exists(source_table):
             raise ValueError(f"Source table '{source_table}' does not exist")

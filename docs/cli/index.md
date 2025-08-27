@@ -24,6 +24,9 @@ cinch status
 - [`cinch view`](view.md) - Create database views
 - [`cinch query`](query.md) - Execute SQL queries
 
+### Data Operations
+- [`cinch data`](data.md) - Bulk data operations (insert, update, delete)
+
 ### Branching & Tenancy
 - [`cinch branch`](branch.md) - Branch operations (create, switch, merge, delete)
 - [`cinch tenant`](tenant.md) - Multi-tenant operations
@@ -38,6 +41,8 @@ cinch status
 | Initialize project | `cinch init myapp` |
 | Create table | `cinch table create users name:TEXT email:TEXT` |
 | Query data | `cinch query "SELECT * FROM users"` |
+| Delete records | `cinch data delete users --where "status=inactive"` |
+| Update records | `cinch data update users --set "status=active" --where "plan=free"` |
 | Create branch | `cinch branch create feature-auth --switch` |
 | Merge to main | `cinch branch merge-into-main feature-auth` |
 | Multi-tenant query | `cinch query "SELECT * FROM users" --tenant customer_a` |

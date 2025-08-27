@@ -77,6 +77,7 @@ nav:
     - Column: cli/column.md
     - View: cli/view.md
     - Query: cli/query.md
+    - Data: cli/data.md
     - Tenant: cli/tenant.md
     - Codegen: cli/codegen.md
   - Python SDK:

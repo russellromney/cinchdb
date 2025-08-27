@@ -116,6 +116,21 @@ class MetadataDB:
                 CREATE INDEX IF NOT EXISTS idx_tenants_shard 
                 ON tenants(shard)
             """)
+            
+            # Add cdc_enabled field to branches table for plugin use
+            # Note: This field is managed by plugins (like bdhcnic), not core CinchDB
+            try:
+                self.conn.execute("""
+                    ALTER TABLE branches ADD COLUMN cdc_enabled BOOLEAN DEFAULT FALSE
+                """)
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+            
+            self.conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_branches_cdc_enabled 
+                ON branches(cdc_enabled)
+            """)
     
     # Database operations
     def create_database(self, database_id: str, name: str, 

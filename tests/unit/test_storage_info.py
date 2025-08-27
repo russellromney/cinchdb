@@ -56,8 +56,8 @@ def test_get_tenant_size():
         
         assert eager_size["name"] == "eager_tenant"
         assert eager_size["materialized"]
-        assert eager_size["size_bytes"] <= 4096  # Should be small with 512-byte page optimization  
-        assert eager_size["page_size"] == 512  # Should use 512-byte pages
+        assert eager_size["size_bytes"] <= 20480  # Should be reasonably small with 4KB pages  
+        assert eager_size["page_size"] == 4096  # Should use 4KB pages (SQLite default)
         assert eager_size["page_count"] >= 1  # At least 1 page, possibly more for schema
 
 
@@ -149,7 +149,7 @@ def test_default_tenant_size():
         
         # Should return info for "other"
         assert size["name"] == "other"
-        assert size["page_size"] == 512  # Optimized size
+        assert size["page_size"] == 4096  # Default size
 
 
 if __name__ == "__main__":

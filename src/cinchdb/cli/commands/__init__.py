@@ -1,6 +1,6 @@
 """CLI command modules."""
 
-from . import database, branch, tenant, table, column, view, query, codegen, remote, index
+from . import database, branch, tenant, table, column, view, query, codegen, remote, index, data
 
 __all__ = [
     "database",
@@ -13,4 +13,5 @@ __all__ = [
     "codegen",
     "remote",
     "index",
+    "data",
 ]

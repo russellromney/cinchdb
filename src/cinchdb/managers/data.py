@@ -283,8 +283,8 @@ class DataManager:
                 conn.rollback()
                 raise
 
-    def delete_by_id(self, model_class: Type[T], record_id: str) -> bool:
-        """Delete a single record by ID.
+    def delete_model_by_id(self, model_class: Type[T], record_id: str) -> bool:
+        """Delete a single record by ID using model class.
 
         Args:
             model_class: Pydantic model class representing the table
@@ -420,12 +420,13 @@ class DataManager:
         return snake_case
 
     def _build_where_clause(
-        self, filters: Dict[str, Any]
+        self, filters: Dict[str, Any], operator: str = "AND"
     ) -> tuple[str, Dict[str, Any]]:
         """Build WHERE clause and parameters from filters.
 
         Args:
             filters: Dictionary of column filters
+            operator: Logical operator to combine conditions - "AND" (default) or "OR"
 
         Returns:
             Tuple of (where_clause, parameters)
@@ -433,31 +434,34 @@ class DataManager:
         if not filters:
             return "", {}
 
+        if operator not in ("AND", "OR"):
+            raise ValueError(f"Operator must be 'AND' or 'OR', got: {operator}")
+
         conditions = []
         params = {}
 
         for key, value in filters.items():
             # Handle special operators (column__operator format)
             if "__" in key:
-                column, operator = key.split("__", 1)
-                param_key = f"{column}_{operator}"
+                column, op = key.split("__", 1)
+                param_key = f"{column}_{op}"
 
-                if operator == "gte":
+                if op == "gte":
                     conditions.append(f"{column} >= :{param_key}")
                     params[param_key] = value
-                elif operator == "lte":
+                elif op == "lte":
                     conditions.append(f"{column} <= :{param_key}")
                     params[param_key] = value
-                elif operator == "gt":
+                elif op == "gt":
                     conditions.append(f"{column} > :{param_key}")
                     params[param_key] = value
-                elif operator == "lt":
+                elif op == "lt":
                     conditions.append(f"{column} < :{param_key}")
                     params[param_key] = value
-                elif operator == "like":
+                elif op == "like":
                     conditions.append(f"{column} LIKE :{param_key}")
                     params[param_key] = value
-                elif operator == "in":
+                elif op == "in":
                     if not isinstance(value, (list, tuple)):
                         raise ValueError(
                             f"'in' operator requires list or tuple, got {type(value)}"
@@ -467,10 +471,182 @@ class DataManager:
                     for i, v in enumerate(value):
                         params[f"{param_key}_{i}"] = v
                 else:
-                    raise ValueError(f"Unsupported operator: {operator}")
+                    raise ValueError(f"Unsupported operator: {op}")
             else:
                 # Exact match
                 conditions.append(f"{key} = :{key}")
                 params[key] = value
 
-        return " AND ".join(conditions), params
+        return f" {operator} ".join(conditions), params
+
+    def delete_where(self, table: str, operator: str = "AND", **filters) -> int:
+        """Delete records from a table based on filter criteria.
+        
+        Args:
+            table: Table name
+            operator: Logical operator to combine conditions - "AND" (default) or "OR"
+            **filters: Filter criteria (supports operators like __gt, __lt, __in, __like, __not)
+                      Multiple conditions are combined with the specified operator
+            
+        Returns:
+            Number of records deleted
+            
+        Examples:
+            # Delete records where status = 'inactive'
+            count = dm.delete_where('users', status='inactive')
+            
+            # Delete records where status = 'inactive' AND age > 65 (default AND)
+            count = dm.delete_where('users', status='inactive', age__gt=65)
+            
+            # Delete records where status = 'inactive' OR age > 65
+            count = dm.delete_where('users', operator='OR', status='inactive', age__gt=65)
+            
+            # Delete records where age > 65
+            count = dm.delete_where('users', age__gt=65)
+            
+            # Delete records where id in [1, 2, 3]
+            count = dm.delete_where('users', id__in=[1, 2, 3])
+            
+            # Delete records where name like 'test%'
+            count = dm.delete_where('users', name__like='test%')
+        """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
+        if not filters:
+            raise ValueError("delete_where requires at least one filter condition")
+        
+        # Build WHERE clause
+        where_clause, params = self._build_where_clause(filters, operator)
+        
+        sql = f"DELETE FROM {table} WHERE {where_clause}"
+        
+        with DatabaseConnection(self.db_path) as conn:
+            cursor = conn.execute(sql, params)
+            conn.commit()
+            return cursor.rowcount
+
+    def update_where(self, table: str, data: Dict[str, Any], operator: str = "AND", **filters) -> int:
+        """Update records in a table based on filter criteria.
+        
+        Args:
+            table: Table name
+            data: Dictionary of column-value pairs to update
+            operator: Logical operator to combine conditions - "AND" (default) or "OR"
+            **filters: Filter criteria (supports operators like __gt, __lt, __in, __like, __not)
+                      Multiple conditions are combined with the specified operator
+            
+        Returns:
+            Number of records updated
+            
+        Examples:
+            # Update status for all users with age > 65
+            count = dm.update_where('users', {'status': 'senior'}, age__gt=65)
+            
+            # Update status where age > 65 AND status = 'active' (default AND)
+            count = dm.update_where('users', {'status': 'senior'}, age__gt=65, status='active')
+            
+            # Update status where age > 65 OR status = 'pending'
+            count = dm.update_where('users', {'status': 'senior'}, operator='OR', age__gt=65, status='pending')
+            
+            # Update multiple fields where id in specific list
+            count = dm.update_where(
+                'users', 
+                {'status': 'inactive', 'updated_at': datetime.now()},
+                id__in=[1, 2, 3]
+            )
+            
+            # Update where name like pattern
+            count = dm.update_where('users', {'category': 'test'}, name__like='test%')
+        """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+        
+        if not filters:
+            raise ValueError("update_where requires at least one filter condition")
+            
+        if not data:
+            raise ValueError("update_where requires data to update")
+        
+        # Build WHERE clause
+        where_clause, where_params = self._build_where_clause(filters, operator)
+        
+        # Build SET clause
+        set_clauses = []
+        update_params = {}
+        
+        for key, value in data.items():
+            param_key = f"update_{key}"
+            set_clauses.append(f"{key} = :{param_key}")
+            update_params[param_key] = value
+        
+        # Combine parameters (update params first to avoid conflicts)
+        all_params = {**update_params, **where_params}
+        
+        sql = f"UPDATE {table} SET {', '.join(set_clauses)} WHERE {where_clause}"
+        
+        with DatabaseConnection(self.db_path) as conn:
+            cursor = conn.execute(sql, all_params)
+            conn.commit()
+            return cursor.rowcount
+
+    def update_by_id(self, table: str, record_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update a single record by ID.
+        
+        Args:
+            table: Table name
+            record_id: Record ID to update
+            data: Dictionary of column-value pairs to update
+            
+        Returns:
+            Updated record
+        """
+        # Build SET clause
+        set_parts = []
+        params = []
+        
+        for key, value in data.items():
+            set_parts.append(f"{key} = ?")
+            params.append(value)
+        
+        if not set_parts:
+            raise ValueError("No data provided for update")
+        
+        set_clause = ", ".join(set_parts)
+        sql = f"UPDATE {table} SET {set_clause} WHERE id = ?"
+        params.append(record_id)
+        
+        with DatabaseConnection(self.db_path) as conn:
+            cursor = conn.execute(sql, params)
+            conn.commit()
+            
+            if cursor.rowcount == 0:
+                raise ValueError(f"No record found with id: {record_id}")
+            
+            # Return the updated record
+            result = conn.execute(f"SELECT * FROM {table} WHERE id = ?", [record_id])
+            row = result.fetchone()
+            if row:
+                return dict(row)
+            else:
+                raise ValueError(f"Record not found after update: {record_id}")
+    
+    def delete_by_id(self, table: str, record_id: str) -> bool:
+        """Delete a single record by ID using table name.
+        
+        This method is used by the high-level database API.
+        
+        Args:
+            table: Table name
+            record_id: Record ID to delete
+            
+        Returns:
+            True if record was deleted, False if not found
+        """
+        sql = f"DELETE FROM {table} WHERE id = ?"
+        
+        with DatabaseConnection(self.db_path) as conn:
+            cursor = conn.execute(sql, [record_id])
+            conn.commit()
+            return cursor.rowcount > 0
+

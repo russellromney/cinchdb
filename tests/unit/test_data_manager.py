@@ -324,7 +324,7 @@ class TestDataManager:
         created_user = data_manager.create(user)
 
         # Delete by ID
-        deleted = data_manager.delete_by_id(UserModel, created_user.id)
+        deleted = data_manager.delete_model_by_id(UserModel, created_user.id)
         assert deleted is True
 
         # Verify deletion
@@ -332,7 +332,7 @@ class TestDataManager:
         assert found is None
 
         # Test deleting non-existent ID
-        not_deleted = data_manager.delete_by_id(UserModel, "non-existent")
+        not_deleted = data_manager.delete_model_by_id(UserModel, "non-existent")
         assert not_deleted is False
 
     def test_delete_without_filters_fails(self, data_manager):

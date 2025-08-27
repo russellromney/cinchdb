@@ -130,8 +130,8 @@ def test_lazy_vs_eager_tenant_size():
         
         # Eager tenant should have a physical database file
         assert eager_db_path.exists()
-        assert eager_size >= 512  # At least one 512-byte page (optimized for small DBs)
-        assert eager_size <= 2048  # Should be very small for empty tenant
+        assert eager_size >= 4096  # At least one 4KB page (SQLite default)
+        assert eager_size <= 8192  # Should be very small for empty tenant
 
 
 def test_duplicate_lazy_tenant_fails():

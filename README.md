@@ -127,24 +127,16 @@ db.update("posts", post_id, {"content": "Updated content"})
 - **Python SDK**: Core functionality for local development
 - **CLI**: Full-featured command-line interface
 
-## Security & Encryption
+## Security
 
-Optional transparent encryption for tenant databases:
+CinchDB uses standard SQLite security features:
 
-```bash
-# Enable encryption
-export CINCH_ENCRYPT_DATA=true
-export CINCH_ENCRYPTION_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+- **WAL mode**: Better concurrency and crash recovery
+- **Foreign key constraints**: Enforced data integrity  
+- **File permissions**: Standard OS-level access control
+- **Multi-tenant isolation**: Separate database files per tenant
 
-# Install encryption library
-pip install pysqlcipher3
-```
-
-- **Tenant databases**: Encrypted with ChaCha20-Poly1305 (~2-5% overhead)
-- **Metadata**: Unencrypted for operational simplicity
-- **Integration**: Transparent - no code changes needed
-
-Works without encryption libraries - gracefully falls back to standard SQLite.
+For production deployments, consider additional security measures at the infrastructure level.
 
 ## Development
 
@@ -157,14 +149,13 @@ make test
 
 ## Future
 
-Though probably not, perhaps I'll evolve it into something bigger and more full-featured, with things like
-- data backups
-- replication to S3
-- audit access
-- SaaS-like dynamics
-- multi-project hosting
-- auth proxying
-- leader-follower abilities for edge deployment
+CinchDB focuses on being a simple, reliable SQLite management layer. Future development will prioritize:
+
+- Remote API server improvements
+- Better CLI user experience  
+- Performance optimizations
+- Additional language SDKs (TypeScript, Go, etc.)
+- Enhanced codegen features
 
 
 ## License

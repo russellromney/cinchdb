@@ -464,38 +464,189 @@ class CinchDB:
                 )
                 return result
 
-    def update(self, table: str, id: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update a record in a table.
+    def update(self, table: str, *updates: Dict[str, Any]) -> Dict[str, Any] | List[Dict[str, Any]]:
+        """Update one or more records in a table.
 
         Args:
             table: Table name
-            id: Record ID
-            data: Updated data as dictionary
+            *updates: One or more update dictionaries, each must contain 'id' field
 
         Returns:
-            Updated record
-        """
-        if self.is_local:
-            return self.data.update(table, id, data)
-        else:
-            # Remote update - use new data CRUD endpoint
-            result = self._make_request(
-                "PUT", f"/tables/{table}/data/{id}", json={"data": data}
-            )
-            return result
+            Single record dict if one record updated, list of dicts if multiple
 
-    def delete(self, table: str, id: str) -> None:
-        """Delete a record from a table.
+        Examples:
+            # Single update
+            db.update("users", {"id": "123", "name": "John Updated", "status": "active"})
+            
+            # Multiple updates using star expansion
+            db.update("users", 
+                {"id": "123", "name": "John Updated", "status": "active"},
+                {"id": "456", "name": "Jane Updated", "email": "jane.new@example.com"},
+                {"id": "789", "status": "inactive"}
+            )
+            
+            # Or with a list using star expansion
+            user_updates = [
+                {"id": "abc", "name": "Alice Updated"},
+                {"id": "def", "status": "premium"}
+            ]
+            db.update("users", *user_updates)
+        """
+        if not updates:
+            raise ValueError("At least one update record must be provided")
+            
+        # Validate that all updates have an 'id' field
+        for i, update_data in enumerate(updates):
+            if 'id' not in update_data:
+                raise ValueError(f"Update record {i} missing required 'id' field")
+            
+        if self.is_local:
+            # Single record
+            if len(updates) == 1:
+                update_data = updates[0].copy()
+                record_id = update_data.pop('id')
+                return self.data.update_by_id(table, record_id, update_data)
+            
+            # Multiple records - batch update
+            results = []
+            for update_data in updates:
+                update_copy = update_data.copy()
+                record_id = update_copy.pop('id')
+                result = self.data.update_by_id(table, record_id, update_copy)
+                results.append(result)
+            return results
+        else:
+            # Remote update
+            if len(updates) == 1:
+                # Single record - use existing endpoint
+                update_data = updates[0].copy()
+                record_id = update_data.pop('id')
+                result = self._make_request(
+                    "PUT", f"/tables/{table}/data/{record_id}", json={"data": update_data}
+                )
+                return result
+            else:
+                # Multiple records - use bulk endpoint
+                result = self._make_request(
+                    "PUT", f"/tables/{table}/data/bulk", json={"updates": list(updates)}
+                )
+                return result
+
+    def delete(self, table: str, *ids: str) -> int:
+        """Delete one or more records from a table.
 
         Args:
             table: Table name
-            id: Record ID
+            *ids: One or more record IDs
+
+        Returns:
+            Number of records deleted
+
+        Examples:
+            # Single delete
+            db.delete("users", "123")
+            
+            # Multiple deletes
+            db.delete("users", "123", "456", "789")
+            
+            # Or with a list using star expansion
+            user_ids = ["abc", "def", "ghi"]
+            db.delete("users", *user_ids)
         """
+        if not ids:
+            raise ValueError("At least one ID must be provided")
+            
         if self.is_local:
-            self.data.delete(table, id)
+            # Single record
+            if len(ids) == 1:
+                success = self.data.delete_by_id(table, ids[0])
+                return 1 if success else 0
+            
+            # Multiple records - batch delete
+            deleted_count = 0
+            for record_id in ids:
+                success = self.data.delete_by_id(table, record_id)
+                if success:
+                    deleted_count += 1
+            return deleted_count
         else:
             # Remote delete
-            self._make_request("DELETE", f"/tables/{table}/data/{id}")
+            if len(ids) == 1:
+                # Single record - use existing endpoint
+                self._make_request("DELETE", f"/tables/{table}/data/{ids[0]}")
+                return 1
+            else:
+                # Multiple records - use bulk endpoint
+                result = self._make_request(
+                    "DELETE", f"/tables/{table}/data/bulk", json={"ids": list(ids)}
+                )
+                return result.get("deleted_count", len(ids))
+
+    def delete_where(self, table: str, operator: str = "AND", **filters) -> int:
+        """Delete records from a table based on filter criteria.
+        
+        Args:
+            table: Table name
+            operator: Logical operator to combine conditions - "AND" (default) or "OR"
+            **filters: Filter criteria (supports operators like __gt, __lt, __in, __like, __not)
+                      Multiple conditions are combined with the specified operator
+            
+        Returns:
+            Number of records deleted
+            
+        Examples:
+            # Delete records where status = 'inactive' (single condition)
+            count = db.delete_where('users', status='inactive')
+            
+            # Delete records where status = 'inactive' AND age > 65 (default AND)
+            count = db.delete_where('users', status='inactive', age__gt=65)
+            
+            # Delete records where status = 'inactive' OR age > 65
+            count = db.delete_where('users', operator='OR', status='inactive', age__gt=65)
+            
+            # Delete records where item_id in [1, 2, 3]
+            count = db.delete_where('items', item_id__in=[1, 2, 3])
+        """
+        if self.is_local:
+            return self.data.delete_where(table, operator=operator, **filters)
+        else:
+            raise NotImplementedError("Remote bulk delete not implemented")
+
+    def update_where(self, table: str, data: Dict[str, Any], operator: str = "AND", **filters) -> int:
+        """Update records in a table based on filter criteria.
+        
+        Args:
+            table: Table name
+            data: Dictionary of column-value pairs to update
+            operator: Logical operator to combine conditions - "AND" (default) or "OR"
+            **filters: Filter criteria (supports operators like __gt, __lt, __in, __like, __not)
+                      Multiple conditions are combined with the specified operator
+            
+        Returns:
+            Number of records updated
+            
+        Examples:
+            # Update status for all users with age > 65 (single condition)
+            count = db.update_where('users', {'status': 'senior'}, age__gt=65)
+            
+            # Update status where age > 65 AND status = 'active' (default AND)
+            count = db.update_where('users', {'status': 'senior'}, age__gt=65, status='active')
+            
+            # Update status where age > 65 OR status = 'pending' 
+            count = db.update_where('users', {'status': 'senior'}, operator='OR', age__gt=65, status='pending')
+            
+            # Update multiple fields where item_id in specific list
+            count = db.update_where(
+                'items', 
+                {'status': 'inactive', 'updated_at': datetime.now()},
+                item_id__in=[1, 2, 3]
+            )
+        """
+        if self.is_local:
+            return self.data.update_where(table, data, operator=operator, **filters)
+        else:
+            raise NotImplementedError("Remote bulk update not implemented")
+
 
     def create_index(
         self,
@@ -581,31 +732,6 @@ class CinchDB:
                 changes.append(Change(**data))
             return changes
 
-    def optimize_tenant(self, tenant_name: str = None, force: bool = False) -> bool:
-        """Optimize a tenant's storage with VACUUM and page size adjustment.
-
-        Args:
-            tenant_name: Name of the tenant to optimize (default: current tenant)
-            force: If True, always perform optimization
-
-        Returns:
-            True if optimization was performed, False otherwise
-            
-        Examples:
-            # Optimize current tenant
-            db.optimize_tenant()
-            
-            # Optimize specific tenant
-            db.optimize_tenant("store_west")
-            
-            # Force optimization even if not needed
-            db.optimize_tenant(force=True)
-        """
-        if self.is_local:
-            tenant_to_optimize = tenant_name or self.tenant
-            return self.tenants.optimize_tenant_storage(tenant_to_optimize, force=force)
-        else:
-            raise NotImplementedError("Remote tenant optimization not implemented")
 
     def get_tenant_size(self, tenant_name: str = None) -> dict:
         """Get storage size information for a tenant.
@@ -639,6 +765,46 @@ class CinchDB:
         else:
             raise NotImplementedError("Remote tenant size query not implemented")
     
+    def vacuum_tenant(self, tenant_name: str = None) -> dict:
+        """Run VACUUM operation on a specific tenant to optimize storage and performance.
+        
+        VACUUM reclaims space from deleted records, defragments the database file,
+        and can improve query performance by rebuilding internal structures.
+        
+        Args:
+            tenant_name: Name of tenant to vacuum (default: current tenant)
+            
+        Returns:
+            Dictionary with vacuum results:
+            - success: Whether vacuum completed successfully
+            - tenant: Name of the tenant
+            - size_before: Size in bytes before vacuum
+            - size_after: Size in bytes after vacuum
+            - space_reclaimed: Bytes reclaimed by vacuum
+            - space_reclaimed_mb: MB reclaimed (rounded to 2 decimals)
+            - duration_seconds: Time taken for vacuum operation
+            - error: Error message if vacuum failed
+            
+        Raises:
+            ValueError: If tenant doesn't exist or is not materialized
+            NotImplementedError: If called on remote database
+            
+        Examples:
+            # Vacuum current tenant
+            result = db.vacuum_tenant()
+            if result['success']:
+                print(f"Reclaimed {result['space_reclaimed_mb']:.2f} MB")
+            
+            # Vacuum specific tenant
+            result = db.vacuum_tenant("store_east")
+            print(f"Vacuum took {result['duration_seconds']} seconds")
+        """
+        if self.is_local:
+            tenant_to_vacuum = tenant_name or self.tenant
+            return self.tenants.vacuum_tenant(tenant_to_vacuum)
+        else:
+            raise NotImplementedError("Remote tenant vacuum not implemented")
+    
     def get_storage_info(self) -> dict:
         """Get storage size information for all tenants in current branch.
         
@@ -667,35 +833,6 @@ class CinchDB:
         else:
             raise NotImplementedError("Remote storage info not implemented")
     
-    def optimize_all_tenants(self, force: bool = False) -> dict:
-        """Optimize storage for all tenants in current branch.
-
-        This is designed to be called periodically to:
-        - Reclaim unused space with VACUUM
-        - Adjust page sizes as databases grow
-        - Keep small databases compact
-
-        Args:
-            force: If True, optimize all tenants regardless of size
-
-        Returns:
-            Dictionary with optimization results:
-            - optimized: List of tenant names that were optimized
-            - skipped: List of tenant names that were skipped
-            - errors: List of tuples (tenant_name, error_message)
-            
-        Examples:
-            # Run periodic optimization
-            results = db.optimize_all_tenants()
-            print(f"Optimized {len(results['optimized'])} tenants")
-            
-            # Force optimization of all tenants
-            results = db.optimize_all_tenants(force=True)
-        """
-        if self.is_local:
-            return self.tenants.optimize_all_tenants(force=force)
-        else:
-            raise NotImplementedError("Remote tenant optimization not implemented")
 
     def close(self):
         """Close any open connections."""

@@ -243,43 +243,139 @@ results = db.insert("users", *user_list)
 
 #### update()
 
-Update a record in a table.
+Update one or more records in a table.
 
 ```python
-update(table: str, id: str, data: Dict[str, Any]) -> Dict[str, Any]
+update(table: str, *updates: Dict[str, Any]) -> Dict[str, Any] | List[Dict[str, Any]]
 ```
 
 **Parameters:**
 - `table` (str): Table name
-- `id` (str): Record ID
-- `data` (Dict[str, Any]): Updated data as dictionary
+- `*updates` (Dict[str, Any]): One or more update dictionaries, each must contain 'id' field
 
 **Returns:**
-- `Dict[str, Any]`: Updated record
+- `Dict[str, Any]`: Single updated record if one update provided
+- `List[Dict[str, Any]]`: List of updated records if multiple updates provided
 
-**Example:**
+**Examples:**
 ```python
-updated = db.update("users", "user-id-123", {
+# Single update
+updated = db.update("users", {
+    "id": "user-id-123",
     "name": "Jane Doe",
     "active": False
 })
+
+# Bulk update - multiple records at once
+updates = [
+    {"id": "user-1", "name": "Alice Updated", "status": "premium"},
+    {"id": "user-2", "name": "Bob Updated", "active": False},
+    {"id": "user-3", "status": "inactive"}
+]
+results = db.update("users", *updates)
+
+# Direct bulk update
+results = db.update("users",
+    {"id": "user-4", "email": "new@example.com"},
+    {"id": "user-5", "status": "premium"}
+)
 ```
 
 #### delete()
 
-Delete a record from a table.
+Delete one or more records from a table.
 
 ```python
-delete(table: str, id: str) -> None
+delete(table: str, *ids: str) -> int
 ```
 
 **Parameters:**
 - `table` (str): Table name
-- `id` (str): Record ID
+- `*ids` (str): One or more record IDs
 
-**Example:**
+**Returns:**
+- `int`: Number of records deleted
+
+**Examples:**
 ```python
-db.delete("users", "user-id-123")
+# Single delete
+deleted_count = db.delete("users", "user-id-123")
+
+# Bulk delete - multiple records at once
+deleted_count = db.delete("users", "user-1", "user-2", "user-3")
+
+# Using list expansion
+user_ids = ["user-4", "user-5", "user-6"]
+deleted_count = db.delete("users", *user_ids)
+```
+
+#### delete_where()
+
+Delete records from a table based on filter criteria.
+
+```python
+delete_where(table: str, operator: str = "AND", **filters) -> int
+```
+
+**Parameters:**
+- `table` (str): Table name
+- `operator` (str, optional): Logical operator to combine conditions - "AND" (default) or "OR"
+- `**filters`: Filter criteria (supports operators like __gt, __lt, __in, __like, __not)
+
+**Returns:**
+- `int`: Number of records deleted
+
+**Examples:**
+```python
+# Delete by single condition
+deleted = db.delete_where("users", active=False)
+
+# Delete by multiple conditions (AND by default)
+deleted = db.delete_where("orders", status="cancelled", total__lt=10.0)
+
+# Delete by multiple conditions with OR operator
+deleted = db.delete_where("products", operator="OR", stock=0, discontinued=True)
+
+# Delete with range conditions
+deleted = db.delete_where("logs", created_at__lt="2024-01-01", level="debug")
+
+# Delete with IN condition
+deleted = db.delete_where("users", status__in=["inactive", "banned"])
+```
+
+#### update_where()
+
+Update records in a table based on filter criteria.
+
+```python
+update_where(table: str, data: Dict[str, Any], operator: str = "AND", **filters) -> int
+```
+
+**Parameters:**
+- `table` (str): Table name  
+- `data` (Dict[str, Any]): Dictionary of column-value pairs to update
+- `operator` (str, optional): Logical operator to combine conditions - "AND" (default) or "OR"
+- `**filters`: Filter criteria (supports operators like __gt, __lt, __in, __like, __not)
+
+**Returns:**
+- `int`: Number of records updated
+
+**Examples:**
+```python
+# Update by single condition
+updated = db.update_where("users", {"active": False}, status="pending")
+
+# Update by multiple conditions (AND by default)  
+updated = db.update_where("orders", {"status": "shipped"}, 
+                         payment_status="paid", region="US")
+
+# Update by multiple conditions with OR operator
+updated = db.update_where("products", {"on_sale": True},
+                         operator="OR", stock__lt=5, category="clearance")
+
+# Update with range conditions
+updated = db.update_where("subscriptions", {"status": "expired"},
+                         end_date__lt="2024-01-01")
 ```
 
 #### create_index()
@@ -640,7 +736,9 @@ execute_many(sql: str, params_list: List[Union[tuple, dict]]) -> int
 
 ### DataManager
 
-Manages data operations with model-based interface.
+**Advanced API:** Manages data operations with Pydantic model-based interface.
+
+> **Note:** Most users should use the high-level CinchDB methods (like `db.insert()`, `db.update()`, `db.delete()`) which work with dictionaries and table names. The DataManager is for advanced use cases requiring Pydantic model validation.
 
 Accessed via: `db.data`
 
@@ -747,12 +845,12 @@ delete(model_class: Type[T], **filters) -> int
 **Returns:**
 - `int`: Number of deleted records
 
-#### delete_by_id()
+#### delete_model_by_id()
 
-Delete a specific record by ID.
+Delete a specific record by ID using a Pydantic model class.
 
 ```python
-delete_by_id(model_class: Type[T], record_id: str) -> bool
+delete_model_by_id(model_class: Type[T], record_id: str) -> bool
 ```
 
 **Parameters:**

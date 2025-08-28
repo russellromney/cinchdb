@@ -7,7 +7,7 @@ from pathlib import Path
 
 from cinchdb.managers.table import TableManager
 from cinchdb.models import Column
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 
 
 class TestCDCTableProtection:
@@ -20,8 +20,7 @@ class TestCDCTableProtection:
         project_dir = Path(temp)
 
         # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        init_project(project_dir)
 
         yield project_dir
         

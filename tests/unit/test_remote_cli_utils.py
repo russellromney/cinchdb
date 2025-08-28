@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 from cinchdb.config import Config, ProjectConfig, RemoteConfig
+from cinchdb.core.initializer import init_project
 from cinchdb.cli.utils import get_cinchdb_instance
 
 
@@ -28,7 +29,7 @@ class TestRemoteCLIUtils:
 
         # Save config
         config.save(project_config)
-        config.init_project()
+        init_project(tmp_path)
 
         return tmp_path
 

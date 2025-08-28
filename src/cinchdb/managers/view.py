@@ -6,7 +6,7 @@ from typing import List
 from cinchdb.models import View, Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
-from cinchdb.core.maintenance import check_maintenance_mode
+from cinchdb.core.maintenance_utils import check_maintenance_mode
 from cinchdb.managers.change_tracker import ChangeTracker
 
 

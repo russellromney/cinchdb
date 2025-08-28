@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import shutil
 from cinchdb.managers.tenant import TenantManager
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.core.connection import DatabaseConnection
 
 
@@ -19,8 +19,7 @@ class TestTenantManager:
         project_dir = Path(temp)
 
         # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        init_project(project_dir)
 
         yield project_dir
         shutil.rmtree(temp)

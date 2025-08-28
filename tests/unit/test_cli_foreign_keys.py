@@ -6,7 +6,7 @@ from cinchdb.cli.main import app
 import tempfile
 import shutil
 from pathlib import Path
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.managers.table import TableManager
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
@@ -22,8 +22,7 @@ class TestCLIForeignKeys:
         project_dir = Path(temp)
 
         # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        init_project(project_dir)
 
         # Change to project directory for CLI commands
         import os

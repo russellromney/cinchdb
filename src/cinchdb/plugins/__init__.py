@@ -1,17 +1,16 @@
 """
-CinchDB Plugin System
+Simple Plugin System for CinchDB
 
-Extensible plugin architecture for CinchDB.
+Easy-to-use plugin architecture for CinchDB.
 """
 
-from .base import BasePlugin, PluginHook
+from .base import Plugin
 from .manager import PluginManager
-from .decorators import hook, plugin_method
+from .decorators import database_method, auto_extend
 
 __all__ = [
-    "BasePlugin",
-    "PluginHook", 
+    "Plugin",
     "PluginManager",
-    "hook",
-    "plugin_method",
+    "database_method", 
+    "auto_extend",
 ]

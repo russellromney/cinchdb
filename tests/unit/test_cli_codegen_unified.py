@@ -9,6 +9,7 @@ import responses
 
 from cinchdb.cli.handlers import CodegenHandler
 from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 
 
 class TestUnifiedCodegenCLI:
@@ -25,7 +26,7 @@ class TestUnifiedCodegenCLI:
 
         # Create config - initialize project first
         config = Config(temp_dir)
-        config.init_project()  # This creates the config file
+        init_project(temp_dir)  # This creates the config file
         config_data = config.load()
         config_data.active_database = "test_db"
         config_data.active_branch = "main"

@@ -5,7 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.managers.table import TableManager
@@ -25,8 +25,7 @@ class TestFullWorkflow:
         project_path = Path(temp_dir)
 
         # Initialize project
-        config = Config(project_path)
-        config.init_project()
+        init_project(project_path)
 
         yield project_path
 

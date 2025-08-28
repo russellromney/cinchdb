@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import shutil
 from cinchdb.config import Config, ProjectConfig, RemoteConfig
+from cinchdb.core.initializer import init_project
 
 
 class TestConfig:
@@ -25,8 +26,8 @@ class TestConfig:
         # Should not exist initially
         assert not config.exists
 
-        # Initialize project
-        project_config = config.init_project()
+        # Initialize project using standalone function
+        project_config = init_project(temp_dir)
 
         # Check defaults
         assert project_config.active_database == "main"
@@ -69,16 +70,16 @@ class TestConfig:
     def test_init_project_already_exists(self, temp_dir):
         """Test initializing when project already exists."""
         config = Config(temp_dir)
-        config.init_project()
+        init_project(temp_dir)
 
         # Should raise error on second init
         with pytest.raises(FileExistsError):
-            config.init_project()
+            init_project(temp_dir)
 
     def test_load_config(self, temp_dir):
         """Test loading configuration."""
         config = Config(temp_dir)
-        original = config.init_project()
+        original = init_project(temp_dir)
 
         # Load from disk
         loaded = config.load()
@@ -88,7 +89,7 @@ class TestConfig:
     def test_save_config(self, temp_dir):
         """Test saving configuration."""
         config = Config(temp_dir)
-        config.init_project()
+        init_project(temp_dir)
 
         # Modify and save
         project_config = config.load()
@@ -124,7 +125,7 @@ class TestConfig:
         """Test that environment variables override config values."""
         # Initialize project
         config = Config(temp_dir)
-        config.init_project()
+        init_project(temp_dir)
 
         # Set environment variables
         monkeypatch.setenv("CINCHDB_DATABASE", "env_db")
@@ -141,7 +142,7 @@ class TestConfig:
         """Test environment variables for remote configuration."""
         # Initialize project
         config = Config(temp_dir)
-        config.init_project()
+        init_project(temp_dir)
 
         # Set remote environment variables
         monkeypatch.setenv("CINCHDB_REMOTE_URL", "https://env.example.com")
@@ -160,7 +161,7 @@ class TestConfig:
         """Test that remote URL from env var has trailing slash removed."""
         # Initialize project
         config = Config(temp_dir)
-        config.init_project()
+        init_project(temp_dir)
 
         # Set remote environment variables with trailing slash
         monkeypatch.setenv("CINCHDB_REMOTE_URL", "https://env.example.com/")
@@ -176,7 +177,7 @@ class TestConfig:
         """Test that partial remote config (only URL or only KEY) doesn't create remote."""
         # Initialize project
         config = Config(temp_dir)
-        config.init_project()
+        init_project(temp_dir)
 
         # Set only URL (no key)
         monkeypatch.setenv("CINCHDB_REMOTE_URL", "https://env.example.com")
@@ -257,7 +258,7 @@ class TestConfig:
 
         # Initialize and load config
         config = Config()
-        config.init_project()
+        init_project(Path(env_project))
         project_config = config.load()
 
         # Verify all overrides

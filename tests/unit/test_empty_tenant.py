@@ -4,7 +4,7 @@ import pytest
 import tempfile
 import shutil
 from pathlib import Path
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.change_applier import ChangeApplier
@@ -24,8 +24,7 @@ class TestEmptyTenant:
         project_dir = Path(temp)
 
         # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        init_project(project_dir)
 
         yield project_dir
         shutil.rmtree(temp)

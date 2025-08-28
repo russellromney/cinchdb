@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import List
+from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db
 
 
 def get_project_root(start_path: Path) -> Path:
@@ -119,10 +120,9 @@ def list_databases(project_root: Path) -> List[str]:
     if not metadata_db_path.exists():
         return []
     
-    from cinchdb.infrastructure.metadata_db import MetadataDB
-    with MetadataDB(project_root) as metadata_db:
-        db_records = metadata_db.list_databases()
-        return sorted(record['name'] for record in db_records)
+    metadata_db = get_metadata_db(project_root)
+    db_records = metadata_db.list_databases()
+    return sorted(record['name'] for record in db_records)
 
 
 def list_branches(project_root: Path, database: str) -> List[str]:
@@ -139,13 +139,12 @@ def list_branches(project_root: Path, database: str) -> List[str]:
     if not metadata_db_path.exists():
         return []
     
-    from cinchdb.infrastructure.metadata_db import MetadataDB
-    with MetadataDB(project_root) as metadata_db:
-        db_info = metadata_db.get_database(database)
-        if not db_info:
-            return []
-        branch_records = metadata_db.list_branches(db_info['id'])
-        return sorted(record['name'] for record in branch_records)
+    metadata_db = get_metadata_db(project_root)
+    db_info = metadata_db.get_database(database)
+    if not db_info:
+        return []
+    branch_records = metadata_db.list_branches(db_info['id'])
+    return sorted(record['name'] for record in branch_records)
 
 
 def list_tenants(project_root: Path, database: str, branch: str) -> List[str]:
@@ -163,13 +162,12 @@ def list_tenants(project_root: Path, database: str, branch: str) -> List[str]:
     if not metadata_db_path.exists():
         return []
     
-    from cinchdb.infrastructure.metadata_db import MetadataDB
-    with MetadataDB(project_root) as metadata_db:
-        db_info = metadata_db.get_database(database)
-        if not db_info:
-            return []
-        branch_info = metadata_db.get_branch(db_info['id'], branch)
-        if not branch_info:
-            return []
-        tenant_records = metadata_db.list_tenants(branch_info['id'])
-        return sorted(record['name'] for record in tenant_records)
+    metadata_db = get_metadata_db(project_root)
+    db_info = metadata_db.get_database(database)
+    if not db_info:
+        return []
+    branch_info = metadata_db.get_branch(db_info['id'], branch)
+    if not branch_info:
+        return []
+    tenant_records = metadata_db.list_tenants(branch_info['id'])
+    return sorted(record['name'] for record in tenant_records)

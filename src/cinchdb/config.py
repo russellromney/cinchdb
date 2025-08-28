@@ -134,17 +134,8 @@ class Config:
         with open(self.config_path, "w") as f:
             toml.dump(config_dict, f)
 
-    def init_project(self) -> ProjectConfig:
-        """Initialize a new CinchDB project with default configuration.
+    @property
+    def base_dir(self) -> Path:
+        """Get the base project directory."""
+        return self.project_dir
 
-        This method now delegates to the ProjectInitializer for the actual
-        initialization logic.
-        """
-        from cinchdb.core.initializer import ProjectInitializer
-
-        initializer = ProjectInitializer(self.project_dir)
-        config = initializer.init_project()
-
-        # Load the config into this instance
-        self._config = config
-        return config

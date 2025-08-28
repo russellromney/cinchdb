@@ -5,7 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.managers import TableManager, ViewModel, CodegenManager
 from cinchdb.models import Column
 
@@ -20,8 +20,7 @@ class TestCodegenManager:
         project_root = Path(temp)
 
         # Initialize project
-        config = Config(project_root)
-        config.init_project()
+        init_project(project_root)
 
         yield project_root
 

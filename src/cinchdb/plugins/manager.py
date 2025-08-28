@@ -1,43 +1,31 @@
 """
-Plugin manager for CinchDB.
+Simple plugin manager for CinchDB.
 """
 
 import importlib
 import importlib.util
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-try:
-    from importlib.metadata import entry_points
-except ImportError:
-    # Fallback for Python < 3.8
-    from importlib_metadata import entry_points
+from typing import Dict, List, Optional, Any, Union
 
-from .base import BasePlugin, PluginHook
+from .base import Plugin
 
 logger = logging.getLogger(__name__)
 
 
 class PluginManager:
-    """Manages plugin lifecycle and hooks for CinchDB."""
+    """Simple plugin manager for CinchDB."""
     
     def __init__(self):
-        self.plugins: Dict[str, BasePlugin] = {}
-        self._cinchdb_instance = None
+        self.plugins: Dict[str, Plugin] = {}
+        self._database_instances: List[Any] = []
         
-    def set_cinchdb_instance(self, instance):
-        """Set the CinchDB instance for plugins."""
-        self._cinchdb_instance = instance
-        
-        # Initialize any already loaded plugins
-        for plugin in self.plugins.values():
-            try:
-                plugin.initialize(instance)
-            except Exception as e:
-                logger.error(f"Failed to initialize plugin {plugin.name}: {e}")
-    
-    def register_plugin(self, plugin: BasePlugin) -> None:
-        """Register a plugin instance."""
+    def register_plugin(self, plugin: Union[Plugin, type]) -> None:
+        """Register a plugin instance or class."""
+        # If it's a class, instantiate it
+        if isinstance(plugin, type):
+            plugin = plugin()
+            
         plugin_name = plugin.name
         
         if plugin_name in self.plugins:
@@ -45,13 +33,12 @@ class PluginManager:
         
         self.plugins[plugin_name] = plugin
         
-        # Initialize with CinchDB instance if available
-        if self._cinchdb_instance:
+        # Apply to existing database instances
+        for db_instance in self._database_instances:
             try:
-                plugin.initialize(self._cinchdb_instance)
-                self._apply_plugin_methods(plugin)
+                plugin.extend_database(db_instance)
             except Exception as e:
-                logger.error(f"Failed to initialize plugin {plugin_name}: {e}")
+                logger.error(f"Failed to extend database with plugin {plugin_name}: {e}")
         
         logger.info(f"Plugin {plugin_name} registered successfully")
     
@@ -72,18 +59,24 @@ class PluginManager:
         try:
             module = importlib.import_module(module_name)
             
-            # Look for plugin classes
+            # Look for Plugin class first
+            if hasattr(module, 'Plugin'):
+                plugin_instance = module.Plugin()
+                self.register_plugin(plugin_instance)
+                return
+            
+            # Fallback: look for any Plugin subclass
             for attr_name in dir(module):
                 attr = getattr(module, attr_name)
                 if (isinstance(attr, type) and 
-                    issubclass(attr, BasePlugin) and 
-                    attr != BasePlugin):
+                    issubclass(attr, Plugin) and 
+                    attr != Plugin):
                     
                     plugin_instance = attr()
                     self.register_plugin(plugin_instance)
                     return
             
-            logger.warning(f"No plugin class found in module {module_name}")
+            logger.warning(f"No Plugin class found in module {module_name}")
             
         except ImportError as e:
             logger.error(f"Failed to import plugin module {module_name}: {e}")
@@ -98,69 +91,108 @@ class PluginManager:
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
                 
-                # Look for plugin classes
-                for attr_name in dir(module):
-                    attr = getattr(module, attr_name)
-                    if (isinstance(attr, type) and 
-                        issubclass(attr, BasePlugin) and 
-                        attr != BasePlugin):
-                        
-                        plugin_instance = attr()
-                        self.register_plugin(plugin_instance)
-                        return
+                # Look for Plugin class
+                if hasattr(module, 'Plugin'):
+                    plugin_instance = module.Plugin()
+                    self.register_plugin(plugin_instance)
+                    return
                 
-                logger.warning(f"No plugin class found in file {file_path}")
+                logger.warning(f"No Plugin class found in file {file_path}")
         
         except Exception as e:
             logger.error(f"Failed to load plugin from file {file_path}: {e}")
     
+    def load_plugins_from_directory(self, plugins_dir: Path) -> None:
+        """Load all plugins from a directory."""
+        if not plugins_dir.exists():
+            logger.info(f"Plugins directory {plugins_dir} does not exist")
+            return
+            
+        for plugin_file in plugins_dir.glob("*.py"):
+            if plugin_file.name == "__init__.py":
+                continue
+            self.load_plugin_from_file(plugin_file)
+    
     def discover_plugins(self) -> None:
-        """Discover plugins using entry points."""
+        """Discover plugins using entry points and plugins directory."""
+        # Try entry points for installed plugins
         try:
+            try:
+                from importlib.metadata import entry_points
+            except ImportError:
+                from importlib_metadata import entry_points
+                
             eps = entry_points()
-            # Handle both old and new entry_points API
             if hasattr(eps, 'select'):
-                # New API (Python 3.10+)
                 plugin_eps = eps.select(group='cinchdb.plugins')
             else:
-                # Old API
                 plugin_eps = eps.get('cinchdb.plugins', [])
             
             for entry_point in plugin_eps:
                 try:
                     plugin_class = entry_point.load()
-                    if issubclass(plugin_class, BasePlugin):
-                        plugin_instance = plugin_class()
-                        self.register_plugin(plugin_instance)
+                    self.register_plugin(plugin_class)
                 except Exception as e:
                     logger.error(f"Failed to load plugin {entry_point.name}: {e}")
         except Exception as e:
-            logger.error(f"Failed to discover plugins: {e}")
-    
-    def _apply_plugin_methods(self, plugin: BasePlugin) -> None:
-        """Apply plugin methods to the CinchDB instance."""
-        if not self._cinchdb_instance:
-            return
-            
-        for method_name, method in plugin.get_methods().items():
-            # Bind method to the instance
-            bound_method = method.__get__(self._cinchdb_instance, type(self._cinchdb_instance))
-            setattr(self._cinchdb_instance, method_name, bound_method)
-    
-    def call_hook(self, hook: PluginHook, *args, **kwargs) -> List[Any]:
-        """Call all plugin hooks for a specific event."""
-        results = []
+            logger.debug(f"Entry points not available: {e}")
         
+        # Also check for local plugins directory
+        plugins_dir = Path("plugins")
+        if plugins_dir.exists():
+            self.load_plugins_from_directory(plugins_dir)
+    
+    def register_database(self, db_instance) -> None:
+        """Register a database instance with all plugins."""
+        self._database_instances.append(db_instance)
+        
+        # Apply all plugins to this database instance
         for plugin in self.plugins.values():
             try:
-                plugin_results = plugin.call_hook(hook, *args, **kwargs)
-                results.extend(plugin_results)
+                plugin.extend_database(db_instance)
             except Exception as e:
-                logger.error(f"Plugin {plugin.name} hook {hook} failed: {e}")
-        
-        return results
+                logger.error(f"Failed to extend database with plugin {plugin.name}: {e}")
     
-    def get_plugin(self, name: str) -> Optional[BasePlugin]:
+    def unregister_database(self, db_instance) -> None:
+        """Unregister a database instance."""
+        if db_instance in self._database_instances:
+            self._database_instances.remove(db_instance)
+    
+    def before_query(self, sql: str, params: Optional[tuple] = None) -> tuple:
+        """Call before_query on all plugins."""
+        for plugin in self.plugins.values():
+            try:
+                sql, params = plugin.before_query(sql, params)
+            except Exception as e:
+                logger.error(f"Plugin {plugin.name} before_query failed: {e}")
+        return sql, params
+    
+    def after_query(self, sql: str, params: Optional[tuple], result: Any) -> Any:
+        """Call after_query on all plugins."""
+        for plugin in self.plugins.values():
+            try:
+                result = plugin.after_query(sql, params, result)
+            except Exception as e:
+                logger.error(f"Plugin {plugin.name} after_query failed: {e}")
+        return result
+    
+    def on_connect(self, db_path: str, connection) -> None:
+        """Call on_connect on all plugins."""
+        for plugin in self.plugins.values():
+            try:
+                plugin.on_connect(db_path, connection)
+            except Exception as e:
+                logger.error(f"Plugin {plugin.name} on_connect failed: {e}")
+    
+    def on_disconnect(self, db_path: str) -> None:
+        """Call on_disconnect on all plugins."""
+        for plugin in self.plugins.values():
+            try:
+                plugin.on_disconnect(db_path)
+            except Exception as e:
+                logger.error(f"Plugin {plugin.name} on_disconnect failed: {e}")
+    
+    def get_plugin(self, name: str) -> Optional[Plugin]:
         """Get a plugin by name."""
         return self.plugins.get(name)
     

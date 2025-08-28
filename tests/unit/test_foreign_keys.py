@@ -4,7 +4,7 @@ import pytest
 import tempfile
 import shutil
 from pathlib import Path
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.managers.table import TableManager
 from cinchdb.models import Column, ForeignKeyRef
 from cinchdb.core.connection import DatabaseConnection
@@ -21,8 +21,7 @@ class TestForeignKeys:
         project_dir = Path(temp)
 
         # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        init_project(project_dir)
 
         yield project_dir
         shutil.rmtree(temp)

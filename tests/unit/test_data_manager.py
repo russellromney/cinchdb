@@ -9,7 +9,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.managers.data import DataManager
 from cinchdb.managers.table import TableManager
 from cinchdb.models import Column
@@ -41,8 +41,7 @@ class TestDataManager:
         project_dir = Path(temp)
 
         # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        init_project(project_dir)
 
         yield project_dir
         shutil.rmtree(temp)

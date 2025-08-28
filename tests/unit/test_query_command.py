@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 from typer.testing import CliRunner
 
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.managers.table import TableManager
 from cinchdb.models import Column
 from cinchdb.cli.main import app
@@ -34,8 +34,7 @@ class TestQueryCommand:
         project_path = Path(temp_dir)
 
         # Initialize project
-        config = Config(project_path)
-        config.init_project()
+        init_project(project_path)
 
         # Create a test table with data
         table_mgr = TableManager(project_path, "main", "main", "main")

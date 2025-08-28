@@ -37,6 +37,7 @@ class MetadataDB:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")  # Better concurrency
     
+    
     def _create_tables(self):
         """Create the metadata tables if they don't exist."""
         with self.conn:
@@ -47,6 +48,9 @@ class MetadataDB:
                     name TEXT NOT NULL UNIQUE,
                     description TEXT,
                     materialized BOOLEAN DEFAULT FALSE,
+                    maintenance_mode BOOLEAN DEFAULT FALSE,
+                    maintenance_reason TEXT,
+                    maintenance_started_at TIMESTAMP,
                     metadata JSON,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -62,6 +66,9 @@ class MetadataDB:
                     parent_branch TEXT,
                     schema_version TEXT,
                     materialized BOOLEAN DEFAULT FALSE,
+                    maintenance_mode BOOLEAN DEFAULT FALSE,
+                    maintenance_reason TEXT,
+                    maintenance_started_at TIMESTAMP,
                     metadata JSON,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -116,9 +123,7 @@ class MetadataDB:
                 CREATE INDEX IF NOT EXISTS idx_tenants_shard 
                 ON tenants(shard)
             """)
-            
-            # Add cdc_enabled field to branches table for plugin use
-            # Note: This field is managed by plugins (like bdhcnic), not core CinchDB
+
             try:
                 self.conn.execute("""
                     ALTER TABLE branches ADD COLUMN cdc_enabled BOOLEAN DEFAULT FALSE
@@ -375,6 +380,94 @@ class MetadataDB:
                       not as_lazy, tenant['metadata']))
             
             return len(tenants)
+    
+    # Maintenance Mode Methods
+    
+    def set_database_maintenance(self, database_name: str, enabled: bool, reason: Optional[str] = None) -> None:
+        """Set maintenance mode for a database."""
+        with self.conn:
+            if enabled:
+                self.conn.execute("""
+                    UPDATE databases 
+                    SET maintenance_mode = TRUE, 
+                        maintenance_reason = ?, 
+                        maintenance_started_at = CURRENT_TIMESTAMP 
+                    WHERE name = ?
+                """, (reason, database_name))
+            else:
+                self.conn.execute("""
+                    UPDATE databases 
+                    SET maintenance_mode = FALSE, 
+                        maintenance_reason = NULL, 
+                        maintenance_started_at = NULL 
+                    WHERE name = ?
+                """, (database_name,))
+    
+    def set_branch_maintenance(self, database_name: str, branch_name: str, enabled: bool, reason: Optional[str] = None) -> None:
+        """Set maintenance mode for a branch."""
+        with self.conn:
+            if enabled:
+                self.conn.execute("""
+                    UPDATE branches 
+                    SET maintenance_mode = TRUE, 
+                        maintenance_reason = ?, 
+                        maintenance_started_at = CURRENT_TIMESTAMP 
+                    WHERE database_id = (SELECT id FROM databases WHERE name = ?) 
+                    AND name = ?
+                """, (reason, database_name, branch_name))
+            else:
+                self.conn.execute("""
+                    UPDATE branches 
+                    SET maintenance_mode = FALSE, 
+                        maintenance_reason = NULL, 
+                        maintenance_started_at = NULL 
+                    WHERE database_id = (SELECT id FROM databases WHERE name = ?) 
+                    AND name = ?
+                """, (database_name, branch_name))
+    
+    def is_database_in_maintenance(self, database_name: str) -> bool:
+        """Check if database is in maintenance mode."""
+        cursor = self.conn.execute("""
+            SELECT maintenance_mode FROM databases WHERE name = ?
+        """, (database_name,))
+        row = cursor.fetchone()
+        return bool(row and row['maintenance_mode'])
+    
+    def is_branch_in_maintenance(self, database_name: str, branch_name: str) -> bool:
+        """Check if branch is in maintenance mode."""
+        cursor = self.conn.execute("""
+            SELECT maintenance_mode FROM branches 
+            WHERE database_id = (SELECT id FROM databases WHERE name = ?) 
+            AND name = ?
+        """, (database_name, branch_name))
+        row = cursor.fetchone()
+        return bool(row and row['maintenance_mode'])
+    
+    def get_maintenance_info(self, database_name: str, branch_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Get maintenance mode information."""
+        if branch_name:
+            # Check branch maintenance
+            cursor = self.conn.execute("""
+                SELECT maintenance_mode, maintenance_reason, maintenance_started_at 
+                FROM branches 
+                WHERE database_id = (SELECT id FROM databases WHERE name = ?) 
+                AND name = ?
+            """, (database_name, branch_name))
+        else:
+            # Check database maintenance
+            cursor = self.conn.execute("""
+                SELECT maintenance_mode, maintenance_reason, maintenance_started_at 
+                FROM databases WHERE name = ?
+            """, (database_name,))
+        
+        row = cursor.fetchone()
+        if row and row['maintenance_mode']:
+            return {
+                'enabled': True,
+                'reason': row['maintenance_reason'],
+                'started_at': row['maintenance_started_at']
+            }
+        return None
     
     def close(self):
         """Close the database connection."""

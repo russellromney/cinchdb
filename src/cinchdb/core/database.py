@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from cinchdb.models import Column, Change
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.utils import validate_query_safe
+from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db
 
 if TYPE_CHECKING:
     from cinchdb.managers.table import TableManager
@@ -120,10 +121,8 @@ class CinchDB:
             return
             
         # Check if this is a lazy database using metadata DB
-        from cinchdb.infrastructure.metadata_db import MetadataDB
-        
-        with MetadataDB(self.project_dir) as metadata_db:
-            db_info = metadata_db.get_database(self.database)
+        metadata_db = get_metadata_db(self.project_dir)
+        db_info = metadata_db.get_database(self.database)
         
         if db_info and not db_info['materialized']:
             # Database exists in metadata but not materialized

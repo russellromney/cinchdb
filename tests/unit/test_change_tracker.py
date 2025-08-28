@@ -6,7 +6,7 @@ import tempfile
 import shutil
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.models import Change, ChangeType
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 
 
 class TestChangeTracker:
@@ -19,8 +19,7 @@ class TestChangeTracker:
         project_dir = Path(temp)
 
         # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        init_project(project_dir)
 
         yield project_dir
         shutil.rmtree(temp)

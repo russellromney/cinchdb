@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
-from cinchdb.core.maintenance import check_maintenance_mode
+from cinchdb.core.maintenance_utils import check_maintenance_mode
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.query import QueryManager
 

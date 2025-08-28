@@ -5,7 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.managers.change_comparator import ChangeComparator
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.branch import BranchManager
@@ -22,8 +22,7 @@ class TestChangeComparator:
         project_path = Path(temp_dir)
 
         # Initialize project with main database and branch
-        config = Config(project_path)
-        config.init_project()
+        init_project(project_path)
 
         yield project_path
 

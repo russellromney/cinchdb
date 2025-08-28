@@ -11,6 +11,7 @@ from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path, get_branch_path
+from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db
 
 logger = logging.getLogger(__name__)
 
@@ -388,21 +389,17 @@ class ChangeApplier:
 
     def _enter_maintenance_mode(self) -> None:
         """Enter maintenance mode to block writes during schema changes."""
-        # Create a maintenance mode file that all connections can check
-        branch_path = get_branch_path(self.project_root, self.database, self.branch)
-        maintenance_file = branch_path / ".maintenance_mode"
-
-        with open(maintenance_file, "w") as f:
-            import json
-
-            json.dump(
-                {
-                    "active": True,
-                    "reason": "Schema update in progress",
-                    "started_at": datetime.now().isoformat(),
-                },
-                f,
+        try:
+            metadata_db = get_metadata_db(self.project_root)
+            metadata_db.set_branch_maintenance(
+                self.database, 
+                self.branch, 
+                True, 
+                "Schema update in progress"
             )
+        except Exception as e:
+            logger.error(f"Failed to enter maintenance mode: {e}")
+            # Continue anyway - we'll try to proceed with the schema update
 
         # Give time for any in-flight writes to complete
         # Can be disabled for tests via environment variable
@@ -414,11 +411,11 @@ class ChangeApplier:
 
     def _exit_maintenance_mode(self) -> None:
         """Exit maintenance mode to allow writes again."""
-        branch_path = get_branch_path(self.project_root, self.database, self.branch)
-        maintenance_file = branch_path / ".maintenance_mode"
-
-        if maintenance_file.exists():
-            maintenance_file.unlink()
+        try:
+            metadata_db = get_metadata_db(self.project_root)
+            metadata_db.set_branch_maintenance(self.database, self.branch, False)
+        except Exception as e:
+            logger.error(f"Failed to exit maintenance mode: {e}")
 
     def is_in_maintenance_mode(self) -> bool:
         """Check if branch is in maintenance mode.
@@ -426,6 +423,8 @@ class ChangeApplier:
         Returns:
             True if in maintenance mode, False otherwise
         """
-        branch_path = get_branch_path(self.project_root, self.database, self.branch)
-        maintenance_file = branch_path / ".maintenance_mode"
-        return maintenance_file.exists()
+        try:
+            metadata_db = get_metadata_db(self.project_root)
+            return metadata_db.is_branch_in_maintenance(self.database, self.branch)
+        except Exception:
+            return False

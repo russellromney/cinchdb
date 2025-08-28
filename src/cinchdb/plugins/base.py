@@ -1,90 +1,73 @@
 """
-Base classes for CinchDB plugins.
+Simple base class for CinchDB plugins.
 """
 
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Callable
-from enum import Enum
+from typing import Any, Dict, Optional
 
 
-class PluginHook(Enum):
-    """Available plugin hooks."""
-    # Database lifecycle hooks
-    DATABASE_INIT = "database_init"
-    DATABASE_CONNECT = "database_connect"
-    DATABASE_DISCONNECT = "database_disconnect"
+class Plugin:
+    """Simple base class for CinchDB plugins."""
     
-    # Query hooks
-    QUERY_BEFORE = "query_before"
-    QUERY_AFTER = "query_after"
-    QUERY_ERROR = "query_error"
+    # Plugin metadata - override in subclass
+    name: str = "unnamed_plugin"
+    version: str = "1.0.0"
+    description: str = ""
     
-    # Table hooks
-    TABLE_CREATE = "table_create"
-    TABLE_DROP = "table_drop"
-    TABLE_ALTER = "table_alter"
-    
-    # Tenant hooks
-    TENANT_CREATE = "tenant_create"
-    TENANT_DROP = "tenant_drop"
-    
-    # Branch hooks
-    BRANCH_CREATE = "branch_create"
-    BRANCH_SWITCH = "branch_switch"
-    BRANCH_MERGE = "branch_merge"
-    
-    # CLI hooks
-    CLI_COMMAND_BEFORE = "cli_command_before"
-    CLI_COMMAND_AFTER = "cli_command_after"
-
-
-class BasePlugin(ABC):
-    """Base class for all CinchDB plugins."""
-    
-    def __init__(self):
-        self.name = self.__class__.__name__
-        self.version = "1.0.0"
-        self.description = ""
-        self._hooks: Dict[PluginHook, List[Callable]] = {}
-        self._methods: Dict[str, Callable] = {}
+    def extend_database(self, db) -> None:
+        """Add methods or modify the database instance.
         
-    @abstractmethod
-    def initialize(self, cinchdb_instance) -> None:
-        """Initialize the plugin with a CinchDB instance."""
+        Override this method to add custom methods to database instances:
+        
+        Example:
+            def extend_database(self, db):
+                db.my_custom_method = self.my_custom_method
+        """
         pass
     
-    def register_hook(self, hook: PluginHook, callback: Callable) -> None:
-        """Register a callback for a specific hook."""
-        if hook not in self._hooks:
-            self._hooks[hook] = []
-        self._hooks[hook].append(callback)
+    def before_query(self, sql: str, params: Optional[tuple] = None) -> tuple:
+        """Called before executing any SQL query.
+        
+        Args:
+            sql: The SQL statement to be executed
+            params: Parameters for the SQL statement
+            
+        Returns:
+            Tuple of (modified_sql, modified_params)
+        """
+        return sql, params
     
-    def register_method(self, method_name: str, method: Callable) -> None:
-        """Register a new method to be added to CinchDB instances."""
-        self._methods[method_name] = method
+    def after_query(self, sql: str, params: Optional[tuple], result: Any) -> Any:
+        """Called after executing any SQL query.
+        
+        Args:
+            sql: The SQL statement that was executed
+            params: Parameters that were used
+            result: The query result
+            
+        Returns:
+            Modified result (or original result)
+        """
+        return result
     
-    def get_hooks(self) -> Dict[PluginHook, List[Callable]]:
-        """Get all registered hooks."""
-        return self._hooks.copy()
+    def on_connect(self, db_path: str, connection) -> None:
+        """Called when a database connection is established.
+        
+        Args:
+            db_path: Path to the database file
+            connection: SQLite connection object
+        """
+        pass
     
-    def get_methods(self) -> Dict[str, Callable]:
-        """Get all registered methods."""
-        return self._methods.copy()
-    
-    def call_hook(self, hook: PluginHook, *args, **kwargs) -> Any:
-        """Call all callbacks for a specific hook."""
-        results = []
-        for callback in self._hooks.get(hook, []):
-            try:
-                result = callback(*args, **kwargs)
-                results.append(result)
-            except Exception as e:
-                # Log error but don't break other plugins
-                print(f"Plugin {self.name} hook {hook} failed: {e}")
-        return results
+    def on_disconnect(self, db_path: str) -> None:
+        """Called when a database connection is closed.
+        
+        Args:
+            db_path: Path to the database file
+        """
+        pass
     
     def cleanup(self) -> None:
-        """Cleanup when plugin is unloaded."""
+        """Called when plugin is being unloaded."""
         pass
     
     @property
@@ -94,6 +77,4 @@ class BasePlugin(ABC):
             "name": self.name,
             "version": self.version,
             "description": self.description,
-            "hooks": list(self._hooks.keys()),
-            "methods": list(self._methods.keys()),
         }

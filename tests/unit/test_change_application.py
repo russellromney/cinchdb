@@ -5,7 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import patch
-from cinchdb.config import Config
+from cinchdb.core.initializer import init_project
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.managers.change_tracker import ChangeTracker
@@ -25,8 +25,7 @@ class TestChangeApplier:
         project_dir = Path(temp)
 
         # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        init_project(project_dir)
 
         yield project_dir
         shutil.rmtree(temp)
@@ -355,8 +354,7 @@ class TestChangeApplierRollback:
         project_dir = Path(temp)
 
         # Initialize project
-        config = Config(project_dir)
-        config.init_project()
+        init_project(project_dir)
 
         yield project_dir
         shutil.rmtree(temp)

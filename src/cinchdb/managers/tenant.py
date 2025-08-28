@@ -15,7 +15,7 @@ from cinchdb.core.path_utils import (
     list_tenants,
 )
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.maintenance import check_maintenance_mode
+from cinchdb.core.maintenance_utils import check_maintenance_mode
 from cinchdb.utils.name_validator import validate_name
 from cinchdb.infrastructure.metadata_db import MetadataDB
 from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db

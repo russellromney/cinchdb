@@ -1,8 +1,9 @@
 """SQLite connection management for CinchDB."""
 
+import os
 import sqlite3
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from contextlib import contextmanager
 from datetime import datetime
 

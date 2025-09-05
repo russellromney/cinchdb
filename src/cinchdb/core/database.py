@@ -1,5 +1,6 @@
 """Unified database connection interface for CinchDB."""
 
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 
@@ -79,7 +80,7 @@ class CinchDB:
         self.database = database
         self.branch = branch
         self.tenant = tenant
-
+        
         # Determine connection type
         if project_dir is not None:
             # Local connection
@@ -129,6 +130,18 @@ class CinchDB:
             from cinchdb.core.initializer import ProjectInitializer
             initializer = ProjectInitializer(self.project_dir)
             initializer.materialize_database(self.database)
+    
+    def get_connection(self, db_path) -> "DatabaseConnection":
+        """Get a database connection.
+        
+        Args:
+            db_path: Path to database file
+            
+        Returns:
+            DatabaseConnection instance
+        """
+        from cinchdb.core.connection import DatabaseConnection
+        return DatabaseConnection(db_path)
 
     @property
     def session(self):

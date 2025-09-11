@@ -7,8 +7,9 @@ and follow consistent naming conventions.
 import re
 
 
-# Regex pattern for valid names: lowercase letters, numbers, dash, underscore, period
-VALID_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9\-_\.]*[a-z0-9]$|^[a-z0-9]$")
+# Regex pattern for valid names: lowercase letters, numbers, dash, underscore
+# Period removed to prevent directory traversal attempts like "../"
+VALID_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9\-_]*[a-z0-9]$|^[a-z0-9]$")
 
 # Reserved names that cannot be used
 RESERVED_NAMES = {
@@ -52,6 +53,7 @@ def validate_name(name: str, entity_type: str = "entity") -> None:
     - Be at least 1 character long
     - Not exceed 255 characters (filesystem limit)
     - Not be a reserved name
+    - Not contain path traversal sequences
 
     Args:
         name: The name to validate
@@ -67,6 +69,19 @@ def validate_name(name: str, entity_type: str = "entity") -> None:
         raise InvalidNameError(
             f"{entity_type.capitalize()} name cannot exceed 255 characters"
         )
+    
+    # Critical: Check for path traversal attempts
+    if ".." in name or "/" in name or "\\" in name or "~" in name:
+        raise InvalidNameError(
+            f"Security violation: {entity_type} name '{name}' contains "
+            f"forbidden path traversal characters"
+        )
+    
+    # Check for null bytes and other control characters
+    if "\x00" in name or any(ord(c) < 32 for c in name):
+        raise InvalidNameError(
+            f"Security violation: {entity_type} name contains invalid control characters"
+        )
 
     # Check for lowercase requirement
     if name != name.lower():
@@ -80,7 +95,7 @@ def validate_name(name: str, entity_type: str = "entity") -> None:
         raise InvalidNameError(
             f"Invalid {entity_type} name '{name}'. "
             f"Names must contain only lowercase letters (a-z), numbers (0-9), "
-            f"dash (-), underscore (_), and period (.). "
+            f"dash (-), and underscore (_). "
             f"Names must start and end with alphanumeric characters."
         )
 
@@ -90,11 +105,6 @@ def validate_name(name: str, entity_type: str = "entity") -> None:
         or "__" in name
         or "-_" in name
         or "_-" in name
-        or ".." in name
-        or ".-" in name
-        or "-." in name
-        or "._" in name
-        or "_." in name
     ):
         raise InvalidNameError(
             f"Invalid {entity_type} name '{name}'. "
@@ -132,14 +142,14 @@ def clean_name(name: str) -> str:
     # Replace spaces with dashes
     cleaned = cleaned.replace(" ", "-")
 
-    # Remove invalid characters
-    cleaned = re.sub(r"[^a-z0-9\-_\.]", "", cleaned)
+    # Remove invalid characters (period no longer allowed)
+    cleaned = re.sub(r"[^a-z0-9\-_]", "", cleaned)
 
     # Remove consecutive special characters
-    cleaned = re.sub(r"[-_\.]{2,}", "-", cleaned)
+    cleaned = re.sub(r"[-_]{2,}", "-", cleaned)
 
     # Remove leading/trailing special characters
-    cleaned = cleaned.strip("-_.")
+    cleaned = cleaned.strip("-_")
 
     return cleaned
 

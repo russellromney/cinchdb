@@ -24,7 +24,8 @@ class TableManager:
     PROTECTED_TABLE_PREFIXES = ("__", "sqlite_")
 
     def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main"
+        self, project_root: Path, database: str, branch: str, tenant: str = "main",
+        encryption_manager=None
     ):
         """Initialize table manager.
 
@@ -33,14 +34,16 @@ class TableManager:
             database: Database name
             branch: Branch name
             tenant: Tenant name (default: main)
+            encryption_manager: EncryptionManager instance for encrypted connections
         """
         self.project_root = Path(project_root)
         self.database = database
         self.branch = branch
         self.tenant = tenant
+        self.encryption_manager = encryption_manager
         self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
         self.change_tracker = ChangeTracker(project_root, database, branch)
-        self.tenant_manager = TenantManager(project_root, database, branch)
+        self.tenant_manager = TenantManager(project_root, database, branch, encryption_manager)
 
     def list_tables(self) -> List[Table]:
         """List all tables in the tenant.
@@ -50,7 +53,7 @@ class TableManager:
         """
         tables = []
 
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             # Get all tables first, then filter in Python (more reliable than SQL LIKE)
             cursor = conn.execute(
                 """
@@ -230,7 +233,7 @@ class TableManager:
         columns = []
         foreign_keys = {}
 
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             # Get foreign key information first
             fk_cursor = conn.execute(f"PRAGMA foreign_key_list({table_name})")
             for fk_row in fk_cursor.fetchall():
@@ -423,7 +426,7 @@ class TableManager:
         Returns:
             True if table exists
         """
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
                 (table_name,),

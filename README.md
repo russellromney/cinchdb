@@ -39,6 +39,10 @@ cinch branch merge-into-main feature
 cinch tenant create customer_a
 cinch query "SELECT * FROM users" --tenant customer_a
 
+# Tenant encryption (bring your own keys)
+cinch tenant create secure_customer --encrypt --key="your-secret-key"
+cinch query "SELECT * FROM users" --tenant secure_customer --key="your-secret-key"
+
 # Future: Remote connectivity planned for production deployment
 
 # Autogenerate Python SDK from database
@@ -127,6 +131,35 @@ db.update("posts", post_id, {"content": "Updated content"})
 
 
 ## Architecture
+
+### Storage Architecture
+
+CinchDB uses a **tenant-first storage model** where database and branch are organizational metadata concepts, while tenants represent the actual isolated data stores:
+
+```
+.cinchdb/
+├── metadata.db                    # Organizational metadata
+└── {database}-{branch}/           # Context root (e.g., main-main, prod-feature)
+    ├── {shard}/                   # SHA256-based sharding (first 2 chars)
+    │   ├── {tenant}.db            # Actual SQLite database
+    │   └── {tenant}.db-wal        # WAL file
+    └── ...
+```
+
+**Key Design Decisions:**
+- **Tenant-first**: Each tenant gets its own SQLite database file
+- **Flat hierarchy**: Database/branch form a single context root, avoiding deep nesting
+- **Hash sharding**: Tenants are distributed across 256 shards using SHA256 for scalability
+- **Lazy initialization**: Tenant databases are created on first access, not on tenant creation
+- **WAL mode**: All databases use Write-Ahead Logging for better concurrency
+
+This architecture enables:
+- True multi-tenant isolation at the file system level
+- Efficient branching without duplicating tenant data
+- Simple backup/restore per tenant
+- Horizontal scaling through sharding
+
+### Components
 
 - **Python SDK**: Core functionality for local development
 - **CLI**: Full-featured command-line interface

@@ -7,7 +7,7 @@ from cinchdb.core.initializer import ProjectInitializer, init_project
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.infrastructure.metadata_db import MetadataDB
-from cinchdb.core.path_utils import list_databases, list_branches
+from cinchdb.core.path_utils import list_databases, list_branches, get_context_root, get_tenant_db_path
 
 
 @pytest.fixture
@@ -34,9 +34,9 @@ class TestLazyDatabases:
         assert "lazy_db" in databases
         assert "testdb" in databases  # Original database
         
-        # Verify no physical directory created
-        db_path = test_project / ".cinchdb" / "databases" / "lazy_db"
-        assert not db_path.exists()
+        # Verify no context root created
+        context_root = get_context_root(test_project, "lazy_db", "main")
+        assert not context_root.exists()
         
         # Verify it's in metadata database
         metadata_db = MetadataDB(test_project)
@@ -55,19 +55,16 @@ class TestLazyDatabases:
         # Materialize it
         initializer.materialize_database("lazy_db2")
         
-        # Verify physical directory now exists
-        db_path = test_project / ".cinchdb" / "databases" / "lazy_db2"
-        assert db_path.exists()
+        # Verify context root now exists
+        context_root = get_context_root(test_project, "lazy_db2", "main")
+        assert context_root.exists()
         
-        # Verify branch structure exists (but tenant files don't until tables are added)
-        branch_path = db_path / "branches" / "main"
-        assert branch_path.exists()
-        assert (branch_path / "metadata.json").exists()
-        assert (branch_path / "changes.json").exists()
-        assert (branch_path / "tenants").exists()  # Directory exists but no tenant files yet
+        # Verify structure exists (but tenant files don't until tables are added)
+        assert (context_root / "metadata.json").exists()
+        assert (context_root / "changes.json").exists()
+        # Context root exists but no tenant files yet
         
         # Main tenant database file should NOT exist yet (no tables = no materialization)
-        from cinchdb.core.path_utils import get_tenant_db_path
         main_tenant_path = get_tenant_db_path(test_project, "lazy_db2", "main", "main")
         assert not main_tenant_path.exists()  # Should be lazy until tables are added
         
@@ -89,8 +86,8 @@ class TestLazyDatabases:
         CinchDB(database="lazy_db3", project_dir=test_project)
         
         # Verify it was materialized
-        db_path = test_project / ".cinchdb" / "databases" / "lazy_db3"
-        assert db_path.exists()
+        context_root = get_context_root(test_project, "lazy_db3", "main")
+        assert context_root.exists()
 
 
 class TestLazyBranches:
@@ -110,9 +107,9 @@ class TestLazyBranches:
         assert "feature1" in branches
         assert "main" in branches
         
-        # Verify physical directory is created (branches are always materialized)
-        branch_path = test_project / ".cinchdb" / "databases" / "testdb" / "branches" / "feature1"
-        assert branch_path.exists()
+        # Verify context root is created (branches are always materialized)
+        context_root = get_context_root(test_project, "testdb", "feature1")
+        assert context_root.exists()
     
     def test_materialize_lazy_branch(self, test_project):
         """Test branch creation (branches are always materialized now)."""
@@ -121,15 +118,14 @@ class TestLazyBranches:
         # Create branch (always materialized)
         branch_manager.create_branch("main", "feature2")
         
-        # Verify physical directory now exists
-        branch_path = test_project / ".cinchdb" / "databases" / "testdb" / "branches" / "feature2"
-        assert branch_path.exists()
-        assert (branch_path / "metadata.json").exists()
-        assert (branch_path / "changes.json").exists()
-        assert (branch_path / "tenants").exists()  # Directory exists
+        # Verify context root now exists
+        context_root = get_context_root(test_project, "testdb", "feature2")
+        assert context_root.exists()
+        assert (context_root / "metadata.json").exists()
+        assert (context_root / "changes.json").exists()
+        # Context root exists (already checked above)
         
         # Main tenant database file should exist (copied from source branch)
-        from cinchdb.core.path_utils import get_tenant_db_path
         main_tenant_path = get_tenant_db_path(test_project, "testdb", "feature2", "main")
         assert main_tenant_path.exists()  # Should be copied from source branch
     
@@ -155,14 +151,14 @@ class TestLazyBranches:
         branch_manager.create_branch("feature", "bugfix")
         
         # All should be materialized (branches are always materialized)
-        dev_path = test_project / ".cinchdb" / "databases" / "testdb" / "branches" / "dev"
-        feature_path = test_project / ".cinchdb" / "databases" / "testdb" / "branches" / "feature"
-        assert dev_path.exists()
-        assert feature_path.exists()
+        dev_context = get_context_root(test_project, "testdb", "dev")
+        feature_context = get_context_root(test_project, "testdb", "feature")
+        assert dev_context.exists()
+        assert feature_context.exists()
         
         # Verify bugfix branch exists
-        bugfix_path = test_project / ".cinchdb" / "databases" / "testdb" / "branches" / "bugfix"
-        assert bugfix_path.exists()
+        bugfix_context = get_context_root(test_project, "testdb", "bugfix")
+        assert bugfix_context.exists()
 
 
 class TestIntegration:
@@ -188,9 +184,9 @@ class TestIntegration:
         assert branch_info is not None
         assert not branch_info['materialized']
         
-        # No physical files should exist
-        db_path = test_project / ".cinchdb" / "databases" / "app_db"
-        assert not db_path.exists()
+        # No context root should exist
+        context_root = get_context_root(test_project, "app_db", "main")
+        assert not context_root.exists()
     
     def test_lazy_resource_performance(self, test_project):
         """Test performance with many lazy resources."""
@@ -217,10 +213,11 @@ class TestIntegration:
         assert len(databases) == n_databases + 1  # +1 for initial testdb
         assert list_time < 1.0
         
-        # No physical directories should exist
-        databases_dir = test_project / ".cinchdb" / "databases"
-        physical_dbs = [d for d in databases_dir.iterdir() if d.is_dir()]
-        assert len(physical_dbs) == 1  # Only testdb should be materialized
+        # Count materialized context roots
+        cinchdb_dir = test_project / ".cinchdb"
+        # Context roots follow the pattern {database}-{branch}
+        context_roots = [d for d in cinchdb_dir.iterdir() if d.is_dir() and "-" in d.name]
+        assert len(context_roots) == 1  # Only testdb-main should be materialized
     
     def test_mixed_lazy_and_materialized(self, test_project):
         """Test system with mix of lazy and materialized resources."""
@@ -246,13 +243,13 @@ class TestIntegration:
         assert all(db in databases for db in ["testdb", "lazy1", "lazy2", "materialized1"])
         
         # Check physical existence
-        assert not (test_project / ".cinchdb" / "databases" / "lazy1").exists()
-        assert not (test_project / ".cinchdb" / "databases" / "lazy2").exists()
-        assert (test_project / ".cinchdb" / "databases" / "materialized1").exists()
+        assert not get_context_root(test_project, "lazy1", "main").exists()
+        assert not get_context_root(test_project, "lazy2", "main").exists()
+        assert get_context_root(test_project, "materialized1", "main").exists()
         
         # Check branches (all branches are materialized)
-        assert (test_project / ".cinchdb" / "databases" / "materialized1" / "branches" / "dev").exists()
-        assert (test_project / ".cinchdb" / "databases" / "materialized1" / "branches" / "prod").exists()
+        assert get_context_root(test_project, "materialized1", "dev").exists()
+        assert get_context_root(test_project, "materialized1", "prod").exists()
         
         # Check tenants
         assert tenant_mgr.is_tenant_lazy("lazy_tenant")

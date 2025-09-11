@@ -1,6 +1,18 @@
-# Codegen Commands
+# Code Generation - Your ORM Replacement
 
-Generate type-safe model code from your database schema.
+CinchDB's code generation replaces traditional ORMs with type-safe models that perfectly match your database schema. Since CinchDB doesn't expose raw SQLite connections, generated models are **the primary way** to interact with your database programmatically.
+
+## Why Use Generated Models Instead of ORMs?
+
+**🚫 Traditional ORMs Don't Work**: CinchDB abstracts SQLite connections for security and multi-tenancy, so SQLAlchemy, Tortoise ORM, etc. can't be used.
+
+**✅ Perfect Type Safety**: Generated models match your exact schema - no generic ORM abstractions that might be wrong.
+
+**✅ Always In Sync**: Regenerate models when your schema changes. No more runtime errors from schema mismatches.
+
+**✅ Full CRUD Operations**: Create, read, update, delete operations generated for every table.
+
+**✅ Framework Agnostic**: Use with FastAPI, Flask, Express.js, Next.js - works anywhere.
 
 ## languages
 

@@ -28,16 +28,24 @@ Tenants in main/main:
 Create a new tenant.
 
 ```bash
-cinch tenant create TENANT_NAME
+cinch tenant create TENANT_NAME [OPTIONS]
 ```
 
 ### Arguments
 - `TENANT_NAME` - Name for the new tenant
 
+### Options
+- `--encrypt` - Create an encrypted tenant database
+- `--key` - Encryption key (required with --encrypt)
+- `--description` / `-d` - Tenant description
+
 ### Examples
 ```bash
 # Create single tenant
 cinch tenant create customer_a
+
+# Create encrypted tenant
+cinch tenant create secure_customer --encrypt --key="my-secret-key-123"
 
 # Create multiple tenants
 cinch tenant create acme_corp
@@ -118,6 +126,7 @@ cinch tenant copy template_tenant customer_b
 # Copy schema only
 cinch tenant copy main new_customer --no-data
 ```
+
 
 ## Working with Tenants
 

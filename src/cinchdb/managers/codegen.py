@@ -379,21 +379,58 @@ class CodegenManager:
         results: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate TypeScript interface models."""
-        # TODO: Implement TypeScript generation
-        # For now, return placeholder
-        results["files_generated"].append("typescript_generation_todo.md")
-
-        placeholder_path = output_dir / "typescript_generation_todo.md"
-        with open(placeholder_path, "w") as f:
-            content = "# TypeScript Generation\n\nTypeScript model generation will be implemented in a future update.\n"
-            if include_tables:
-                content += "\nTables will be generated as TypeScript interfaces.\n"
-            if include_views:
-                content += (
-                    "\nViews will be generated as read-only TypeScript interfaces.\n"
-                )
-            f.write(content)
-
+        # Generate interfaces for tables
+        if include_tables:
+            tables = self.table_manager.list_tables()
+            for table in tables:
+                interface_content = self._generate_typescript_table_interface(table)
+                file_name = f"{self._to_pascal_case(table.name)}.ts"
+                file_path = output_dir / file_name
+                
+                with open(file_path, "w") as f:
+                    f.write(interface_content)
+                
+                results["tables_processed"].append(table.name)
+                results["files_generated"].append(file_name)
+        
+        # Generate interfaces for views
+        if include_views:
+            views = self.view_manager.list_views()
+            for view in views:
+                interface_content = self._generate_typescript_view_interface(view)
+                file_name = f"{self._to_pascal_case(view.name)}View.ts"
+                file_path = output_dir / file_name
+                
+                with open(file_path, "w") as f:
+                    f.write(interface_content)
+                
+                results["views_processed"].append(view.name)
+                results["files_generated"].append(file_name)
+        
+        # Generate main index file
+        index_content = self._generate_typescript_index(
+            results["tables_processed"], 
+            results["views_processed"]
+        )
+        index_path = output_dir / "index.ts"
+        with open(index_path, "w") as f:
+            f.write(index_content)
+        results["files_generated"].append("index.ts")
+        
+        # Generate API client
+        client_content = self._generate_typescript_client()
+        client_path = output_dir / "client.ts"
+        with open(client_path, "w") as f:
+            f.write(client_content)
+        results["files_generated"].append("client.ts")
+        
+        # Generate types file
+        types_content = self._generate_typescript_types()
+        types_path = output_dir / "types.ts"
+        with open(types_path, "w") as f:
+            f.write(types_content)
+        results["files_generated"].append("types.ts")
+        
         return results
 
     def _get_view_columns(self, view_name: str) -> Dict[str, str]:
@@ -454,6 +491,326 @@ class CodegenManager:
         # Split on underscores and capitalize each part
         parts = name.replace("-", "_").split("_")
         return "".join(word.capitalize() for word in parts if word)
+    
+    def _sqlite_to_typescript_type(self, sqlite_type: str, column_name: str = "") -> str:
+        """Convert SQLite type to TypeScript type string."""
+        sqlite_type = sqlite_type.upper()
+        
+        # Special case for timestamp fields
+        if column_name in ["created_at", "updated_at"]:
+            return "string"  # ISO date strings
+        
+        if "INT" in sqlite_type:
+            return "number"
+        elif sqlite_type in ["REAL", "FLOAT", "DOUBLE", "NUMERIC"]:
+            return "number"
+        elif sqlite_type == "BLOB":
+            return "Uint8Array"
+        elif sqlite_type == "BOOLEAN":
+            return "boolean"
+        else:
+            # TEXT, VARCHAR, etc.
+            return "string"
+    
+    def _generate_typescript_table_interface(self, table: Table) -> str:
+        """Generate TypeScript interface for a table."""
+        interface_name = self._to_pascal_case(table.name)
+        
+        content = [
+            f"/**",
+            f" * Generated interface for {table.name} table",
+            f" */",
+            f"export interface {interface_name} {{",
+        ]
+        
+        # Generate properties for each column
+        for column in table.columns:
+            ts_type = self._sqlite_to_typescript_type(column.type, column.name)
+            optional = "?" if column.nullable and column.name not in ["id", "created_at"] else ""
+            content.append(f"  {column.name}{optional}: {ts_type};")
+        
+        content.append("}")
+        content.append("")
+        
+        # Generate input interface (for create/update operations)
+        content.extend([
+            f"/**",
+            f" * Input interface for creating/updating {table.name} records",
+            f" */",
+            f"export interface {interface_name}Input {{",
+        ])
+        
+        for column in table.columns:
+            # Skip auto-generated fields in input
+            if column.name in ["id", "created_at", "updated_at"]:
+                continue
+            ts_type = self._sqlite_to_typescript_type(column.type, column.name)
+            optional = "?" if column.nullable else ""
+            content.append(f"  {column.name}{optional}: {ts_type};")
+        
+        content.append("}")
+        content.append("")
+        
+        return "\n".join(content)
+    
+    def _generate_typescript_view_interface(self, view: View) -> str:
+        """Generate TypeScript interface for a view."""
+        interface_name = f"{self._to_pascal_case(view.name)}View"
+        
+        # Get view columns from PRAGMA
+        columns = self._get_view_columns(view.name)
+        
+        content = [
+            f"/**",
+            f" * Generated interface for {view.name} view (read-only)",
+            f" */",
+            f"export interface {interface_name} {{",
+        ]
+        
+        # Generate properties for each column
+        for column_name, column_type in columns.items():
+            ts_type = self._sqlite_to_typescript_type(column_type, column_name)
+            content.append(f"  {column_name}: {ts_type};")
+        
+        content.append("}")
+        content.append("")
+        
+        return "\n".join(content)
+    
+    def _generate_typescript_index(self, tables: List[str], views: List[str]) -> str:
+        """Generate TypeScript index file exporting all interfaces."""
+        content = [
+            "/**",
+            " * Generated TypeScript models for CinchDB",
+            " */",
+            "",
+        ]
+        
+        # Export tables
+        for table_name in tables:
+            interface_name = self._to_pascal_case(table_name)
+            content.append(f"export {{ {interface_name}, {interface_name}Input }} from './{interface_name}';")
+        
+        # Export views
+        for view_name in views:
+            interface_name = f"{self._to_pascal_case(view_name)}View"
+            content.append(f"export {{ {interface_name} }} from './{interface_name}';")
+        
+        # Export client and types
+        content.extend([
+            "",
+            "export { CinchDBClient } from './client';",
+            "export * from './types';",
+            "",
+        ])
+        
+        return "\n".join(content)
+    
+    def _generate_typescript_client(self) -> str:
+        """Generate TypeScript API client class."""
+        content = [
+            "/**",
+            " * CinchDB TypeScript API Client",
+            " */",
+            "",
+            "import { QueryResult, CreateResult, UpdateResult, DeleteResult } from './types';",
+            "",
+            "export class CinchDBClient {",
+            "  private baseUrl: string;",
+            "  private headers: HeadersInit;",
+            "",
+            "  constructor(baseUrl: string, apiKey: string) {",
+            "    this.baseUrl = baseUrl;",
+            "    this.headers = {",
+            "      'Content-Type': 'application/json',",
+            "      'X-API-Key': apiKey,",
+            "    };",
+            "  }",
+            "",
+            "  /**",
+            "   * Execute a query against the database",
+            "   */",
+            "  async query<T = any>(sql: string, params?: any[]): Promise<QueryResult<T>> {",
+            "    const response = await fetch(`${this.baseUrl}/api/v1/query`, {",
+            "      method: 'POST',",
+            "      headers: this.headers,",
+            "      body: JSON.stringify({ sql, params }),",
+            "    });",
+            "",
+            "    if (!response.ok) {",
+            "      throw new Error(`Query failed: ${response.statusText}`);",
+            "    }",
+            "",
+            "    return response.json();",
+            "  }",
+            "",
+            "  /**",
+            "   * Select records from a table",
+            "   */",
+            "  async select<T = any>(",
+            "    table: string,",
+            "    filters?: Record<string, any>,",
+            "    limit?: number,",
+            "    offset?: number",
+            "  ): Promise<T[]> {",
+            "    const params = new URLSearchParams();",
+            "    if (filters) {",
+            "      Object.entries(filters).forEach(([key, value]) => {",
+            "        params.append(key, String(value));",
+            "      });",
+            "    }",
+            "    if (limit !== undefined) params.append('limit', String(limit));",
+            "    if (offset !== undefined) params.append('offset', String(offset));",
+            "",
+            "    const response = await fetch(",
+            "      `${this.baseUrl}/api/v1/tables/${table}/records?${params}`,",
+            "      {",
+            "        method: 'GET',",
+            "        headers: this.headers,",
+            "      }",
+            "    );",
+            "",
+            "    if (!response.ok) {",
+            "      throw new Error(`Select failed: ${response.statusText}`);",
+            "    }",
+            "",
+            "    const result = await response.json();",
+            "    return result.records;",
+            "  }",
+            "",
+            "  /**",
+            "   * Create a new record",
+            "   */",
+            "  async create<T = any>(table: string, data: Partial<T>): Promise<CreateResult<T>> {",
+            "    const response = await fetch(`${this.baseUrl}/api/v1/tables/${table}/records`, {",
+            "      method: 'POST',",
+            "      headers: this.headers,",
+            "      body: JSON.stringify(data),",
+            "    });",
+            "",
+            "    if (!response.ok) {",
+            "      throw new Error(`Create failed: ${response.statusText}`);",
+            "    }",
+            "",
+            "    return response.json();",
+            "  }",
+            "",
+            "  /**",
+            "   * Update a record by ID",
+            "   */",
+            "  async update<T = any>(",
+            "    table: string,",
+            "    id: string,",
+            "    data: Partial<T>",
+            "  ): Promise<UpdateResult<T>> {",
+            "    const response = await fetch(",
+            "      `${this.baseUrl}/api/v1/tables/${table}/records/${id}`,",
+            "      {",
+            "        method: 'PUT',",
+            "        headers: this.headers,",
+            "        body: JSON.stringify(data),",
+            "      }",
+            "    );",
+            "",
+            "    if (!response.ok) {",
+            "      throw new Error(`Update failed: ${response.statusText}`);",
+            "    }",
+            "",
+            "    return response.json();",
+            "  }",
+            "",
+            "  /**",
+            "   * Delete a record by ID",
+            "   */",
+            "  async delete(table: string, id: string): Promise<DeleteResult> {",
+            "    const response = await fetch(",
+            "      `${this.baseUrl}/api/v1/tables/${table}/records/${id}`,",
+            "      {",
+            "        method: 'DELETE',",
+            "        headers: this.headers,",
+            "      }",
+            "    );",
+            "",
+            "    if (!response.ok) {",
+            "      throw new Error(`Delete failed: ${response.statusText}`);",
+            "    }",
+            "",
+            "    return response.json();",
+            "  }",
+            "",
+            "  /**",
+            "   * Bulk create multiple records",
+            "   */",
+            "  async bulkCreate<T = any>(",
+            "    table: string,",
+            "    records: Partial<T>[]",
+            "  ): Promise<CreateResult<T>[]> {",
+            "    const response = await fetch(",
+            "      `${this.baseUrl}/api/v1/tables/${table}/records/bulk`,",
+            "      {",
+            "        method: 'POST',",
+            "        headers: this.headers,",
+            "        body: JSON.stringify({ records }),",
+            "      }",
+            "    );",
+            "",
+            "    if (!response.ok) {",
+            "      throw new Error(`Bulk create failed: ${response.statusText}`);",
+            "    }",
+            "",
+            "    return response.json();",
+            "  }",
+            "}",
+            "",
+        ]
+        
+        return "\n".join(content)
+    
+    def _generate_typescript_types(self) -> str:
+        """Generate TypeScript type definitions."""
+        content = [
+            "/**",
+            " * Common TypeScript type definitions for CinchDB",
+            " */",
+            "",
+            "export interface QueryResult<T = any> {",
+            "  success: boolean;",
+            "  data: T[];",
+            "  rowCount: number;",
+            "  error?: string;",
+            "}",
+            "",
+            "export interface CreateResult<T = any> {",
+            "  success: boolean;",
+            "  data: T;",
+            "  error?: string;",
+            "}",
+            "",
+            "export interface UpdateResult<T = any> {",
+            "  success: boolean;",
+            "  data: T;",
+            "  rowsAffected: number;",
+            "  error?: string;",
+            "}",
+            "",
+            "export interface DeleteResult {",
+            "  success: boolean;",
+            "  rowsAffected: number;",
+            "  error?: string;",
+            "}",
+            "",
+            "export interface PaginationParams {",
+            "  limit?: number;",
+            "  offset?: number;",
+            "}",
+            "",
+            "export interface FilterParams {",
+            "  [key: string]: any;",
+            "}",
+            "",
+        ]
+        
+        return "\n".join(content)
 
     def _generate_cinch_models_class(self) -> str:
         """Generate the CinchModels container class."""

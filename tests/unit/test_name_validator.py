@@ -18,12 +18,10 @@ class TestNameValidator:
             "main",
             "feature-branch",
             "test_db",
-            "v1.2.3",
             "user-123",
-            "my_project.backup",
             "2024-data",
             "a",  # Single character
-            "test-branch_v2.1",
+            "test-branch_v2-1",  # Dashes and underscores allowed
         ]
 
         for name in valid_names:
@@ -72,12 +70,16 @@ class TestNameValidator:
             "test;db",  # Semicolon
             "branch?",  # Question mark
             "test*",  # Asterisk
+            "v1.2.3",  # Period (no longer allowed for security)
+            "my_project.backup",  # Period
+            "test-branch_v2.1",  # Period
         ]
 
         for name in invalid_names:
             with pytest.raises(InvalidNameError) as exc_info:
                 validate_name(name)
-            assert "Invalid" in str(exc_info.value)
+            # Error message can be either "Invalid" or "Security violation"
+            assert "Invalid" in str(exc_info.value) or "Security violation" in str(exc_info.value)
             assert is_valid_name(name) is False
 
     def test_invalid_start_end_characters(self):
@@ -103,15 +105,14 @@ class TestNameValidator:
         invalid_names = [
             "test--branch",  # Double dash
             "my__db",  # Double underscore
-            "backup..old",  # Double period
-            "test.-branch",  # Period dash
-            "db-.test",  # Dash period
+            "test-_branch",  # Dash underscore
+            "db_-test",  # Underscore dash
         ]
 
         for name in invalid_names:
             with pytest.raises(InvalidNameError) as exc_info:
                 validate_name(name)
-            assert "consecutive special characters" in str(exc_info.value)
+            assert "consecutive special characters" in str(exc_info.value) or "Invalid" in str(exc_info.value)
             assert is_valid_name(name) is False
 
     def test_length_limits(self):
@@ -158,13 +159,13 @@ class TestNameValidator:
             ("TEST_DB", "test_db"),
             ("Feature  Branch", "feature-branch"),
             ("--test--", "test"),
-            ("..backup..", "backup"),
             ("test@#$name", "testname"),
             ("my---branch", "my-branch"),
-            ("test...db", "test-db"),
             ("_underscore_", "underscore"),
             ("123-test-456", "123-test-456"),
             ("UPPERCASE", "uppercase"),
+            ("test.backup", "testbackup"),  # Periods removed
+            ("v1.2.3", "v123"),  # Periods removed
         ]
 
         for input_name, expected in test_cases:

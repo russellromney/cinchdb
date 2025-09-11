@@ -21,7 +21,8 @@ db = cinchdb.connect(
     database="myapp",           # Database name (required)
     branch="feature",           # Branch name (default: "main")
     tenant="customer_a",        # Tenant name (default: "main")
-    project_dir="/path/to/dir"  # Project path (optional)
+    project_dir="/path/to/dir", # Project path (optional)
+    encryption_key="secret-key" # Encryption key for encrypted tenants
 )
 ```
 
@@ -90,6 +91,18 @@ users = tenant_db.query("SELECT * FROM users")
 ```python
 # Connect to specific branch and tenant
 specific_db = cinchdb.connect("myapp", branch="feature", tenant="customer_b")
+```
+
+## Encrypted Tenants
+
+```python
+# Connect with encryption key
+db = cinchdb.connect("myapp", tenant="secure", encryption_key="your-key")
+
+# Use environment variables for keys
+import os
+key = os.environ.get("TENANT_KEY")
+db = cinchdb.connect("myapp", tenant="secure", encryption_key=key)
 ```
 
 ## Connection Properties

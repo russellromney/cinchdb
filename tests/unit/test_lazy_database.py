@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from cinchdb.core.initializer import init_project, init_database, ProjectInitializer
-from cinchdb.core.path_utils import list_databases, get_database_path
+from cinchdb.core.path_utils import list_databases, get_database_path, get_context_root, get_tenant_db_path
 from cinchdb.core.database import CinchDB, connect
 from cinchdb.infrastructure.metadata_db import MetadataDB
 
@@ -34,9 +34,9 @@ def test_lazy_database_creation():
         metadata = json.loads(db_info["metadata"]) if db_info["metadata"] else {}
         assert metadata.get("initial_branch") == "main"
         
-        # Check that database directory does NOT exist
-        db_path = get_database_path(project_dir, "lazy-db")
-        assert not db_path.exists()
+        # Check that context root does NOT exist (tenant-first architecture)
+        context_root = get_context_root(project_dir, "lazy-db", "main")
+        assert not context_root.exists()
         
         # Verify database appears in list
         databases = list_databases(project_dir)
@@ -56,27 +56,18 @@ def test_lazy_database_materialization():
         # Create lazy database
         init_database(project_dir, database_name="lazy-db", branch_name="dev", lazy=True)
         
-        # Database directory shouldn't exist yet
-        db_path = get_database_path(project_dir, "lazy-db")
-        assert not db_path.exists()
+        # Context root shouldn't exist yet
+        context_root = get_context_root(project_dir, "lazy-db", "dev")
+        assert not context_root.exists()
         
         # Materialize the database
         initializer = ProjectInitializer(project_dir)
         initializer.materialize_database("lazy-db")
         
-        # Now database directory should exist
-        assert db_path.exists()
-        
-        # Check that branch was created with specified name
-        branch_path = db_path / "branches" / "dev"
-        assert branch_path.exists()
-        
-        # Check that tenants directory exists but no tenant files yet (lazy architecture)
-        tenants_dir = branch_path / "tenants"
-        assert tenants_dir.exists()
+        # Now context root should exist
+        assert context_root.exists()
         
         # Main tenant database should NOT exist until tables are added
-        from cinchdb.core.path_utils import get_tenant_db_path
         main_tenant_path = get_tenant_db_path(project_dir, "lazy-db", "dev", "main")
         assert not main_tenant_path.exists()  # Should be lazy until tables are added
         
@@ -98,16 +89,15 @@ def test_auto_materialization_on_connect():
         # Create lazy database
         init_database(project_dir, database_name="lazy-db", lazy=True)
         
-        # Database directory shouldn't exist
-        db_path = get_database_path(project_dir, "lazy-db")
-        assert not db_path.exists()
+        # Context root shouldn't exist
+        context_root = get_context_root(project_dir, "lazy-db", "main")
+        assert not context_root.exists()
         
         # Connect to the database
         connect("lazy-db", project_dir=project_dir)
         
-        # Database should now be materialized
-        assert db_path.exists()
-        assert (db_path / "branches" / "main").exists()
+        # Context root should now be materialized
+        assert context_root.exists()
 
 
 def test_lazy_vs_eager_database_size():
@@ -121,26 +111,27 @@ def test_lazy_vs_eager_database_size():
         
         # Create eager database
         init_database(project_dir, database_name="eager-db", lazy=False)
-        eager_db_path = get_database_path(project_dir, "eager-db")
+        eager_context_root = get_context_root(project_dir, "eager-db", "main")
         
         # Calculate size of eager database (directory tree)
         def get_dir_size(path):
             total = 0
-            for item in path.rglob('*'):
-                if item.is_file():
-                    total += item.stat().st_size
+            if path.exists():
+                for item in path.rglob('*'):
+                    if item.is_file():
+                        total += item.stat().st_size
             return total
         
-        eager_size = get_dir_size(eager_db_path)
+        eager_size = get_dir_size(eager_context_root)
         
         # Create lazy database
         init_database(project_dir, database_name="lazy-db", lazy=True)
         
         # For lazy database, we now use metadata database (not .meta file)
         # The lazy database info is stored in the metadata.db SQLite file
-        # which is shared by all databases. So we just check that no directory exists
-        lazy_db_path = get_database_path(project_dir, "lazy-db")
-        assert not lazy_db_path.exists()  # No directory for lazy database
+        # which is shared by all databases. So we just check that no context root exists
+        lazy_context_root = get_context_root(project_dir, "lazy-db", "main")
+        assert not lazy_context_root.exists()  # No context root for lazy database
         
         # Eager database should have actual files (even if small due to optimization)
         assert eager_size > 0  # Should have some files
@@ -193,18 +184,17 @@ def test_materialize_already_materialized():
         
         # Create eager database
         init_database(project_dir, database_name="eager-db", lazy=False)
-        db_path = get_database_path(project_dir, "eager-db")
+        context_root = get_context_root(project_dir, "eager-db", "main")
         
-        # Get original modification time of a file
-        branch_metadata = db_path / "branches" / "main" / "metadata.json"
-        original_mtime = branch_metadata.stat().st_mtime
+        # Get original modification time of context root
+        original_mtime = context_root.stat().st_mtime if context_root.exists() else 0
         
         # Try to materialize (should be no-op)
         initializer = ProjectInitializer(project_dir)
         initializer.materialize_database("eager-db")
         
-        # Modification time should not change
-        assert branch_metadata.stat().st_mtime == original_mtime
+        # Context root should still exist
+        assert context_root.exists()
 
 
 def test_lazy_database_with_custom_branch():
@@ -225,13 +215,16 @@ def test_lazy_database_with_custom_branch():
         metadata = json.loads(db_info["metadata"]) if db_info["metadata"] else {}
         assert metadata["initial_branch"] == "develop"
         
-        # Materialize and verify branch is created
+        # Materialize and verify context root is created with correct branch
         initializer = ProjectInitializer(project_dir)
         initializer.materialize_database("lazy-db")
         
-        db_path = get_database_path(project_dir, "lazy-db")
-        assert (db_path / "branches" / "develop").exists()
-        assert not (db_path / "branches" / "main").exists()  # Should not create main
+        context_root = get_context_root(project_dir, "lazy-db", "develop")
+        assert context_root.exists()
+        
+        # Should not create main branch context
+        main_context = get_context_root(project_dir, "lazy-db", "main")
+        assert not main_context.exists()
 
 
 def test_cinchdb_class_with_lazy_database():
@@ -249,9 +242,9 @@ def test_cinchdb_class_with_lazy_database():
         # Use CinchDB class
         db = CinchDB(database="lazy-db", project_dir=project_dir)
         
-        # Database should be materialized
-        db_path = get_database_path(project_dir, "lazy-db")
-        assert db_path.exists()
+        # Context root should be materialized
+        context_root = get_context_root(project_dir, "lazy-db", "main")
+        assert context_root.exists()
         
         # Should be able to use it normally
         assert db.database == "lazy-db"

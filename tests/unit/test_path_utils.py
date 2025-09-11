@@ -52,25 +52,17 @@ class TestPathUtils:
         assert db_path == expected
 
     def test_get_branch_path(self, temp_project):
-        """Test getting branch path."""
+        """Test getting branch path (now returns context root)."""
         branch_path = get_branch_path(temp_project, "test_db", "feature")
-        expected = (
-            temp_project / ".cinchdb" / "databases" / "test_db" / "branches" / "feature"
-        )
+        # In tenant-first structure, branch path is the context root
+        expected = temp_project / ".cinchdb" / "test_db-feature"
         assert branch_path == expected
 
     def test_get_tenant_path(self, temp_project):
-        """Test getting tenant path."""
+        """Test getting tenant path (now returns context root)."""
         tenant_path = get_tenant_path(temp_project, "test_db", "main", "customer1")
-        expected = (
-            temp_project
-            / ".cinchdb"
-            / "databases"
-            / "test_db"
-            / "branches"
-            / "main"
-            / "tenants"
-        )
+        # In tenant-first structure without /tenants, tenant path is just context_root
+        expected = temp_project / ".cinchdb" / "test_db-main"
         assert tenant_path == expected
 
     def test_get_tenant_db_path(self, temp_project):
@@ -81,14 +73,11 @@ class TestPathUtils:
         hash_val = hashlib.sha256("customer1".encode('utf-8')).hexdigest()
         expected_shard = hash_val[:2]
         
+        # Use new tenant-first structure without /tenants
         expected = (
             temp_project
             / ".cinchdb"
-            / "databases"
-            / "test_db"
-            / "branches"
-            / "main"
-            / "tenants"
+            / "test_db-main"  # New context root format
             / expected_shard
             / "customer1.db"
         )

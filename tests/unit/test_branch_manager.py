@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import shutil
 from cinchdb.managers.branch import BranchManager
+from cinchdb.core.path_utils import get_context_root
 
 
 class TestBranchManager:
@@ -48,19 +49,11 @@ class TestBranchManager:
         assert new_branch.database == "main"
         assert not new_branch.is_main
 
-        # Verify directory structure was created
-        branch_path = (
-            branch_manager.project_root
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "feature"
-        )
-        assert branch_path.exists()
-        assert (branch_path / "metadata.json").exists()
-        assert (branch_path / "changes.json").exists()
-        assert (branch_path / "tenants").exists()
+        # Verify context root was created
+        context_root = get_context_root(branch_manager.project_root, "main", "feature")
+        assert context_root.exists()
+        assert (context_root / "metadata.json").exists()
+        assert (context_root / "changes.json").exists()
 
         # List branches should now show 2
         branches = branch_manager.list_branches()

@@ -43,7 +43,8 @@ class TestCLIIntegration:
         # Verify project structure
         assert (temp_project / ".cinchdb").exists()
         assert (temp_project / ".cinchdb" / "config.toml").exists()
-        assert (temp_project / ".cinchdb" / "databases" / "main").exists()
+        # In tenant-first architecture, context root is created
+        assert (temp_project / ".cinchdb" / "main-main").exists()
 
         # Check version
         result = self.run_in_project(["version"], temp_project)

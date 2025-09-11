@@ -50,18 +50,10 @@ class TestTenantManager:
         assert new_tenant.description == "Customer 1 data"
         assert not new_tenant.is_main
 
-        # Verify database file was created in the correct shard directory
-        # customer1 hash = de
-        db_path = (
-            tenant_manager.project_root
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "tenants"
-            / "de"  # shard directory
-            / "customer1.db"
+        # Verify database file was created using new tenant-first structure
+        from cinchdb.core.path_utils import get_tenant_db_path
+        db_path = get_tenant_db_path(
+            tenant_manager.project_root, "main", "main", "customer1"
         )
         assert db_path.exists()
 
@@ -91,17 +83,10 @@ class TestTenantManager:
         # Create new eager tenant to test schema copying
         tenant_manager.create_tenant("customer1", lazy=False)
 
-        # Check schema was copied (customer1 hash = de)
-        customer_db_path = (
-            tenant_manager.project_root
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "tenants"
-            / "de"  # shard directory
-            / "customer1.db"
+        # Check schema was copied using new tenant-first structure
+        from cinchdb.core.path_utils import get_tenant_db_path
+        customer_db_path = get_tenant_db_path(
+            tenant_manager.project_root, "main", "main", "customer1"
         )
 
         with DatabaseConnection(customer_db_path) as conn:
@@ -167,17 +152,10 @@ class TestTenantManager:
 
     def test_copy_tenant(self, tenant_manager):
         """Test copying a tenant."""
-        # Add some data to main tenant (main hash = 0d)
-        main_db_path = (
-            tenant_manager.project_root
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "tenants"
-            / "0d"  # shard directory
-            / "main.db"
+        # Add some data to main tenant using new structure
+        from cinchdb.core.path_utils import get_tenant_db_path
+        main_db_path = get_tenant_db_path(
+            tenant_manager.project_root, "main", "main", "main"
         )
 
         with DatabaseConnection(main_db_path) as conn:
@@ -195,17 +173,9 @@ class TestTenantManager:
 
         assert new_tenant.name == "customer1"
 
-        # Check data was copied (customer1 hash = de)
-        customer_db_path = (
-            tenant_manager.project_root
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "tenants"
-            / "de"  # shard directory
-            / "customer1.db"
+        # Check data was copied using new structure
+        customer_db_path = get_tenant_db_path(
+            tenant_manager.project_root, "main", "main", "customer1"
         )
 
         with DatabaseConnection(customer_db_path) as conn:
@@ -234,28 +204,13 @@ class TestTenantManager:
         assert "customer1" not in tenant_names
         assert "customer2" in tenant_names
 
-        # Check files were renamed (customer1 hash = de, customer2 hash = c8)
-        old_path = (
-            tenant_manager.project_root
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "tenants"
-            / "de"  # old shard directory
-            / "customer1.db"
+        # Check files were renamed using new structure
+        from cinchdb.core.path_utils import get_tenant_db_path
+        old_path = get_tenant_db_path(
+            tenant_manager.project_root, "main", "main", "customer1"
         )
-        new_path = (
-            tenant_manager.project_root
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "tenants"
-            / "c8"  # new shard directory
-            / "customer2.db"
+        new_path = get_tenant_db_path(
+            tenant_manager.project_root, "main", "main", "customer2"
         )
         assert not old_path.exists()
         assert new_path.exists()

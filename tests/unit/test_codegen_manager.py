@@ -163,18 +163,6 @@ class TestCodegenManager:
         assert (output_dir / "user_posts_view.py").exists()
         assert (output_dir / "cinch_models.py").exists()
 
-    def test_generate_typescript_placeholder(self, codegen_manager, temp_project):
-        """Test TypeScript generation (currently placeholder)."""
-        output_dir = temp_project / "generated_ts"
-
-        results = codegen_manager.generate_models(
-            language="typescript", output_dir=output_dir
-        )
-
-        # Should create placeholder file
-        assert (output_dir / "typescript_generation_todo.md").exists()
-        assert "typescript_generation_todo.md" in results["files_generated"]
-
     def test_invalid_language(self, codegen_manager, temp_project):
         """Test error handling for invalid language."""
         output_dir = temp_project / "generated_invalid"
@@ -227,6 +215,136 @@ class TestCodegenManager:
         field = codegen_manager._generate_python_field(col)
         assert "name: str" in field
         assert "Optional" not in field
+    
+    def test_generate_typescript_models_tables_only(self, codegen_manager, temp_project):
+        """Test generating TypeScript models for tables only."""
+        output_dir = temp_project / "generated_ts_models"
+        
+        results = codegen_manager.generate_models(
+            language="typescript",
+            output_dir=output_dir,
+            include_tables=True,
+            include_views=False,
+        )
+        
+        # Check results structure
+        assert results["language"] == "typescript"
+        assert results["output_dir"] == str(output_dir)
+        assert len(results["files_generated"]) == 5  # Users.ts, Posts.ts, index.ts, client.ts, types.ts
+        assert len(results["tables_processed"]) == 2
+        assert "users" in results["tables_processed"]
+        assert "posts" in results["tables_processed"]
+        assert len(results["views_processed"]) == 0
+        
+        # Check files exist
+        assert (output_dir / "index.ts").exists()
+        assert (output_dir / "Users.ts").exists()
+        assert (output_dir / "Posts.ts").exists()
+        assert (output_dir / "client.ts").exists()
+        assert (output_dir / "types.ts").exists()
+        
+        # Check Users.ts content
+        users_content = (output_dir / "Users.ts").read_text()
+        assert "export interface Users {" in users_content
+        assert "name: string;" in users_content
+        assert "email: string;" in users_content
+        assert "age?: number;" in users_content
+        assert "id: string;" in users_content
+        assert "created_at: string;" in users_content
+        assert "updated_at?: string;" in users_content
+        
+        # Check input interface
+        assert "export interface UsersInput {" in users_content
+        assert "name: string;" in users_content
+        assert "email: string;" in users_content
+        # id, created_at, updated_at should NOT be in input interface
+        users_lines = users_content.split("\n")
+        input_start = next(i for i, line in enumerate(users_lines) if "UsersInput" in line)
+        input_end = next(i for i in range(input_start, len(users_lines)) if users_lines[i].strip() == "}")
+        input_section = "\n".join(users_lines[input_start:input_end+1])
+        assert "id:" not in input_section
+        assert "created_at:" not in input_section
+        
+        # Check index.ts content
+        index_content = (output_dir / "index.ts").read_text()
+        assert "export { Users, UsersInput } from './Users';" in index_content
+        assert "export { Posts, PostsInput } from './Posts';" in index_content
+        assert "export { CinchDBClient } from './client';" in index_content
+        assert "export * from './types';" in index_content
+    
+    def test_generate_typescript_models_views_only(self, codegen_manager, temp_project):
+        """Test generating TypeScript models for views only."""
+        output_dir = temp_project / "generated_ts_views"
+        
+        results = codegen_manager.generate_models(
+            language="typescript",
+            output_dir=output_dir,
+            include_tables=False,
+            include_views=True,
+        )
+        
+        # Check results
+        assert results["language"] == "typescript"
+        assert len(results["tables_processed"]) == 0
+        assert len(results["views_processed"]) == 1
+        assert "user_posts" in results["views_processed"]
+        
+        # Check files exist
+        assert (output_dir / "index.ts").exists()
+        assert (output_dir / "UserPostsView.ts").exists()
+        assert (output_dir / "client.ts").exists()
+        assert (output_dir / "types.ts").exists()
+        
+        # Check view content
+        view_content = (output_dir / "UserPostsView.ts").read_text()
+        assert "export interface UserPostsView {" in view_content
+        assert "read-only" in view_content  # Comment indicates it's read-only
+    
+    def test_generate_typescript_client(self, codegen_manager, temp_project):
+        """Test TypeScript client generation."""
+        output_dir = temp_project / "generated_ts_client"
+        
+        codegen_manager.generate_models(
+            language="typescript",
+            output_dir=output_dir,
+            include_tables=True,
+            include_views=False,
+        )
+        
+        # Check client.ts content
+        client_content = (output_dir / "client.ts").read_text()
+        assert "export class CinchDBClient {" in client_content
+        assert "constructor(baseUrl: string, apiKey: string)" in client_content
+        assert "async query<T = any>" in client_content
+        assert "async select<T = any>" in client_content
+        assert "async create<T = any>" in client_content
+        assert "async update<T = any>" in client_content
+        assert "async delete" in client_content
+        assert "async bulkCreate<T = any>" in client_content
+        
+        # Check types.ts content
+        types_content = (output_dir / "types.ts").read_text()
+        assert "export interface QueryResult<T = any>" in types_content
+        assert "export interface CreateResult<T = any>" in types_content
+        assert "export interface UpdateResult<T = any>" in types_content
+        assert "export interface DeleteResult" in types_content
+        assert "export interface PaginationParams" in types_content
+        assert "export interface FilterParams" in types_content
+    
+    def test_sqlite_to_typescript_type_mapping(self, codegen_manager):
+        """Test SQLite to TypeScript type mapping."""
+        assert codegen_manager._sqlite_to_typescript_type("TEXT") == "string"
+        assert codegen_manager._sqlite_to_typescript_type("VARCHAR(255)") == "string"
+        assert codegen_manager._sqlite_to_typescript_type("INTEGER") == "number"
+        assert codegen_manager._sqlite_to_typescript_type("REAL") == "number"
+        assert codegen_manager._sqlite_to_typescript_type("FLOAT") == "number"
+        assert codegen_manager._sqlite_to_typescript_type("BLOB") == "Uint8Array"
+        assert codegen_manager._sqlite_to_typescript_type("NUMERIC") == "number"
+        assert codegen_manager._sqlite_to_typescript_type("BOOLEAN") == "boolean"
+        
+        # Special cases for timestamp fields
+        assert codegen_manager._sqlite_to_typescript_type("TEXT", "created_at") == "string"
+        assert codegen_manager._sqlite_to_typescript_type("TEXT", "updated_at") == "string"
 
         # Nullable integer field
         col = Column(name="age", type="INTEGER", nullable=True)

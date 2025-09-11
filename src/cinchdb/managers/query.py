@@ -16,7 +16,8 @@ class QueryManager:
     """Manages SQL query execution with support for typed returns."""
 
     def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main"
+        self, project_root: Path, database: str, branch: str, tenant: str = "main",
+        encryption_manager=None
     ):
         """Initialize query manager.
 
@@ -25,13 +26,15 @@ class QueryManager:
             database: Database name
             branch: Branch name
             tenant: Tenant name (default: main)
+            encryption_manager: EncryptionManager instance for encrypted connections
         """
         self.project_root = Path(project_root)
         self.database = database
         self.branch = branch
         self.tenant = tenant
+        self.encryption_manager = encryption_manager
         # Initialize tenant manager for lazy tenant handling
-        self.tenant_manager = TenantManager(project_root, database, branch)
+        self.tenant_manager = TenantManager(project_root, database, branch, encryption_manager)
     
     def _is_write_query(self, sql: str) -> bool:
         """Check if a SQL query is a write operation.
@@ -84,7 +87,7 @@ class QueryManager:
             self.tenant, is_write=False
         )
         
-        with DatabaseConnection(db_path) as conn:
+        with DatabaseConnection(db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(sql, params)
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
@@ -214,7 +217,7 @@ class QueryManager:
             self.tenant, is_write=True
         )
 
-        with DatabaseConnection(db_path) as conn:
+        with DatabaseConnection(db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(sql, params)
             affected_rows = cursor.rowcount
             conn.commit()
@@ -243,7 +246,7 @@ class QueryManager:
             self.tenant, is_write=is_write
         )
 
-        with DatabaseConnection(db_path) as conn:
+        with DatabaseConnection(db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             try:
                 for params in params_list:
                     cursor = conn.execute(sql, params)

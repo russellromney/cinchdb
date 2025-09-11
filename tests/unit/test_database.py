@@ -60,7 +60,7 @@ class TestCinchDB:
         with patch("cinchdb.managers.table.TableManager") as mock_table_manager:
             _ = db.tables
             mock_table_manager.assert_called_once_with(
-                tmp_path, "test_db", "main", "main"
+                tmp_path, "test_db", "main", "main", None
             )
 
         # Should be cached
@@ -92,10 +92,10 @@ class TestCinchDB:
             result = db.query("SELECT * FROM users WHERE id = ?", [1])
 
             mock_query_manager.assert_called_once_with(
-                tmp_path, "test_db", "main", "main"
+                tmp_path, "test_db", "main", "main", None
             )
             mock_instance.execute.assert_called_once_with(
-                "SELECT * FROM users WHERE id = ?", [1]
+                "SELECT * FROM users WHERE id = ?", [1], False
             )
             assert result == [{"id": 1, "name": "test"}]
 

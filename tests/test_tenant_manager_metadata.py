@@ -97,7 +97,7 @@ class TestTenantManagerWithMetadata:
         
         # Verify tenant exists both in metadata and on filesystem
         assert not manager.is_tenant_lazy("tenant2")
-        # Use path utils to get correct sharded path
+        # Use path utils to get correct sharded path with new tenant-first structure
         from cinchdb.core.path_utils import get_tenant_db_path
         db_path = get_tenant_db_path(test_project, "testdb", "main", "tenant2")
         assert db_path.exists()

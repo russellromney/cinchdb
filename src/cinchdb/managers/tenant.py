@@ -1,6 +1,8 @@
 """Tenant management for CinchDB."""
 
 import hashlib
+import logging
+import os
 import shutil
 import sqlite3
 import uuid
@@ -13,6 +15,13 @@ from cinchdb.core.path_utils import (
     get_branch_path,
     get_tenant_db_path,
     list_tenants,
+    # New tenant-first path utilities
+    get_context_root,
+    get_tenant_db_path_in_context,
+    ensure_context_directory,
+    ensure_tenant_db_path,
+    calculate_shard,
+    invalidate_cache,
 )
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.maintenance_utils import check_maintenance_mode
@@ -20,22 +29,32 @@ from cinchdb.utils.name_validator import validate_name
 from cinchdb.infrastructure.metadata_db import MetadataDB
 from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db
 
+logger = logging.getLogger(__name__)
+
 
 class TenantManager:
     """Manages tenants within a branch."""
 
-    def __init__(self, project_root: Path, database: str, branch: str):
+    def __init__(self, project_root: Path, database: str, branch: str, encryption_manager=None):
         """Initialize tenant manager.
 
         Args:
             project_root: Path to project root
             database: Database name
             branch: Branch name
+            encryption_manager: EncryptionManager instance for encrypted connections
         """
         self.project_root = Path(project_root)
         self.database = database
         self.branch = branch
+        self.encryption_manager = encryption_manager
+        
+        # New tenant-first approach: use context root
+        self.context_root = get_context_root(self.project_root, database, branch)
+        
+        # Legacy support: keep branch_path for backward compatibility
         self.branch_path = get_branch_path(self.project_root, database, branch)
+        
         self._empty_tenant_name = "__empty__"  # Reserved name for lazy tenant template
         
         # Lazy-initialized pooled connection
@@ -98,7 +117,8 @@ class TenantManager:
         return tenants
 
     def create_tenant(
-        self, tenant_name: str, description: Optional[str] = None, lazy: bool = True
+        self, tenant_name: str, description: Optional[str] = None, lazy: bool = True,
+        encrypt: bool = False, encryption_key: Optional[str] = None
     ) -> Tenant:
         """Create a new tenant by copying schema from main tenant.
 
@@ -106,6 +126,8 @@ class TenantManager:
             tenant_name: Name for the new tenant
             description: Optional description
             lazy: If True, don't create database file until first use
+            encrypt: If True, create encrypted tenant database
+            encryption_key: Encryption key for encrypted tenant (required if encrypt=True)
 
         Returns:
             Created Tenant object
@@ -115,6 +137,12 @@ class TenantManager:
             InvalidNameError: If tenant name is invalid
             MaintenanceError: If branch is in maintenance mode
         """
+        # Validate encryption parameters
+        if encrypt and not encryption_key:
+            raise ValueError("encryption_key is required when encrypt=True")
+        if encryption_key and not encrypt:
+            raise ValueError("encrypt=True is required when providing encryption_key")
+            
         # Check for reserved name
         if tenant_name == self._empty_tenant_name:
             raise ValueError(f"'{self._empty_tenant_name}' is a reserved tenant name")
@@ -140,28 +168,37 @@ class TenantManager:
         tenant_id = str(uuid.uuid4())
         
         # Calculate shard for tenant
-        shard = self._calculate_shard(tenant_name)
+        shard = calculate_shard(tenant_name)
         
         # Create tenant in metadata database
         metadata = {
             "description": description,
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "encrypted": encrypt,
         }
         self.metadata_db.create_tenant(tenant_id, self.branch_id, tenant_name, shard, metadata)
 
+        # Generate encryption key if plugged is available and encryption is enabled
+        self._maybe_generate_tenant_key(tenant_name)
+
         if not lazy:
-            # Ensure __empty__ tenant exists with current schema
-            self._ensure_empty_tenant()
-            
             # Create actual database file using sharded paths
-            new_db_path = self._get_sharded_tenant_db_path(tenant_name)
-            empty_db_path = self._get_sharded_tenant_db_path(self._empty_tenant_name)
+            # Use ensure_tenant_db_path to create directories if needed
+            new_db_path = ensure_tenant_db_path(
+                self.project_root, self.database, self.branch, tenant_name
+            )
             
-            # Directory creation is handled by _get_sharded_tenant_db_path
-            
-            # Copy __empty__ tenant database to new tenant
-            # __empty__ already has 512-byte pages and no data
-            shutil.copy2(empty_db_path, new_db_path)
+            if encrypt:
+                # Create encrypted database with schema from main tenant
+                self._create_encrypted_tenant_database(new_db_path, encryption_key)
+            else:
+                # Ensure __empty__ tenant exists with current schema
+                self._ensure_empty_tenant()
+                
+                # Copy __empty__ tenant database to new tenant
+                # __empty__ already has 512-byte pages and no data
+                empty_db_path = self._get_sharded_tenant_db_path(self._empty_tenant_name)
+                shutil.copy2(empty_db_path, new_db_path)
             
             # Mark as materialized in metadata
             self.metadata_db.mark_tenant_materialized(tenant_id)
@@ -174,49 +211,35 @@ class TenantManager:
             is_main=False,
         )
 
-    def _calculate_shard(self, tenant_name: str) -> str:
-        """Calculate the shard directory for a tenant using SHA256 hash.
+
+    def _get_tenant_db_path(self, tenant_name: str) -> Path:
+        """Get the database path for a tenant using new tenant-first approach.
         
         Args:
             tenant_name: Name of the tenant
             
         Returns:
-            Two-character hex string (e.g., "a0", "ff")
+            Path to the tenant database file in the context
         """
-        hash_val = hashlib.sha256(tenant_name.encode('utf-8')).hexdigest()
-        return hash_val[:2]
+        # Ensure context directory exists
+        ensure_context_directory(self.project_root, self.database, self.branch)
+        
+        # Use new tenant-first path resolution
+        return get_tenant_db_path_in_context(self.context_root, tenant_name)
 
     def _get_sharded_tenant_db_path(self, tenant_name: str) -> Path:
-        """Get the sharded database path for a tenant using metadata DB lookup.
+        """Get the sharded database path for a tenant (legacy compatibility).
+        
+        This method is kept for backward compatibility but now uses the new
+        tenant-first storage approach internally.
         
         Args:
             tenant_name: Name of the tenant
             
         Returns:
             Path to the tenant database file in its shard directory
-            
-        Raises:
-            ValueError: If tenant doesn't exist in metadata
         """
-        # For __empty__ tenant, calculate shard directly
-        if tenant_name == self._empty_tenant_name:
-            shard = self._calculate_shard(tenant_name)
-        else:
-            # Look up shard from metadata DB
-            tenant_info = self.metadata_db.get_tenant(self.branch_id, tenant_name)
-            if not tenant_info or not tenant_info.get('shard'):
-                raise ValueError(f"Tenant '{tenant_name}' not found in metadata or missing shard info")
-            shard = tenant_info['shard']
-        
-        # Build sharded path
-        branch_path = get_branch_path(self.project_root, self.database, self.branch)
-        tenants_dir = branch_path / "tenants"
-        shard_dir = tenants_dir / shard
-        
-        # Ensure shard directory exists
-        shard_dir.mkdir(parents=True, exist_ok=True)
-        
-        return shard_dir / f"{tenant_name}.db"
+        return self._get_tenant_db_path(tenant_name)
 
     def _ensure_empty_tenant(self) -> None:
         """Ensure the __empty__ tenant exists with current schema.
@@ -238,7 +261,7 @@ class TenantManager:
         # Create in metadata if doesn't exist (should already be created during branch/database init)
         if not empty_tenant:
             tenant_id = str(uuid.uuid4())
-            shard = self._calculate_shard(self._empty_tenant_name)
+            shard = calculate_shard(self._empty_tenant_name)
             self.metadata_db.create_tenant(
                 tenant_id, self.branch_id, self._empty_tenant_name, shard,
                 metadata={"system": True, "description": "Template for lazy tenants"}
@@ -248,7 +271,10 @@ class TenantManager:
         
         # If __empty__ database doesn't exist, create it by copying from main tenant
         if not empty_db_path.exists():
-            empty_db_path.parent.mkdir(parents=True, exist_ok=True)
+            # Use centralized function to ensure directory exists
+            ensure_tenant_db_path(
+                self.project_root, self.database, self.branch, "__empty__"
+            )
             
             # Get main tenant database path (may need to materialize it first)
             main_db_path = self._get_sharded_tenant_db_path("main")
@@ -258,7 +284,7 @@ class TenantManager:
                 shutil.copy2(main_db_path, empty_db_path)
                 
                 # Clear all data from tables (keep schema only)
-                with DatabaseConnection(empty_db_path) as conn:
+                with DatabaseConnection(empty_db_path, encryption_manager=self.encryption_manager) as conn:
                     # Get all tables
                     result = conn.execute("""
                         SELECT name FROM sqlite_master 
@@ -275,7 +301,7 @@ class TenantManager:
             else:
                 # If main doesn't exist either, create empty database
                 empty_db_path.touch()
-                with DatabaseConnection(empty_db_path):
+                with DatabaseConnection(empty_db_path, encryption_manager=self.encryption_manager):
                     pass  # Just initialize with PRAGMAs
             
             # Set reasonable default page size for template
@@ -304,16 +330,20 @@ class TenantManager:
 
         Raises:
             ValueError: If tenant doesn't exist, is main tenant, or is reserved
+            InvalidNameError: If tenant name is invalid
             MaintenanceError: If branch is in maintenance mode
         """
-        # Check maintenance mode
-        check_maintenance_mode(self.project_root, self.database, self.branch)
-
-        # Can't delete main or __empty__ tenants
+        # Can't delete main or __empty__ tenants (check before validation)
         if tenant_name == "main":
             raise ValueError("Cannot delete the main tenant")
         if tenant_name == self._empty_tenant_name:
             raise ValueError(f"Cannot delete the reserved '{self._empty_tenant_name}' tenant")
+        
+        # Validate tenant name for security
+        validate_name(tenant_name, "tenant")
+        
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
 
         # Ensure initialization
         self._ensure_initialized()
@@ -349,6 +379,9 @@ class TenantManager:
                     wal_path.unlink()
                 if shm_path.exists():
                     shm_path.unlink()
+        
+        # Invalidate cache for this tenant
+        invalidate_cache(tenant=tenant_name)
 
     
     def materialize_tenant(self, tenant_name: str) -> None:
@@ -359,7 +392,11 @@ class TenantManager:
             
         Raises:
             ValueError: If tenant doesn't exist or is already materialized
+            InvalidNameError: If tenant name is invalid
         """
+        # Validate tenant name first for security
+        validate_name(tenant_name, "tenant")
+        
         # Ensure initialization
         self._ensure_initialized()
         
@@ -375,17 +412,15 @@ class TenantManager:
         if tenant_info['materialized']:
             return  # Already materialized
             
-        db_path = get_tenant_db_path(
+        # Use centralized function to get path and ensure directory exists
+        db_path = ensure_tenant_db_path(
             self.project_root, self.database, self.branch, tenant_name
         )
-        
-        # Ensure tenants directory exists
-        db_path.parent.mkdir(parents=True, exist_ok=True)
         
         # Ensure __empty__ tenant exists with current schema
         self._ensure_empty_tenant()
             
-        # Get __empty__ tenant path for schema copy
+        # Get __empty__ tenant path for schema copy using new structure
         empty_db_path = get_tenant_db_path(
             self.project_root, self.database, self.branch, self._empty_tenant_name
         )
@@ -398,6 +433,7 @@ class TenantManager:
         
         # Mark as materialized in metadata database
         self.metadata_db.mark_tenant_materialized(tenant_info['id'])
+
 
     def copy_tenant(self, source_tenant: str, target_tenant: str) -> Tenant:
         """Copy a tenant to a new tenant.
@@ -438,7 +474,7 @@ class TenantManager:
 
         # Create tenant in metadata database first with shard
         tenant_id = str(uuid.uuid4())
-        target_shard = self._calculate_shard(target_tenant)
+        target_shard = calculate_shard(target_tenant)
         metadata = {
             "description": f"Copied from {source_tenant}",
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -447,9 +483,10 @@ class TenantManager:
 
         # Get paths using sharded approach
         source_path = self._get_sharded_tenant_db_path(source_tenant)
-        target_path = self._get_sharded_tenant_db_path(target_tenant)
-
-        # Directory creation is handled by _get_sharded_tenant_db_path
+        # Use ensure function to create directory if needed
+        target_path = ensure_tenant_db_path(
+            self.project_root, self.database, self.branch, target_tenant
+        )
 
         # Copy database file
         shutil.copy2(source_path, target_path)
@@ -473,9 +510,10 @@ class TenantManager:
 
         Raises:
             ValueError: If old doesn't exist, new already exists, or trying to rename main
-            InvalidNameError: If new tenant name is invalid
+            InvalidNameError: If either tenant name is invalid
         """
-        # Validate new tenant name
+        # Validate both names for security (prevent path traversal)
+        validate_name(old_name, "tenant")
         validate_name(new_name, "tenant")
 
         # Can't rename main tenant
@@ -507,18 +545,18 @@ class TenantManager:
         if tenant_info['materialized']:
             # Calculate paths before metadata update
             old_shard = tenant_info['shard']
-            new_shard = self._calculate_shard(new_name)
+            new_shard = calculate_shard(new_name)
             
-            branch_path = get_branch_path(self.project_root, self.database, self.branch)
-            tenants_dir = branch_path / "tenants"
+            context_root = get_context_root(self.project_root, self.database, self.branch)
             
-            old_path = tenants_dir / old_shard / f"{old_name}.db"
-            new_shard_dir = tenants_dir / new_shard
-            new_shard_dir.mkdir(parents=True, exist_ok=True)
-            new_path = new_shard_dir / f"{new_name}.db"
+            old_path = context_root / old_shard / f"{old_name}.db"
+            # Use centralized function to ensure new directory exists
+            new_path = ensure_tenant_db_path(
+                self.project_root, self.database, self.branch, new_name
+            )
 
         # Update metadata database
-        new_shard = self._calculate_shard(new_name)
+        new_shard = calculate_shard(new_name)
         with self.metadata_db.conn:
             self.metadata_db.conn.execute(
                 "UPDATE tenants SET name = ?, shard = ? WHERE id = ?",
@@ -530,7 +568,7 @@ class TenantManager:
 
             # Rename database file if it exists
             if old_path.exists():
-                new_path.parent.mkdir(parents=True, exist_ok=True)
+                # Directory already created by ensure_tenant_db_path above
                 old_path.rename(new_path)
 
                 # Also rename WAL and SHM files if they exist
@@ -747,13 +785,19 @@ class TenantManager:
 
         Raises:
             ValueError: If tenant doesn't exist
+            InvalidNameError: If tenant name is invalid
             
         Example:
             with tenant_manager.get_tenant_connection("main") as conn:
                 conn.execute("SELECT * FROM table")
         """
+        # Validate tenant name first for security (prevent path traversal)
+        # Exception: __empty__ and main are system tenants
+        if tenant_name not in ("__empty__", "main"):
+            validate_name(tenant_name, "tenant")
+        
         db_path = self.get_tenant_db_path_for_operation(tenant_name, is_write)
-        return DatabaseConnection(db_path)
+        return DatabaseConnection(db_path, tenant_id=tenant_name, encryption_manager=self.encryption_manager)
 
     def vacuum_tenant(self, tenant_name: str) -> dict:
         """Run VACUUM operation on a specific tenant to reclaim space and optimize performance.
@@ -812,7 +856,7 @@ class TenantManager:
         error_message = None
         
         try:
-            with DatabaseConnection(db_path) as conn:
+            with DatabaseConnection(db_path, tenant_id=tenant_name, encryption_manager=self.encryption_manager) as conn:
                 # Run VACUUM command
                 conn.execute("VACUUM")
             success = True
@@ -839,3 +883,115 @@ class TenantManager:
             result["error"] = error_message
         
         return result
+    
+    def _maybe_generate_tenant_key(self, tenant_name: str) -> None:
+        """Generate encryption key for tenant if plugged is available and encryption enabled."""
+        try:
+            # Try to import plugged TenantKeyManager
+            from plugged.tenant_key_manager import TenantKeyManager
+            
+            # Create tenant ID for plugged (using same format as cinchdb)
+            tenant_id = f"{self.database}-{self.branch}-{tenant_name}"
+            
+            # Initialize key manager with our metadata database
+            key_manager = TenantKeyManager(self.metadata_db)
+            
+            # Generate encryption key for the new tenant
+            encryption_key = key_manager.generate_tenant_key(tenant_id)
+            
+            logger.info(f"Generated encryption key for tenant {tenant_name} (version 1)")
+            
+        except ImportError:
+            # Plugged not available - continue without encryption
+            logger.debug(f"Plugged not available, skipping key generation for tenant {tenant_name}")
+        except Exception as e:
+            # Key generation failed - log warning but don't fail tenant creation
+            logger.warning(f"Failed to generate encryption key for tenant {tenant_name}: {e}")
+    
+    def rotate_tenant_key(self, tenant_name: str) -> str:
+        """Rotate encryption key for tenant if plugged is available."""
+        try:
+            from plugged.tenant_key_manager import TenantKeyManager
+            
+            tenant_id = f"{self.database}-{self.branch}-{tenant_name}"
+            key_manager = TenantKeyManager(self.metadata_db)
+            
+            # Generate new key version
+            new_key = key_manager.generate_tenant_key(tenant_id)
+            
+            logger.info(f"Rotated encryption key for tenant {tenant_name}")
+            return new_key
+            
+        except ImportError:
+            raise ValueError("Plugged extension not available - encryption key rotation requires plugged")
+        except Exception as e:
+            raise ValueError(f"Failed to rotate key for tenant {tenant_name}: {e}")
+    
+    def _create_encrypted_tenant_database(self, db_path: str, encryption_key: str) -> None:
+        """Create an encrypted tenant database with current schema.
+        
+        Args:
+            db_path: Path where the encrypted database should be created
+            encryption_key: Encryption key for the database
+        """
+        try:
+            # Import sqlite3 to check for SQLCipher support
+            import sqlite3
+            
+            # Create encrypted database connection
+            conn = sqlite3.connect(db_path)
+            
+            # Try to set encryption key (this will fail if SQLCipher is not available)
+            try:
+                conn.execute(f"PRAGMA key = '{encryption_key}'")
+            except sqlite3.OperationalError as e:
+                conn.close()
+                # Remove the created file since it's not encrypted
+                if os.path.exists(db_path):
+                    os.remove(db_path)
+                raise ValueError(
+                    "SQLCipher is required for encryption but not available. "
+                    "Please install pysqlcipher3 or sqlite3 with SQLCipher support."
+                ) from e
+            
+            # Set SQLite optimization settings for new database
+            conn.execute("PRAGMA page_size = 512")
+            conn.execute("PRAGMA journal_mode = WAL")
+            
+            # Get schema from main tenant to replicate
+            main_db_path = self._get_sharded_tenant_db_path("main")
+            if os.path.exists(main_db_path):
+                # Connect to main tenant to get schema
+                main_conn = sqlite3.connect(main_db_path)
+                
+                # Get all table creation statements
+                cursor = main_conn.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                )
+                
+                # Create tables in encrypted database
+                for (sql,) in cursor.fetchall():
+                    if sql:  # Skip empty SQL statements
+                        conn.execute(sql)
+                
+                # Get all index creation statements
+                cursor = main_conn.execute(
+                    "SELECT sql FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'"
+                )
+                
+                # Create indexes in encrypted database
+                for (sql,) in cursor.fetchall():
+                    if sql:  # Skip empty SQL statements
+                        conn.execute(sql)
+                
+                main_conn.close()
+            
+            # Commit changes and close
+            conn.commit()
+            conn.close()
+            
+        except Exception as e:
+            # Clean up on failure
+            if os.path.exists(db_path):
+                os.remove(db_path)
+            raise ValueError(f"Failed to create encrypted database: {e}") from e

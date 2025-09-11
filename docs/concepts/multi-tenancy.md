@@ -194,6 +194,7 @@ prod_db = cinchdb.connect("myapp", tenant="customer_001")
 - **Access control** - Can set file permissions per tenant
 - **Backup granularity** - Backup individual tenants
 
+
 ### Compliance
 - **GDPR** - Delete entire tenant file for data deletion
 - **SOC 2** - Audit individual tenant access

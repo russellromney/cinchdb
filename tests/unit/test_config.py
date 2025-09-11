@@ -7,6 +7,7 @@ import tempfile
 import shutil
 from cinchdb.config import Config, ProjectConfig, RemoteConfig
 from cinchdb.core.initializer import init_project
+from cinchdb.core.path_utils import get_context_root
 
 
 class TestConfig:
@@ -34,38 +35,12 @@ class TestConfig:
         assert project_config.active_branch == "main"
         assert project_config.api_keys == {}
 
-        # Check files were created
+        # Check files were created (using tenant-first structure)
         assert config.exists
-        assert (
-            temp_dir / ".cinchdb" / "databases" / "main" / "branches" / "main"
-        ).exists()
-        assert (
-            temp_dir
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "metadata.json"
-        ).exists()
-        assert (
-            temp_dir
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "changes.json"
-        ).exists()
-        assert (
-            temp_dir
-            / ".cinchdb"
-            / "databases"
-            / "main"
-            / "branches"
-            / "main"
-            / "tenants"
-        ).exists()
+        context_root = get_context_root(temp_dir, "main", "main")
+        assert context_root.exists()
+        assert (context_root / "metadata.json").exists()
+        assert (context_root / "changes.json").exists()
 
     def test_init_project_already_exists(self, temp_dir):
         """Test initializing when project already exists."""

@@ -63,6 +63,8 @@ class CinchDB:
         project_dir: Optional[Path] = None,
         api_url: Optional[str] = None,
         api_key: Optional[str] = None,
+        encryption_manager=None,
+        encryption_key: Optional[str] = None,
     ):
         """Initialize CinchDB connection.
 
@@ -73,6 +75,8 @@ class CinchDB:
             project_dir: Path to project directory for local connection
             api_url: Base URL for remote API connection
             api_key: API key for remote connection
+            encryption_manager: EncryptionManager instance for encrypted connections
+            encryption_key: Encryption key for encrypted tenant databases
 
         Raises:
             ValueError: If neither local nor remote connection params provided
@@ -80,6 +84,8 @@ class CinchDB:
         self.database = database
         self.branch = branch
         self.tenant = tenant
+        self.encryption_manager = encryption_manager
+        self.encryption_key = encryption_key
         
         # Determine connection type
         if project_dir is not None:
@@ -131,17 +137,20 @@ class CinchDB:
             initializer = ProjectInitializer(self.project_dir)
             initializer.materialize_database(self.database)
     
-    def get_connection(self, db_path) -> "DatabaseConnection":
+    def get_connection(self, db_path, tenant_id: Optional[str] = None, encryption_manager=None, encryption_key: Optional[str] = None) -> "DatabaseConnection":
         """Get a database connection.
         
         Args:
             db_path: Path to database file
+            tenant_id: Tenant ID for per-tenant encryption
+            encryption_manager: EncryptionManager instance for encrypted connections
+            encryption_key: Encryption key for encrypted databases
             
         Returns:
             DatabaseConnection instance
         """
         from cinchdb.core.connection import DatabaseConnection
-        return DatabaseConnection(db_path)
+        return DatabaseConnection(db_path, tenant_id=tenant_id, encryption_manager=encryption_manager, encryption_key=encryption_key)
 
     @property
     def session(self):
@@ -232,7 +241,7 @@ class CinchDB:
             from cinchdb.managers.table import TableManager
 
             self._table_manager = TableManager(
-                self.project_dir, self.database, self.branch, self.tenant
+                self.project_dir, self.database, self.branch, self.tenant, self.encryption_manager
             )
         return self._table_manager
 
@@ -247,7 +256,7 @@ class CinchDB:
             from cinchdb.managers.column import ColumnManager
 
             self._column_manager = ColumnManager(
-                self.project_dir, self.database, self.branch, self.tenant
+                self.project_dir, self.database, self.branch, self.tenant, self.encryption_manager
             )
         return self._column_manager
 
@@ -290,7 +299,7 @@ class CinchDB:
             from cinchdb.managers.tenant import TenantManager
 
             self._tenant_manager = TenantManager(
-                self.project_dir, self.database, self.branch
+                self.project_dir, self.database, self.branch, self.encryption_manager
             )
         return self._tenant_manager
 
@@ -305,7 +314,7 @@ class CinchDB:
             from cinchdb.managers.data import DataManager
 
             self._data_manager = DataManager(
-                self.project_dir, self.database, self.branch, self.tenant
+                self.project_dir, self.database, self.branch, self.tenant, self.encryption_manager
             )
         return self._data_manager
 
@@ -382,9 +391,9 @@ class CinchDB:
                 from cinchdb.managers.query import QueryManager
 
                 self._query_manager = QueryManager(
-                    self.project_dir, self.database, self.branch, self.tenant
+                    self.project_dir, self.database, self.branch, self.tenant, self.encryption_manager
                 )
-            return self._query_manager.execute(sql, params)
+            return self._query_manager.execute(sql, params, skip_validation)
         else:
             # Remote query
             data = {"sql": sql}
@@ -866,6 +875,7 @@ def connect(
     branch: str = "main",
     tenant: str = "main",
     project_dir: Optional[Path] = None,
+    encryption_key: Optional[str] = None,
 ) -> CinchDB:
     """Connect to a local CinchDB database.
 
@@ -874,6 +884,7 @@ def connect(
         branch: Branch name (default: main)
         tenant: Tenant name (default: main)
         project_dir: Path to project directory (optional, will search for .cinchdb)
+        encryption_key: Encryption key for encrypted tenant databases
 
     Returns:
         CinchDB connection instance
@@ -885,6 +896,9 @@ def connect(
         # Connect to specific branch
         db = connect("mydb", "feature-branch")
 
+        # Connect to encrypted tenant
+        db = connect("mydb", tenant="customer_a", encryption_key="my-secret-key")
+
         # Connect with explicit project directory
         db = connect("mydb", project_dir=Path("/path/to/project"))
     """
@@ -895,7 +909,8 @@ def connect(
             raise ValueError("No .cinchdb directory found. Run 'cinchdb init' first.")
 
     return CinchDB(
-        database=database, branch=branch, tenant=tenant, project_dir=project_dir
+        database=database, branch=branch, tenant=tenant, project_dir=project_dir,
+        encryption_key=encryption_key
     )
 
 

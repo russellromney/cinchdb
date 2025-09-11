@@ -5,7 +5,7 @@ from pathlib import Path
 
 from cinchdb.core.initializer import init_project, init_database, ProjectInitializer
 from cinchdb.managers.tenant import TenantManager
-from cinchdb.core.path_utils import get_database_path, get_tenant_db_path
+from cinchdb.core.path_utils import get_database_path, get_tenant_db_path, get_context_root, get_tenant_db_path
 from cinchdb.infrastructure.metadata_db import MetadataDB
 
 
@@ -21,9 +21,9 @@ def test_database_default_is_lazy():
         # Create database without specifying lazy parameter
         init_database(project_dir, "test-db")
         
-        # Should be lazy (directory should not exist)
-        db_path = get_database_path(project_dir, "test-db")
-        assert not db_path.exists()  # Directory should not exist
+        # Should be lazy (context root should not exist)
+        context_root = get_context_root(project_dir, "test-db", "main")
+        assert not context_root.exists()  # Context root should not exist
         
         # Check metadata database
         metadata_db = MetadataDB(project_dir)
@@ -44,10 +44,9 @@ def test_database_explicit_eager():
         # Create database explicitly as eager
         init_database(project_dir, "eager-db", lazy=False)
         
-        # Should be eager (directory structure exists)
-        db_path = get_database_path(project_dir, "eager-db")
-        assert db_path.exists()  # Directory should exist
-        assert (db_path / "branches" / "main").exists()
+        # Should be eager (context root exists)
+        context_root = get_context_root(project_dir, "eager-db", "main")
+        assert context_root.exists()  # Context root should exist
         
         # Check metadata database
         metadata_db = MetadataDB(project_dir)
@@ -128,14 +127,14 @@ def test_mixed_lazy_eager_defaults():
         init_database(project_dir, "explicit-eager", lazy=False)  # Should be eager
         init_database(project_dir, "explicit-lazy", lazy=True)  # Should be lazy
         
-        # Check default-lazy
-        assert not (project_dir / ".cinchdb" / "databases" / "default-lazy").exists()
+        # Check default-lazy (context root should not exist)
+        assert not get_context_root(project_dir, "default-lazy", "main").exists()
         
-        # Check explicit-eager
-        assert (project_dir / ".cinchdb" / "databases" / "explicit-eager").exists()
+        # Check explicit-eager (context root should exist)
+        assert get_context_root(project_dir, "explicit-eager", "main").exists()
         
-        # Check explicit-lazy
-        assert not (project_dir / ".cinchdb" / "databases" / "explicit-lazy").exists()
+        # Check explicit-lazy (context root should not exist)
+        assert not get_context_root(project_dir, "explicit-lazy", "main").exists()
         
         # Verify in metadata database
         metadata_db = MetadataDB(project_dir)
@@ -164,8 +163,8 @@ def test_initializer_method_defaults():
         # Create database using initializer directly without lazy param
         initializer.init_database("from-initializer")
         
-        # Should be lazy by default
-        assert not (project_dir / ".cinchdb" / "databases" / "from-initializer").exists()
+        # Should be lazy by default (context root should not exist)
+        assert not get_context_root(project_dir, "from-initializer", "main").exists()
         
         # Check metadata database
         metadata_db = MetadataDB(project_dir)

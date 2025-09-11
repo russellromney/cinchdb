@@ -29,13 +29,19 @@ sqlite3.register_converter("DATETIME", convert_datetime)
 class DatabaseConnection:
     """Manages a SQLite database connection with WAL mode."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, tenant_id: Optional[str] = None, encryption_manager=None, encryption_key: Optional[str] = None):
         """Initialize database connection.
 
         Args:
             path: Path to SQLite database file
+            tenant_id: Tenant ID for per-tenant encryption
+            encryption_manager: EncryptionManager instance for encrypted connections
+            encryption_key: Encryption key for encrypted databases
         """
         self.path = Path(path)
+        self.tenant_id = tenant_id
+        self.encryption_manager = encryption_manager
+        self.encryption_key = encryption_key
         self._conn: Optional[sqlite3.Connection] = None
         self._connect()
 
@@ -44,19 +50,45 @@ class DatabaseConnection:
         # Ensure directory exists
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Connect with row factory for dict-like access
-        # detect_types=PARSE_DECLTYPES tells SQLite to use our registered converters
-        self._conn = sqlite3.connect(
-            str(self.path),
-            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-        )
+        # Use EncryptionManager if available
+        if self.encryption_manager:
+            self._conn = self.encryption_manager.get_connection(self.path, tenant_id=self.tenant_id)
+        elif self.encryption_key:
+            # Direct encryption key provided - use SQLCipher
+            self._conn = sqlite3.connect(
+                str(self.path),
+                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+            )
+            
+            # Try to set encryption key (this will fail if SQLCipher is not available)
+            try:
+                self._conn.execute(f"PRAGMA key = '{self.encryption_key}'")
+            except sqlite3.OperationalError as e:
+                self._conn.close()
+                raise ValueError(
+                    "SQLCipher is required for encryption but not available. "
+                    "Please install pysqlcipher3 or sqlite3 with SQLCipher support."
+                ) from e
+            
+            # Configure WAL mode and settings
+            self._conn.execute("PRAGMA journal_mode = WAL")
+            self._conn.execute("PRAGMA synchronous = NORMAL")
+            self._conn.execute("PRAGMA wal_autocheckpoint = 0")
+        else:
+            # Fallback to standard SQLite connection
+            # Connect with row factory for dict-like access
+            # detect_types=PARSE_DECLTYPES tells SQLite to use our registered converters
+            self._conn = sqlite3.connect(
+                str(self.path),
+                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+            )
+            
+            # Configure WAL mode and settings
+            self._conn.execute("PRAGMA journal_mode = WAL")
+            self._conn.execute("PRAGMA synchronous = NORMAL")
+            self._conn.execute("PRAGMA wal_autocheckpoint = 0")
         
-        # Configure WAL mode and settings
-        self._conn.execute("PRAGMA journal_mode = WAL")
-        self._conn.execute("PRAGMA synchronous = NORMAL")
-        self._conn.execute("PRAGMA wal_autocheckpoint = 0")
-        
-        # Set row factory and foreign keys
+        # Set row factory and foreign keys (both encrypted and unencrypted)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.commit()
@@ -142,23 +174,28 @@ class ConnectionPool:
 
     def __init__(self):
         """Initialize connection pool."""
-        self._connections: Dict[Path, DatabaseConnection] = {}
+        self._connections: Dict[Any, DatabaseConnection] = {}
 
-    def get_connection(self, path: Path) -> DatabaseConnection:
+    def get_connection(self, path: Path, tenant_id: Optional[str] = None, encryption_manager=None) -> DatabaseConnection:
         """Get or create a connection for the given path.
 
         Args:
             path: Database file path
+            tenant_id: Tenant ID for per-tenant encryption
+            encryption_manager: EncryptionManager instance for encrypted connections
 
         Returns:
             Database connection
         """
         path = Path(path).resolve()
+        
+        # Create a cache key that includes tenant_id to handle per-tenant connections
+        cache_key = (str(path), tenant_id) if tenant_id else str(path)
 
-        if path not in self._connections:
-            self._connections[path] = DatabaseConnection(path)
+        if cache_key not in self._connections:
+            self._connections[cache_key] = DatabaseConnection(path, tenant_id=tenant_id, encryption_manager=encryption_manager)
 
-        return self._connections[path]
+        return self._connections[cache_key]
 
     def close_connection(self, path: Path) -> None:
         """Close and remove a specific connection.

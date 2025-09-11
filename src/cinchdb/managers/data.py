@@ -20,7 +20,8 @@ class DataManager:
     """Manages data operations within a database tenant."""
 
     def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main"
+        self, project_root: Path, database: str, branch: str, tenant: str = "main",
+        encryption_manager=None
     ):
         """Initialize data manager.
 
@@ -29,14 +30,16 @@ class DataManager:
             database: Database name
             branch: Branch name
             tenant: Tenant name (default: main)
+            encryption_manager: EncryptionManager instance for encrypted connections
         """
         self.project_root = Path(project_root)
         self.database = database
         self.branch = branch
         self.tenant = tenant
+        self.encryption_manager = encryption_manager
         self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
-        self.table_manager = TableManager(project_root, database, branch, tenant)
-        self.query_manager = QueryManager(project_root, database, branch, tenant)
+        self.table_manager = TableManager(project_root, database, branch, tenant, encryption_manager)
+        self.query_manager = QueryManager(project_root, database, branch, tenant, encryption_manager)
 
     def select(
         self,
@@ -73,7 +76,7 @@ class DataManager:
         if offset:
             query += f" OFFSET {offset}"
 
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(query, params)
             rows = cursor.fetchall()
 
@@ -130,7 +133,7 @@ class DataManager:
             VALUES ({", ".join(placeholders)})
         """
 
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             try:
                 conn.execute(query, record_data)
                 conn.commit()
@@ -233,7 +236,7 @@ class DataManager:
 
         params = {**update_data, "id": data["id"]}
 
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             try:
                 conn.execute(query, params)
                 conn.commit()
@@ -273,7 +276,7 @@ class DataManager:
 
         query = f"DELETE FROM {table_name} WHERE {where_clause}"
 
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             try:
                 cursor = conn.execute(query, params)
                 deleted_count = cursor.rowcount
@@ -320,7 +323,7 @@ class DataManager:
         table_name = self._get_table_name(type(instances[0]))
         created_instances = []
 
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             try:
                 for instance in instances:
                     data = instance.model_dump()
@@ -370,7 +373,7 @@ class DataManager:
         if where_clause:
             query += f" WHERE {where_clause}"
 
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(query, params)
             result = cursor.fetchone()
             return result["count"] if result else 0
@@ -521,7 +524,7 @@ class DataManager:
         
         sql = f"DELETE FROM {table} WHERE {where_clause}"
         
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(sql, params)
             conn.commit()
             return cursor.rowcount
@@ -585,7 +588,7 @@ class DataManager:
         
         sql = f"UPDATE {table} SET {', '.join(set_clauses)} WHERE {where_clause}"
         
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(sql, all_params)
             conn.commit()
             return cursor.rowcount
@@ -616,7 +619,7 @@ class DataManager:
         sql = f"UPDATE {table} SET {set_clause} WHERE id = ?"
         params.append(record_id)
         
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(sql, params)
             conn.commit()
             
@@ -645,7 +648,7 @@ class DataManager:
         """
         sql = f"DELETE FROM {table} WHERE id = ?"
         
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(sql, [record_id])
             conn.commit()
             return cursor.rowcount > 0

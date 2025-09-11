@@ -12,7 +12,7 @@ from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.change_applier import ChangeApplier, ChangeError
 from cinchdb.models import Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.path_utils import get_tenant_db_path, get_branch_path
+from cinchdb.core.path_utils import get_tenant_db_path as get_tenant_db_path, get_branch_path
 
 
 class TestChangeApplier:

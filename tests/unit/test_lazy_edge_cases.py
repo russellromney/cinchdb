@@ -6,7 +6,7 @@ import pytest
 
 from cinchdb.core.initializer import init_project, init_database, ProjectInitializer
 from cinchdb.managers.tenant import TenantManager
-from cinchdb.core.path_utils import list_databases, list_tenants
+from cinchdb.core.path_utils import list_databases, list_tenants, get_context_root, get_tenant_db_path
 from cinchdb.core.database import CinchDB
 from cinchdb.infrastructure.metadata_db import MetadataDB
 
@@ -31,12 +31,12 @@ def test_lazy_database_with_lazy_tenants():
         tenant = tenant_manager.create_tenant("lazy-tenant", lazy=True)
         assert tenant.name == "lazy-tenant"
         
-        # Check that database was materialized
-        db_path = project_dir / ".cinchdb" / "databases" / "lazy-db"
-        assert db_path.exists()
+        # Check that context root was materialized
+        context_root = get_context_root(project_dir, "lazy-db", "main")
+        assert context_root.exists()
         
         # Check that tenant is lazy (no physical .db file)
-        tenant_db = db_path / "branches" / "main" / "tenants" / "lazy-tenant.db"
+        tenant_db = get_tenant_db_path(project_dir, "lazy-db", "main", "lazy-tenant")
         assert not tenant_db.exists()
         
         # Check tenant is in metadata database
@@ -73,13 +73,13 @@ def test_mixed_lazy_and_eager_databases():
         assert "lazy-db1" in databases
         assert "lazy-db2" in databases
         
-        # Verify eager databases have directories
-        assert (project_dir / ".cinchdb" / "databases" / "main").exists()
-        assert (project_dir / ".cinchdb" / "databases" / "eager-db").exists()
+        # Verify eager databases have context roots
+        assert get_context_root(project_dir, "main", "main").exists()
+        assert get_context_root(project_dir, "eager-db", "main").exists()
         
-        # Verify lazy databases don't have physical directories
-        assert not (project_dir / ".cinchdb" / "databases" / "lazy-db1").exists()
-        assert not (project_dir / ".cinchdb" / "databases" / "lazy-db2").exists()
+        # Verify lazy databases don't have context roots
+        assert not get_context_root(project_dir, "lazy-db1", "main").exists()
+        assert not get_context_root(project_dir, "lazy-db2", "main").exists()
         
         # Verify lazy databases exist in metadata
         with MetadataDB(project_dir) as metadata_db:
@@ -168,9 +168,9 @@ def test_concurrent_access_to_lazy_database():
         assert db1.database == "lazy-db"
         assert db2.database == "lazy-db"
         
-        # Database should be materialized only once
-        db_path = project_dir / ".cinchdb" / "databases" / "lazy-db"
-        assert db_path.exists()
+        # Context root should be materialized only once
+        context_root = get_context_root(project_dir, "lazy-db", "main")
+        assert context_root.exists()
         
         # Metadata should be updated to show it's materialized
         with MetadataDB(project_dir) as metadata_db:
@@ -247,7 +247,6 @@ def test_lazy_tenant_in_lazy_database_lifecycle():
         tenant_manager.materialize_tenant("tenant1")
         
         # Check states using sharded paths
-        from cinchdb.core.path_utils import get_tenant_db_path
         tenant1_path = get_tenant_db_path(project_dir, "lazy-db", "main", "tenant1")
         tenant2_path = get_tenant_db_path(project_dir, "lazy-db", "main", "tenant2")
         assert tenant1_path.exists()  # Materialized

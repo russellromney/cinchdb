@@ -18,7 +18,8 @@ class ColumnManager:
     PROTECTED_COLUMNS = {"id", "created_at", "updated_at"}
 
     def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main"
+        self, project_root: Path, database: str, branch: str, tenant: str = "main",
+        encryption_manager=None
     ):
         """Initialize column manager.
 
@@ -27,14 +28,16 @@ class ColumnManager:
             database: Database name
             branch: Branch name
             tenant: Tenant name (default: main)
+            encryption_manager: EncryptionManager instance for encrypted connections
         """
         self.project_root = Path(project_root)
         self.database = database
         self.branch = branch
         self.tenant = tenant
+        self.encryption_manager = encryption_manager
         self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
         self.change_tracker = ChangeTracker(project_root, database, branch)
-        self.table_manager = TableManager(project_root, database, branch, tenant)
+        self.table_manager = TableManager(project_root, database, branch, tenant, encryption_manager)
 
     def list_columns(self, table_name: str) -> List[Column]:
         """List all columns in a table.
@@ -415,7 +418,7 @@ class ColumnManager:
 
         create_sql = f"CREATE TABLE {temp_table} ({', '.join(col_defs)})"
 
-        with DatabaseConnection(self.db_path) as conn:
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             # Create new table
             conn.execute(create_sql)
 
@@ -488,7 +491,7 @@ class ColumnManager:
 
         # If making NOT NULL, check for NULL values
         if not nullable:
-            with DatabaseConnection(self.db_path) as conn:
+            with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
                 cursor = conn.execute(
                     f"SELECT COUNT(*) FROM {table_name} WHERE {column_name} IS NULL"
                 )

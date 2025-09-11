@@ -10,7 +10,7 @@ from cinchdb.models import Change, ChangeType, Tenant
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.path_utils import get_tenant_db_path, get_branch_path
+from cinchdb.core.path_utils import get_tenant_db_path as get_tenant_db_path, get_branch_path
 from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db
 
 logger = logging.getLogger(__name__)

@@ -68,9 +68,24 @@ def create(
     description: Optional[str] = typer.Option(
         None, "--description", "-d", help="Tenant description"
     ),
+    encrypt: bool = typer.Option(
+        False, "--encrypt", help="Create encrypted tenant database"
+    ),
+    key: Optional[str] = typer.Option(
+        None, "--key", help="Encryption key for encrypted tenant (required with --encrypt)"
+    ),
 ):
     """Create a new tenant."""
     name = validate_required_arg(name, "name", ctx)
+
+    # Validate encryption parameters
+    if encrypt and not key:
+        console.print("[red]❌ --key is required when using --encrypt[/red]")
+        raise typer.Exit(1)
+    
+    if key and not encrypt:
+        console.print("[red]❌ --encrypt is required when using --key[/red]")
+        raise typer.Exit(1)
 
     # Validate tenant name
     try:
@@ -85,8 +100,13 @@ def create(
 
     try:
         tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
-        tenant_mgr.create_tenant(name, description)
-        console.print(f"[green]✅ Created tenant '{name}'[/green]")
+        tenant_mgr.create_tenant(name, description, encrypt=encrypt, encryption_key=key)
+        
+        if encrypt:
+            console.print(f"[green]✅ Created encrypted tenant '{name}'[/green]")
+            console.print("[yellow]Note: Keep your encryption key secure - losing it means losing your data[/yellow]")
+        else:
+            console.print(f"[green]✅ Created tenant '{name}'[/green]")
         console.print("[yellow]Note: Tenant has same schema as main tenant[/yellow]")
 
     except ValueError as e:
@@ -232,6 +252,34 @@ def vacuum(
             console.print(f"[red]❌ VACUUM failed: {result.get('error', 'Unknown error')}[/red]")
             raise typer.Exit(1)
 
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command(name="rotate-key")
+def rotate_key(
+    tenant_name: str = typer.Argument(..., help="Name of the tenant to rotate encryption key for"),
+):
+    """Rotate encryption key for a tenant (requires plugged extension)."""
+    validate_required_arg(tenant_name, "tenant name")
+    
+    config, config_data = get_config_with_data()
+    db_name = config_data.active_database
+    branch_name = config_data.active_branch
+
+    try:
+        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        
+        console.print(f"[yellow]🔐 Rotating encryption key for tenant '{tenant_name}'...[/yellow]")
+        
+        new_key = tenant_mgr.rotate_tenant_key(tenant_name)
+        
+        console.print("[green]✅ Encryption key rotated successfully[/green]")
+        console.print(f"  Tenant: {tenant_name}")
+        console.print(f"  New key generated (version incremented)")
+        console.print("[blue]ℹ️  Historical data remains accessible with previous key versions[/blue]")
+        
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
         raise typer.Exit(1)

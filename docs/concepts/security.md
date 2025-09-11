@@ -19,32 +19,23 @@ CinchDB uses SQLite's built-in security features:
 
 ## Tenant Encryption
 
-CinchDB supports per-tenant encryption using SQLCipher. You bring the keys, we handle the encryption.
-
-### Usage
+Encrypt individual tenant databases with your own keys using SQLCipher.
 
 ```bash
-# CLI - Create and query encrypted tenant
+# CLI
 cinch tenant create secure --encrypt --key="your-secret-key"
 cinch query "SELECT * FROM users" --tenant secure --key="your-secret-key"
 ```
 
 ```python
-# Python SDK - Connect to encrypted tenant
+# Python SDK
 db = cinchdb.connect("myapp", tenant="secure", encryption_key="your-secret-key")
-users = db.query("SELECT * FROM users")
 ```
 
-### Key Management
-
-- **You manage keys** - CinchDB never stores encryption keys
-- **Provide key for all operations** - Required when accessing encrypted tenants
-- **Use environment variables** - Recommended for production
-
-### Requirements
-
-- SQLCipher support (`pip install pysqlcipher3`)
-- Consistent key management strategy
+**Key points:**
+- You manage keys (we don't store them)
+- Requires SQLCipher (`pip install pysqlcipher3`)
+- Provide key for all operations on encrypted tenants
 
 ## Advanced Security Features
 
@@ -62,7 +53,6 @@ For additional security requirements, consider infrastructure-level solutions su
 3. **Network security**: When using API servers, implement proper authentication
 
 4. **Access logs**: Monitor file system access to database files
-
 
 ## Production Considerations
 

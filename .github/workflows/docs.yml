@@ -41,9 +41,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-docs.txt
           
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building docs for version $VERSION"
+          
       - name: Build documentation
         run: |
-          mkdocs build --strict --verbose
+          CINCHDB_VERSION="${{ steps.version.outputs.VERSION }}" mkdocs build --strict --verbose
           
       - name: Upload artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

@@ -42,6 +42,8 @@ plugins:
   - search:
       separator: '[\s\-,:!=\[\]()"`/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
       lang: en
+  - macros:
+      on_env: docs.hooks:on_env
   - mkdocstrings:
       handlers:
         python:
@@ -98,6 +100,9 @@ nav:
     - Security & Encryption: concepts/security.md
 
 extra:
+  version:
+    provider: mike
+    default: latest
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/russellromney/cinchdb

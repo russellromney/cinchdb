@@ -21,9 +21,9 @@ cinch query "SELECT * FROM users WHERE active = true"
 
 # Note: query command is for SELECT statements only
 # For INSERT, UPDATE, DELETE operations, use dedicated commands:
-# cinch insert users --data '{"name": "John", "email": "john@company.com"}'
-# cinch update users user-123 --data '{"active": false}'
-# cinch delete users user-123
+# cinch data insert users --data '{"name": "John", "email": "john@company.com"}'
+# cinch data update users --set "active=false" --where "id=user-123"
+# cinch data delete users --where "id=user-123"
 ```
 
 ### With Parameters
@@ -57,7 +57,7 @@ cinch query "SELECT * FROM users" --format csv
 cinch query "SELECT * FROM users" --tenant customer_a
 
 # Insert for specific tenant
-cinch insert products --tenant customer_b --data '{"name": "Widget"}'
+cinch data insert products --tenant customer_b --data '{"name": "Widget"}'
 ```
 
 ### Advanced Queries

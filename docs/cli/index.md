@@ -57,7 +57,7 @@ cinch branch create add-products --switch
 
 # Make changes
 cinch table create products name:TEXT price:REAL category:TEXT
-cinch insert products --data '{"name": "Laptop", "price": 999.99, "category": "electronics"}'
+cinch data insert products --data '{"name": "Laptop", "price": 999.99, "category": "electronics"}'
 
 # Test changes
 cinch query "SELECT * FROM products"
@@ -74,8 +74,8 @@ cinch tenant create customer_a
 cinch tenant create customer_b
 
 # Add tenant-specific data
-cinch insert users --tenant customer_a --data '{"name": "John", "email": "john@customer-a.com"}'
-cinch insert users --tenant customer_b --data '{"name": "Jane", "email": "jane@customer-b.com"}'
+cinch data insert users --tenant customer_a --data '{"name": "John", "email": "john@customer-a.com"}'
+cinch data insert users --tenant customer_b --data '{"name": "Jane", "email": "jane@customer-b.com"}'
 
 # Query per tenant
 cinch query "SELECT * FROM users" --tenant customer_a

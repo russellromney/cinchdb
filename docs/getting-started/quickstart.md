@@ -34,7 +34,7 @@ Every table automatically includes:
 
 ```bash
 # Insert data
-cinch insert users --data '{"name": "Alice", "email": "alice@example.com", "age": 30}'
+cinch data insert users --data '{"name": "Alice", "email": "alice@example.com", "age": 30}'
 
 # Query data
 cinch query "SELECT * FROM users"
@@ -69,7 +69,7 @@ cinch tenant create customer_a
 cinch query "SELECT * FROM users" --tenant customer_a
 
 # Insert data for a specific tenant
-cinch insert users --tenant customer_a --data '{"name": "Bob", "email": "bob@customer-a.com"}'
+cinch data insert users --tenant customer_a --data '{"name": "Bob", "email": "bob@customer-a.com"}'
 ```
 
 ## Python SDK Usage

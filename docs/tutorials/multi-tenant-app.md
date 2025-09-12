@@ -37,7 +37,7 @@ cinch branch merge-into-main
 ### CLI Onboarding
 ```bash
 cinch tenant create acme_corp
-cinch insert users --tenant acme_corp --data '{"email": "admin@acme.com", "name": "ACME Admin", "role": "admin", "active": true}'
+cinch data insert users --tenant acme_corp --data '{"email": "admin@acme.com", "name": "ACME Admin", "role": "admin", "active": true}'
 ```
 
 ### SDK Onboarding

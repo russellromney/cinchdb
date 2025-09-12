@@ -136,7 +136,7 @@ cinch tenant copy main new_customer --no-data
 cinch query "SELECT * FROM users" --tenant acme_corp
 
 # Insert into tenant
-cinch insert users --tenant acme_corp --data '{"name": "Alice", "email": "alice@acme.com"}'
+cinch data insert users --tenant acme_corp --data '{"name": "Alice", "email": "alice@acme.com"}'
 ```
 
 ### Tenant-Specific Operations
@@ -158,7 +158,7 @@ cinch tenant create customer_001
 cinch tenant create customer_002
 
 # Customer-specific data
-cinch insert settings --tenant customer_001 --data '{"key": "theme", "value": "dark"}'
+cinch data insert settings --tenant customer_001 --data '{"key": "theme", "value": "dark"}'
 ```
 
 ### Development/Testing

@@ -28,7 +28,7 @@ cinch table create user_profiles user_id:TEXT bio:TEXT? website:TEXT? location:T
 cinch column add users profile_complete:BOOLEAN
 
 # 3. Test changes
-cinch insert user_profiles --data '{"user_id": "123", "bio": "Software developer"}'
+cinch data insert user_profiles --data '{"user_id": "123", "bio": "Software developer"}'
 cinch table info user_profiles
 
 # 4. Deploy to production

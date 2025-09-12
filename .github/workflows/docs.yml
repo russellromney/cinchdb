@@ -41,7 +41,7 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+          VERSION=$(uv run python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building docs for version $VERSION"
           

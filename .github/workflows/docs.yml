@@ -23,23 +23,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+          
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements-docs.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-            
-      - name: Install documentation dependencies
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-docs.txt
+          uv sync --dev
           
       - name: Extract version
         id: version
@@ -50,7 +47,7 @@ jobs:
           
       - name: Build documentation
         run: |
-          CINCHDB_VERSION="${{ steps.version.outputs.VERSION }}" mkdocs build --strict --verbose
+          CINCHDB_VERSION="${{ steps.version.outputs.VERSION }}" uv run mkdocs build --strict --verbose
           
       - name: Upload artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

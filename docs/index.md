@@ -1,7 +1,5 @@
 # CinchDB
 
-**Version {{ cinchdb_version }}**
-
 **Git-like SQLite with schema branching and multi-tenancy**
 
 > ⚠️ **Early Alpha**: Test project. Don't use in production.

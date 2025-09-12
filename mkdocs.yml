@@ -42,8 +42,6 @@ plugins:
   - search:
       separator: '[\s\-,:!=\[\]()"`/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
       lang: en
-  - macros:
-      on_env: docs.hooks:on_env
   - mkdocstrings:
       handlers:
         python:

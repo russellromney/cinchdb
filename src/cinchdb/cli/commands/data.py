@@ -21,15 +21,61 @@ def callback(ctx: typer.Context):
 @app.command()
 def insert(
     table_name: str = typer.Argument(..., help="Name of table to insert into"),
-    data: str = typer.Option(..., "--data", "-d", help="JSON object or array of objects to insert"),
+    data: str = typer.Option(..., "--data", "-d", help="JSON object to insert"),
     tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
 ):
-    """Insert one or more records into a table.
+    """Insert a single record into a table using JSON data.
     
     Examples:
         cinch data insert users --data '{"name": "Alice", "email": "alice@example.com"}'
-        cinch data insert users --data '[{"name": "Bob"}, {"name": "Charlie"}]'
         cinch data insert products --tenant customer_a --data '{"name": "Widget", "price": 99.99}'
+    """
+    import json
+    from cinchdb.core.database import CinchDB
+    
+    config, config_data = get_config_with_data()
+    
+    # Parse JSON data
+    try:
+        insert_data = json.loads(data)
+        if isinstance(insert_data, list):
+            console.print(f"[red]❌ For multiple records, use 'cinch data bulk-insert' command[/red]")
+            raise typer.Exit(1)
+    except json.JSONDecodeError as e:
+        console.print(f"[red]❌ Invalid JSON format: {e}[/red]")
+        raise typer.Exit(1)
+    
+    if not insert_data:
+        console.print("[red]❌ No data provided to insert[/red]")
+        raise typer.Exit(1)
+    
+    try:
+        db = CinchDB(config_data.active_database, tenant=tenant, project_dir=config.project_dir)
+        
+        console.print(f"[yellow]➕ Inserting record into '{table_name}'...[/yellow]")
+        
+        # Insert data
+        result = db.insert(table_name, insert_data)
+        console.print(f"[green]✅ Inserted record into '{table_name}'[/green]")
+        console.print(f"[cyan]   ID: {result.get('id')}[/cyan]")
+    
+    except Exception as e:
+        console.print(f"[red]❌ Failed to insert: {e}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command(name="bulk-insert")
+def bulk_insert(
+    table_name: str = typer.Argument(..., help="Name of table to insert into"),
+    data: str = typer.Option(..., "--data", "-d", help="JSON array of objects to insert"),
+    tenant: Optional[str] = typer.Option("main", "--tenant", "-t", help="Tenant name"),
+):
+    """Insert multiple records into a table using JSON data.
+    
+    Examples:
+        cinch data bulk-insert users --data '[{"name": "Alice", "email": "alice@example.com"}]'
+        cinch data bulk-insert users --data '[{"name": "Bob"}, {"name": "Charlie"}]'
+        cinch data bulk-insert products --tenant customer_a --data '[{"name": "Widget", "price": 99.99}]'
     """
     import json
     from cinchdb.core.database import CinchDB

@@ -40,6 +40,8 @@ cinch status
 |------|---------|
 | Initialize project | `cinch init myapp` |
 | Create table | `cinch table create users name:TEXT email:TEXT` |
+| Insert single record | `cinch data insert users --data '{"name": "Alice", "email": "alice@example.com"}'` |
+| Insert multiple records | `cinch data bulk-insert users --data '[{"name": "Alice"}, {"name": "Bob"}]'` |
 | Query data | `cinch query "SELECT * FROM users"` |
 | Delete records | `cinch data delete users --where "status=inactive"` |
 | Update records | `cinch data update users --set "status=active" --where "plan=free"` |

@@ -69,7 +69,7 @@ cinch tenant create customer_a
 cinch query "SELECT * FROM users" --tenant customer_a
 
 # Insert data for a specific tenant
-cinch data insert users --tenant customer_a --data '{"name": "Bob", "email": "bob@customer-a.com"}'
+cinch data bulk-insert users --tenant customer_a --data '[{"name": "Bob", "email": "bob@customer-a.com"}]'
 ```
 
 ## Python SDK Usage

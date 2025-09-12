@@ -6,10 +6,89 @@ Manipulate data using bulk operations with filtering and validation.
 
 | Command | Description |
 |---------|-------------|
+| [`insert`](#insert) | Insert a single record with JSON data |
+| [`bulk-insert`](#bulk-insert) | Insert multiple records with JSON data |
 | [`delete`](#delete) | Delete records with filtering criteria |
 | [`update`](#update) | Update records with filtering criteria | 
 | [`bulk-update`](#bulk-update) | Update multiple records with JSON data |
 | [`bulk-delete`](#bulk-delete) | Delete multiple records by ID |
+
+## insert
+
+Insert a single record into a table using JSON data.
+
+```bash
+cinch data insert <table> --data <json> [OPTIONS]
+```
+
+**Arguments:**
+- `<table>` - Name of table to insert into
+
+**Options:**
+- `--data, -d` - JSON object to insert (required)
+- `--tenant, -t` - Tenant name (default: main)
+
+**Examples:**
+```bash
+# Insert single record
+cinch data insert users --data '{"name": "Alice", "email": "alice@example.com", "age": 30}'
+
+# Insert with specific tenant
+cinch data insert products --tenant customer_a --data '{"name": "Widget", "price": 99.99}'
+
+# Insert from file
+cinch data insert users --data "$(cat user.json)"
+```
+
+**Notes:**
+- Automatically generates UUID for `id` field
+- Sets `created_at` and `updated_at` timestamps
+- Returns the ID of the inserted record
+- Validates data types against table schema
+- For multiple records, use `bulk-insert` command
+
+## bulk-insert
+
+Insert multiple records into a table using JSON data.
+
+```bash
+cinch data bulk-insert <table> --data <json> [OPTIONS]
+```
+
+**Arguments:**
+- `<table>` - Name of table to insert into
+
+**Options:**
+- `--data, -d` - JSON array of objects to insert (required)
+- `--tenant, -t` - Tenant name (default: main)
+
+**Examples:**
+```bash
+# Insert single record
+cinch data bulk-insert users --data '[{"name": "Alice", "email": "alice@example.com", "age": 30}]'
+
+# Insert multiple records
+cinch data bulk-insert users --data '[
+  {"name": "Bob", "email": "bob@example.com", "age": 25},
+  {"name": "Charlie", "email": "charlie@example.com", "age": 35}
+]'
+
+# Insert with specific tenant
+cinch data bulk-insert products --tenant customer_a --data '[
+  {"name": "Widget", "price": 99.99},
+  {"name": "Gadget", "price": 149.99}
+]'
+
+# Insert from file
+cinch data bulk-insert users --data "$(cat users.json)"
+```
+
+**Notes:**
+- Automatically generates UUID for `id` field
+- Sets `created_at` and `updated_at` timestamps
+- Returns the ID(s) of inserted records
+- Validates data types against table schema
+- All inserts are performed in a single transaction
 
 ## delete
 

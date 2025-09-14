@@ -250,8 +250,8 @@ class TestCinchDB:
         with patch("cinchdb.managers.data.DataManager") as mock_data_manager:
             mock_instance = Mock()
             
-            # Mock return values for each insert
-            mock_instance.create_from_dict.side_effect = [
+            # Mock return value for bulk insert
+            mock_instance.bulk_create_from_dict.return_value = [
                 {"id": "id-1", "name": "User 1"},
                 {"id": "id-2", "name": "User 2"},
                 {"id": "id-3", "name": "User 3"}
@@ -270,8 +270,8 @@ class TestCinchDB:
             assert result[1]["id"] == "id-2"
             assert result[2]["id"] == "id-3"
             
-            # Verify create_from_dict was called 3 times
-            assert mock_instance.create_from_dict.call_count == 3
+            # Verify bulk_create_from_dict was called once with all records
+            assert mock_instance.bulk_create_from_dict.call_count == 1
     
     def test_remote_insert_multiple(self):
         """Test multiple insert on remote connection."""
@@ -317,7 +317,7 @@ class TestCinchDB:
         
         with patch("cinchdb.managers.data.DataManager") as mock_data_manager:
             mock_instance = Mock()
-            mock_instance.create_from_dict.side_effect = [
+            mock_instance.bulk_create_from_dict.return_value = [
                 {"id": "id-1", "name": "Alice"},
                 {"id": "id-2", "name": "Bob"}
             ]

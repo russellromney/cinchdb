@@ -172,9 +172,9 @@ cinch branch merge-into-main new_user_onboarding
 cinch db create migration_staging
 cinch db use migration_staging
 
-# Test migration steps
-cinch query "INSERT INTO users (email) SELECT old_email FROM legacy_users"
-cinch query "UPDATE users SET username = SUBSTR(email, 1, INSTR(email, '@')-1)"
+# Test migration steps (use Python SDK for complex operations)
+# Python: db.query("INSERT INTO users (email) SELECT old_email FROM legacy_users")
+# Python: db.query("UPDATE users SET username = SUBSTR(email, 1, INSTR(email, '@')-1)")
 
 # Apply to production when validated
 cinch db use production
@@ -191,8 +191,8 @@ cinch db use analytics
 cinch table create daily_stats date:TEXT revenue:REAL orders:INTEGER
 cinch table create user_metrics user_id:INTEGER last_active:TEXT orders_count:INTEGER
 
-# Populate from operational databases
-cinch query "INSERT INTO daily_stats SELECT DATE(created_at), SUM(total), COUNT(*) FROM production.orders GROUP BY DATE(created_at)"
+# Populate from operational databases (use Python SDK)
+# Python: db.query("INSERT INTO daily_stats SELECT DATE(created_at), SUM(total), COUNT(*) FROM production.orders GROUP BY DATE(created_at)")
 ```
 
 

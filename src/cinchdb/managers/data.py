@@ -146,6 +146,63 @@ class DataManager:
                     raise ValueError(f"Record with ID {record_data['id']} already exists")
                 raise
 
+    def bulk_create_from_dict(self, table_name: str, data_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Bulk create multiple records from dictionaries using executemany.
+
+        Args:
+            table_name: Name of the table to insert into
+            data_list: List of dictionaries containing record data
+
+        Returns:
+            List of dictionaries with created records including generated IDs and timestamps
+
+        Raises:
+            ValueError: If any record has duplicate ID
+            MaintenanceError: If branch is in maintenance mode
+        """
+        # Check maintenance mode
+        check_maintenance_mode(self.project_root, self.database, self.branch)
+
+        if not data_list:
+            return []
+
+        # Prepare all records
+        records = []
+        now = datetime.now()
+        
+        for data in data_list:
+            record_data = data.copy()
+            
+            # Generate ID if not provided
+            if not record_data.get("id"):
+                record_data["id"] = str(uuid.uuid4())
+            
+            # Set timestamps
+            record_data["created_at"] = now
+            record_data["updated_at"] = now
+            
+            records.append(record_data)
+        
+        # Get columns from first record (all should have same structure)
+        columns = list(records[0].keys())
+        placeholders = [f":{col}" for col in columns]
+        query = f"""
+            INSERT INTO {table_name} ({", ".join(columns)}) 
+            VALUES ({", ".join(placeholders)})
+        """
+
+        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
+            try:
+                # Use executemany for bulk insert
+                conn.executemany(query, records)
+                conn.commit()
+                return records
+            except Exception as e:
+                conn.rollback()
+                if "UNIQUE constraint failed" in str(e):
+                    raise ValueError(f"Duplicate ID found in bulk insert")
+                raise
+
     def create(self, instance: T) -> T:
         """Create a new record from a model instance.
 
@@ -518,6 +575,10 @@ class DataManager:
         
         if not filters:
             raise ValueError("delete_where requires at least one filter condition")
+        
+        # If the database doesn't exist (lazy tenant), return 0 deleted
+        if not self.db_path.exists():
+            return 0
         
         # Build WHERE clause
         where_clause, params = self._build_where_clause(filters, operator)

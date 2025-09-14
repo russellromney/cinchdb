@@ -3,9 +3,12 @@
 import pytest
 import tempfile
 import shutil
+import time
+import threading
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -13,6 +16,7 @@ from cinchdb.core.initializer import init_project
 from cinchdb.managers.data import DataManager
 from cinchdb.managers.table import TableManager
 from cinchdb.models import Column
+from cinchdb.models.table import Column as TableColumn
 
 
 # Test model for CRUD operations

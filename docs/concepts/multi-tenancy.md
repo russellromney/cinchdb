@@ -79,7 +79,7 @@ cinch query "SELECT * FROM products"
 cinch query "SELECT * FROM products" --tenant acme_corp
 
 # Insert tenant-specific data
-cinch query "INSERT INTO users (name, email) VALUES ('John', 'john@acme.com')" --tenant acme_corp
+cinch data insert users --data '{"name": "John", "email": "john@acme.com"}' --tenant acme_corp
 ```
 
 ### Python SDK
@@ -121,7 +121,7 @@ cinch branch create add-orders --switch
 cinch table create orders user_id:TEXT total:REAL
 
 # 3. Test with sample data
-cinch query "INSERT INTO orders (user_id, total) VALUES ('user-123', 29.99)" --tenant acme_corp
+cinch data insert orders --data '{"user_id": "user-123", "total": 29.99}' --tenant acme_corp
 
 # 4. Merge back (schema change applies to all tenants on main)  
 cinch branch switch main
@@ -163,7 +163,7 @@ cinch tenant create customer_002
 cinch tenant create customer_003
 
 # Each customer gets isolated data
-cinch query "INSERT INTO users (name, email) VALUES ('Admin', 'admin@customer001.com')" --tenant customer_001
+cinch data insert users --data '{"name": "Admin", "email": "admin@customer001.com"}' --tenant customer_001
 ```
 
 ### Per-User Databases  

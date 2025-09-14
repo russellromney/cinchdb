@@ -114,8 +114,8 @@ class TestCDCTableProtection:
         # These should all work
         table_manager.create_table("users", columns)
         table_manager.create_table("orders", columns)
-        table_manager.create_table("_private", columns)  # Single underscore is OK
-        table_manager.create_table("test__table", columns)  # __ in middle is OK
+        table_manager.create_table("private_data", columns)  # Underscore in middle is OK
+        table_manager.create_table("test_table", columns)  # Single underscore is OK
         
         # Verify all tables were created
         tables = table_manager.list_tables()
@@ -123,8 +123,8 @@ class TestCDCTableProtection:
         
         assert "users" in table_names
         assert "orders" in table_names
-        assert "_private" in table_names
-        assert "test__table" in table_names
+        assert "private_data" in table_names
+        assert "test_table" in table_names
         assert len(table_names) == 4
     
     def test_copy_table_rejects_double_underscore_target(self, table_manager):
@@ -163,8 +163,8 @@ class TestCDCTableProtection:
         copied_table = table_manager.copy_table("source", "target")
         assert copied_table.name == "target"
         
-        table_manager.copy_table("source", "_backup")  # Single underscore OK
-        table_manager.copy_table("source", "test__copy")  # __ in middle OK
+        table_manager.copy_table("source", "backup_table")  # Underscore in middle OK
+        table_manager.copy_table("source", "test_copy")  # Valid name
         
         # Verify tables exist
         tables = table_manager.list_tables()
@@ -172,8 +172,8 @@ class TestCDCTableProtection:
         
         assert "source" in table_names
         assert "target" in table_names
-        assert "_backup" in table_names
-        assert "test__copy" in table_names
+        assert "backup_table" in table_names
+        assert "test_copy" in table_names
         assert len(table_names) == 4
 
 

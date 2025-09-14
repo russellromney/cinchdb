@@ -261,9 +261,22 @@ def bulk_update(
         console.print(f"[yellow]📝 Updating {len(updates)} record(s) in '{table_name}'...[/yellow]")
         
         result = db.update(table_name, *updates)
-        updated_count = len(updates)
         
-        console.print(f"[green]✅ Updated {updated_count} record(s) in '{table_name}'[/green]")
+        # Count successful updates
+        if isinstance(result, list):
+            successful = [r for r in result if 'error' not in r]
+            failed = [r for r in result if 'error' in r]
+            
+            if failed:
+                console.print(f"[yellow]⚠️  Updated {len(successful)} record(s), {len(failed)} failed[/yellow]")
+                for fail in failed[:5]:  # Show first 5 failures
+                    console.print(f"[yellow]   - {fail['error']}[/yellow]")
+                if len(failed) > 5:
+                    console.print(f"[yellow]   ... and {len(failed) - 5} more[/yellow]")
+            else:
+                console.print(f"[green]✅ Updated {len(successful)} record(s) in '{table_name}'[/green]")
+        else:
+            console.print(f"[green]✅ Updated 1 record in '{table_name}'[/green]")
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -328,22 +341,41 @@ def _parse_conditions(conditions_str: str) -> dict:
     """Parse condition string into filter dictionary."""
     filters = {}
     
-    # Split by commas but handle quotes
+    # Split by commas but handle quotes and __in operator
     parts = []
     current_part = ""
     in_quotes = False
+    in_operator_value = False
     
-    for char in conditions_str:
+    for i, char in enumerate(conditions_str):
         if char == '"' and not in_quotes:
             in_quotes = True
             current_part += char
         elif char == '"' and in_quotes:
             in_quotes = False
             current_part += char
+        elif char == '=' and not in_quotes and '__in' in current_part:
+            # We're starting an __in operator value, don't split on commas
+            in_operator_value = True
+            current_part += char
         elif char == ',' and not in_quotes:
-            if current_part.strip():
-                parts.append(current_part.strip())
-            current_part = ""
+            if in_operator_value:
+                # Check if there's another condition coming (has = sign after comma)
+                remaining = conditions_str[i+1:].strip()
+                if '=' in remaining and not remaining.startswith('='):
+                    # Next part looks like a new condition
+                    if current_part.strip():
+                        parts.append(current_part.strip())
+                    current_part = ""
+                    in_operator_value = False
+                else:
+                    # Still part of the __in value list
+                    current_part += char
+            else:
+                # Normal comma separation
+                if current_part.strip():
+                    parts.append(current_part.strip())
+                current_part = ""
         else:
             current_part += char
     

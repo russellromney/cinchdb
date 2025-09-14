@@ -117,15 +117,15 @@ class TestNameValidator:
 
     def test_length_limits(self):
         """Test name length validation."""
-        # Max length name (255 chars)
-        max_name = "a" + "b" * 253 + "c"  # 255 chars
+        # Max length name (63 chars)
+        max_name = "a" + "b" * 61 + "c"  # 63 chars
         validate_name(max_name)  # Should pass
 
         # Too long name
-        too_long = "a" * 256
+        too_long = "a" * 64
         with pytest.raises(InvalidNameError) as exc_info:
             validate_name(too_long)
-        assert "cannot exceed 255 characters" in str(exc_info.value)
+        assert "cannot exceed 63 characters" in str(exc_info.value)
 
     def test_reserved_names(self):
         """Test that reserved names are rejected."""

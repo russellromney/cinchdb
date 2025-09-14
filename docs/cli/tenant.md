@@ -251,7 +251,9 @@ Example file structure:
 cinch tenant create bigcorp
 
 # Import initial data
-cinch query "INSERT INTO users SELECT * FROM import_table" --tenant bigcorp
+# Use Python SDK for complex data migration
+# Python: db = cinchdb.connect("myapp", tenant="bigcorp")
+# Python: db.query("INSERT INTO users SELECT * FROM import_table")
 
 # Verify setup
 cinch query "SELECT COUNT(*) FROM users" --tenant bigcorp

@@ -169,8 +169,8 @@ cinch table create inventory product_id:TEXT quantity:INTEGER
 cinch table create warehouse_locations name:TEXT address:TEXT
 
 # 4. Test with different tenants
-cinch query "INSERT INTO inventory VALUES ('prod-123', 50)" --tenant customer_a
-cinch query "INSERT INTO inventory VALUES ('prod-456', 25)" --tenant customer_b
+cinch data insert inventory --data '{"product_id": "prod-123", "quantity": 50}' --tenant customer_a
+cinch data insert inventory --data '{"product_id": "prod-456", "quantity": 25}' --tenant customer_b
 
 # 5. Verify schema works
 cinch query "SELECT * FROM inventory" --tenant customer_a  # Only customer_a's data

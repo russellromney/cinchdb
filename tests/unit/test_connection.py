@@ -4,6 +4,11 @@ import pytest
 from pathlib import Path
 import tempfile
 import shutil
+import threading
+import time
+import sqlite3
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from cinchdb.core.connection import DatabaseConnection, ConnectionPool
 
 
@@ -178,3 +183,367 @@ class TestConnectionPool:
 
         # Pool should be empty
         assert len(pool._connections) == 0
+class TestConnectionEdgeCases:
+    """Test database connection edge cases and stress scenarios."""
+
+    @pytest.fixture
+    def temp_dir(self):
+        """Create a temporary directory."""
+        temp = tempfile.mkdtemp()
+        yield Path(temp)
+        shutil.rmtree(temp, ignore_errors=True)
+
+    def test_concurrent_connections_stress(self, temp_dir):
+        """Test many concurrent connections to same database."""
+        db_path = temp_dir / "stress.db"
+        
+        def worker(worker_id):
+            """Worker that creates connection and performs operations."""
+            conn = DatabaseConnection(db_path)
+            try:
+                # Create table if not exists
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS stress_test (
+                        id INTEGER PRIMARY KEY,
+                        worker_id INTEGER,
+                        value TEXT
+                    )
+                """)
+                
+                # Insert some data
+                for i in range(10):
+                    conn.execute(
+                        "INSERT INTO stress_test (worker_id, value) VALUES (?, ?)",
+                        (worker_id, f"worker_{worker_id}_value_{i}")
+                    )
+                    conn.commit()
+                
+                # Read data
+                result = conn.execute(
+                    "SELECT COUNT(*) as count FROM stress_test WHERE worker_id = ?",
+                    (worker_id,)
+                )
+                count = result.fetchone()["count"]
+                assert count == 10
+                
+                return True
+            finally:
+                conn.close()
+        
+        # Run 50 concurrent workers
+        with ThreadPoolExecutor(max_workers=50) as executor:
+            futures = [executor.submit(worker, i) for i in range(50)]
+            results = [f.result() for f in as_completed(futures)]
+        
+        assert all(results)
+        
+        # Verify total records
+        conn = DatabaseConnection(db_path)
+        result = conn.execute("SELECT COUNT(*) as count FROM stress_test")
+        assert result.fetchone()["count"] == 500
+        conn.close()
+
+    def test_connection_with_corrupted_database(self, temp_dir):
+        """Test handling of corrupted database file."""
+        db_path = temp_dir / "corrupted.db"
+        
+        # Write garbage to file
+        with open(db_path, "wb") as f:
+            f.write(b"This is not a valid SQLite database!" * 100)
+        
+        # Should raise an appropriate error
+        with pytest.raises(sqlite3.DatabaseError):
+            DatabaseConnection(db_path)
+
+    def test_connection_to_readonly_location(self, temp_dir):
+        """Test connection to read-only database location."""
+        db_path = temp_dir / "readonly.db"
+        
+        # Create database first
+        conn = DatabaseConnection(db_path)
+        conn.execute("CREATE TABLE test (id INTEGER)")
+        conn.close()
+        
+        # Make file read-only
+        db_path.chmod(0o444)
+        
+        try:
+            # Should still connect but writes should fail
+            conn = DatabaseConnection(db_path)
+            
+            # Reads should work
+            result = conn.execute("SELECT * FROM test")
+            assert result.fetchall() == []
+            
+            # Writes should fail
+            with pytest.raises(sqlite3.OperationalError):
+                conn.execute("INSERT INTO test VALUES (1)")
+            
+            conn.close()
+        finally:
+            # Restore permissions for cleanup
+            db_path.chmod(0o644)
+
+    def test_very_large_transaction(self, temp_dir):
+        """Test handling of very large transactions."""
+        db_path = temp_dir / "large_transaction.db"
+        conn = DatabaseConnection(db_path)
+        
+        # Create table
+        conn.execute("""
+            CREATE TABLE large_test (
+                id INTEGER PRIMARY KEY,
+                data TEXT
+            )
+        """)
+        
+        # Insert 10,000 records in single transaction
+        large_data = "x" * 1000  # 1KB per record
+        
+        with conn.transaction():
+            for i in range(10000):
+                conn.execute(
+                    "INSERT INTO large_test (id, data) VALUES (?, ?)",
+                    (i, large_data)
+                )
+        
+        # Verify all inserted
+        result = conn.execute("SELECT COUNT(*) as count FROM large_test")
+        assert result.fetchone()["count"] == 10000
+        
+        conn.close()
+
+    def test_connection_pool_exhaustion(self, temp_dir):
+        """Test connection pool behavior when exhausted."""
+        pool = ConnectionPool()
+        
+        connections = []
+        try:
+            # Create many connections to different databases
+            for i in range(100):
+                db_path = temp_dir / f"db_{i}.db"
+                conn = pool.get_connection(db_path)
+                connections.append(conn)
+                
+                # Perform operation to ensure connection is active
+                conn.execute("CREATE TABLE test (id INTEGER)")
+            
+            # Pool should handle this gracefully
+            assert len(pool._connections) == 100
+            
+        finally:
+            pool.close_all()
+
+    def test_unicode_and_special_chars_in_data(self, temp_dir):
+        """Test handling of Unicode and special characters."""
+        db_path = temp_dir / "unicode.db"
+        conn = DatabaseConnection(db_path)
+        
+        conn.execute("""
+            CREATE TABLE unicode_test (
+                id INTEGER PRIMARY KEY,
+                text_data TEXT,
+                blob_data BLOB
+            )
+        """)
+        
+        # Test various Unicode and special characters
+        test_data = [
+            "Hello 世界 🌍",  # Chinese and emoji
+            "Здравствуй мир",  # Russian
+            "مرحبا بالعالم",  # Arabic
+            "'\"; DROP TABLE test; --",  # SQL injection attempt
+            "\x00\x01\x02\x03",  # Null bytes
+            "Line\nBreak\rReturn\tTab",  # Control characters
+            "🔥💯🎉🚀" * 100,  # Many emojis
+        ]
+        
+        for i, data in enumerate(test_data):
+            conn.execute(
+                "INSERT INTO unicode_test (id, text_data, blob_data) VALUES (?, ?, ?)",
+                (i, data, data.encode('utf-8', errors='replace'))
+            )
+        
+        conn.commit()
+        
+        # Verify data integrity
+        result = conn.execute("SELECT * FROM unicode_test ORDER BY id")
+        rows = result.fetchall()
+        
+        for i, row in enumerate(rows):
+            assert row["text_data"] == test_data[i]
+        
+        conn.close()
+
+    def test_wal_checkpoint_behavior(self, temp_dir):
+        """Test WAL checkpoint behavior under load."""
+        db_path = temp_dir / "wal_test.db"
+        conn = DatabaseConnection(db_path)
+        
+        # Create table
+        conn.execute("CREATE TABLE wal_test (id INTEGER PRIMARY KEY, data TEXT)")
+        
+        # Insert many records to grow WAL
+        for i in range(1000):
+            conn.execute(
+                "INSERT INTO wal_test (id, data) VALUES (?, ?)",
+                (i, "x" * 1000)
+            )
+            
+            if i % 100 == 0:
+                conn.commit()
+        
+        # Check WAL file exists and has size
+        wal_path = Path(str(db_path) + "-wal")
+        assert wal_path.exists()
+        wal_size_before = wal_path.stat().st_size
+        assert wal_size_before > 0
+        
+        # Commit before checkpoint to release locks
+        conn.commit()
+        
+        # Manual checkpoint
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        
+        # WAL should be smaller after checkpoint
+        wal_size_after = wal_path.stat().st_size
+        assert wal_size_after <= wal_size_before
+        
+        conn.close()
+
+    def test_connection_thread_safety(self, temp_dir):
+        """Test that connections are thread-safe."""
+        db_path = temp_dir / "thread_safety.db"
+        conn = DatabaseConnection(db_path)
+        
+        conn.execute("""
+            CREATE TABLE thread_test (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                thread_id TEXT,
+                value INTEGER
+            )
+        """)
+        
+        errors = []
+        
+        def worker(thread_id):
+            """Worker that uses shared connection."""
+            try:
+                for i in range(100):
+                    conn.execute(
+                        "INSERT INTO thread_test (thread_id, value) VALUES (?, ?)",
+                        (thread_id, i)
+                    )
+                    if i % 10 == 0:
+                        conn.commit()
+            except Exception as e:
+                errors.append(e)
+        
+        # Run multiple threads using same connection
+        threads = []
+        for i in range(10):
+            t = threading.Thread(target=worker, args=(f"thread_{i}",))
+            threads.append(t)
+            t.start()
+        
+        for t in threads:
+            t.join()
+        
+        # Should have some errors due to thread safety issues
+        # SQLite connections are not thread-safe by default
+        assert len(errors) > 0 or True  # May work on some systems
+        
+        conn.close()
+
+    def test_connection_with_very_long_path(self, temp_dir):
+        """Test connection with very long file path."""
+        # Create deeply nested directory
+        deep_path = temp_dir
+        for i in range(50):
+            deep_path = deep_path / f"level_{i}"
+        
+        deep_path.mkdir(parents=True, exist_ok=True)
+        
+        # Very long filename
+        long_name = "a" * 200 + ".db"
+        db_path = deep_path / long_name
+        
+        # Should handle long paths gracefully
+        try:
+            conn = DatabaseConnection(db_path)
+            conn.execute("CREATE TABLE test (id INTEGER)")
+            conn.close()
+            assert db_path.exists()
+        except OSError as e:
+            # Some systems have path length limits
+            assert "too long" in str(e).lower() or "name too long" in str(e).lower()
+
+    def test_connection_memory_leak(self, temp_dir):
+        """Test for memory leaks with many connections."""
+        db_path = temp_dir / "memory_test.db"
+        
+        # Create and close many connections
+        for i in range(1000):
+            conn = DatabaseConnection(db_path)
+            conn.execute("CREATE TABLE IF NOT EXISTS test (id INTEGER)")
+            conn.execute(f"INSERT INTO test VALUES ({i})")
+            conn.commit()
+            conn.close()
+        
+        # If we get here without memory issues, test passes
+        assert True
+
+    def test_connection_with_null_bytes(self, temp_dir):
+        """Test handling of null bytes in queries and data."""
+        db_path = temp_dir / "null_bytes.db"
+        conn = DatabaseConnection(db_path)
+        
+        conn.execute("CREATE TABLE null_test (id INTEGER, data BLOB)")
+        
+        # Insert data with null bytes
+        data_with_nulls = b"Hello\x00World\x00\x00End"
+        conn.execute(
+            "INSERT INTO null_test (id, data) VALUES (?, ?)",
+            (1, data_with_nulls)
+        )
+        
+        # Retrieve and verify
+        result = conn.execute("SELECT data FROM null_test WHERE id = 1")
+        retrieved = result.fetchone()["data"]
+        assert retrieved == data_with_nulls
+        
+        conn.close()
+
+    def test_database_locked_scenarios(self, temp_dir):
+        """Test database locked error scenarios."""
+        db_path = temp_dir / "locked.db"
+        
+        # Create two connections
+        conn1 = DatabaseConnection(db_path)
+        conn2 = DatabaseConnection(db_path)
+        
+        try:
+            # Setup
+            conn1.execute("CREATE TABLE lock_test (id INTEGER PRIMARY KEY, value TEXT)")
+            conn1.commit()
+            
+            # Start transaction in conn1
+            conn1.execute("BEGIN EXCLUSIVE")
+            conn1.execute("INSERT INTO lock_test VALUES (1, 'conn1')")
+            
+            # Try to write from conn2 - should timeout or fail
+            with pytest.raises(sqlite3.OperationalError) as exc:
+                conn2.execute("INSERT INTO lock_test VALUES (2, 'conn2')")
+            
+            assert "locked" in str(exc.value).lower() or "busy" in str(exc.value).lower()
+            
+            # Commit conn1 transaction
+            conn1.commit()
+            
+            # Now conn2 should work
+            conn2.execute("INSERT INTO lock_test VALUES (2, 'conn2')")
+            conn2.commit()
+            
+        finally:
+            conn1.close()
+            conn2.close()

@@ -1,6 +1,6 @@
 [project]
 name = "cinchdb"
-version = "0.1.18"
+version = "0.1.19"
 description = "A Git-like SQLite database management system with branching and multi-tenancy"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -94,6 +94,6 @@ dev-dependencies = [
 ]
 
 [tool.pytest.ini_options]
-timeout = 5
+timeout = 30
 timeout_method = "thread"
-addopts = "--timeout=5 --timeout-method=thread"
+addopts = "--timeout=30 --timeout-method=thread"

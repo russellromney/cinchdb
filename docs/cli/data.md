@@ -64,8 +64,8 @@ cinch data bulk-insert <table> --data <json> [OPTIONS]
 
 **Examples:**
 ```bash
-# Insert single record
-cinch data bulk-insert users --data '[{"name": "Alice", "email": "alice@example.com", "age": 30}]'
+# Insert single record (use insert command instead)
+cinch data insert users --data '{"name": "Alice", "email": "alice@example.com", "age": 30}'
 
 # Insert multiple records
 cinch data bulk-insert users --data '[

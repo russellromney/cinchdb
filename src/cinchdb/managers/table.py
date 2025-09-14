@@ -12,6 +12,7 @@ from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.core.maintenance_utils import check_maintenance_mode
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.tenant import TenantManager
+from cinchdb.utils.name_validator import validate_name
 
 
 class TableManager:
@@ -95,20 +96,26 @@ class TableManager:
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
         
-        # Validate table name doesn't use protected prefixes
+        # Validate table name doesn't use protected prefixes (check this FIRST)
         for prefix in self.PROTECTED_TABLE_PREFIXES:
             if table_name.startswith(prefix):
                 raise ValueError(
                     f"Table name '{table_name}' is not allowed. "
                     f"Table names cannot start with '{prefix}' as these are reserved for system use."
                 )
+        
+        # Validate table name format (after checking protected prefixes)
+        validate_name(table_name, "table")
 
         # Validate table doesn't exist
         if self._table_exists(table_name):
             raise ValueError(f"Table '{table_name}' already exists")
 
-        # Check for protected column names
+        # Check for protected column names and validate column names
         for column in columns:
+            # Validate column name format
+            validate_name(column.name, "column")
+            
             if column.name in self.PROTECTED_COLUMNS:
                 raise ValueError(
                     f"Column name '{column.name}' is protected and cannot be used"
@@ -346,13 +353,16 @@ class TableManager:
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
         
-        # Validate target table name doesn't use protected prefixes
+        # Validate target table name doesn't use protected prefixes (check this FIRST)
         for prefix in self.PROTECTED_TABLE_PREFIXES:
             if target_table.startswith(prefix):
                 raise ValueError(
                     f"Table name '{target_table}' is not allowed. "
                     f"Table names cannot start with '{prefix}' as these are reserved for system use."
                 )
+        
+        # Validate target table name format (after checking protected prefixes)
+        validate_name(target_table, "table")
 
         if not self._table_exists(source_table):
             raise ValueError(f"Source table '{source_table}' does not exist")

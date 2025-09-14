@@ -7,9 +7,12 @@ and follow consistent naming conventions.
 import re
 
 
-# Regex pattern for valid names: lowercase letters, numbers, dash, underscore
-# Period removed to prevent directory traversal attempts like "../"
-VALID_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9\-_]*[a-z0-9]$|^[a-z0-9]$")
+# Regex patterns for different entity types
+# Database/branch/tenant names: can have hyphens and start with numbers
+VALID_DB_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9\-_]*[a-z0-9]$|^[a-z0-9]$")
+
+# Table/column names: no hyphens (to avoid SQL quoting), must start with letter
+VALID_TABLE_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*[a-z0-9]$|^[a-z]$")
 
 # Reserved names that cannot be used
 RESERVED_NAMES = {
@@ -65,9 +68,9 @@ def validate_name(name: str, entity_type: str = "entity") -> None:
     if not name:
         raise InvalidNameError(f"{entity_type.capitalize()} name cannot be empty")
 
-    if len(name) > 255:
+    if len(name) > 63:
         raise InvalidNameError(
-            f"{entity_type.capitalize()} name cannot exceed 255 characters"
+            f"{entity_type.capitalize()} name cannot exceed 63 characters"
         )
     
     # Critical: Check for path traversal attempts
@@ -90,14 +93,25 @@ def validate_name(name: str, entity_type: str = "entity") -> None:
             f"Use '{name.lower()}' instead of '{name}'"
         )
 
-    # Check pattern
-    if not VALID_NAME_PATTERN.match(name):
-        raise InvalidNameError(
-            f"Invalid {entity_type} name '{name}'. "
-            f"Names must contain only lowercase letters (a-z), numbers (0-9), "
-            f"dash (-), and underscore (_). "
-            f"Names must start and end with alphanumeric characters."
-        )
+    # Check pattern based on entity type
+    if entity_type in ["table", "column"]:
+        # Tables and columns: no hyphens, must start with letter
+        if not VALID_TABLE_NAME_PATTERN.match(name):
+            raise InvalidNameError(
+                f"Invalid {entity_type} name '{name}'. "
+                f"{entity_type.capitalize()} names must contain only lowercase letters (a-z), "
+                f"numbers (0-9), and underscore (_). "
+                f"Names must start with a letter and end with a letter or number."
+            )
+    else:
+        # Database/branch/tenant: can have hyphens, can start with numbers
+        if not VALID_DB_NAME_PATTERN.match(name):
+            raise InvalidNameError(
+                f"Invalid {entity_type} name '{name}'. "
+                f"Names must contain only lowercase letters (a-z), numbers (0-9), "
+                f"dash (-), and underscore (_). "
+                f"Names must start and end with alphanumeric characters."
+            )
 
     # Check for consecutive special characters
     if (

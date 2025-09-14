@@ -464,12 +464,8 @@ class CinchDB:
             if len(data) == 1:
                 return self._data_manager.create_from_dict(table, data[0])
             
-            # Multiple records - batch insert
-            results = []
-            for record in data:
-                result = self._data_manager.create_from_dict(table, record)
-                results.append(result)
-            return results
+            # Multiple records - use bulk insert
+            return self._data_manager.bulk_create_from_dict(table, list(data))
         else:
             # Remote insert
             if len(data) == 1:
@@ -533,8 +529,12 @@ class CinchDB:
             for update_data in updates:
                 update_copy = update_data.copy()
                 record_id = update_copy.pop('id')
-                result = self.data.update_by_id(table, record_id, update_copy)
-                results.append(result)
+                try:
+                    result = self.data.update_by_id(table, record_id, update_copy)
+                    results.append(result)
+                except ValueError as e:
+                    # Record not found - include error in results
+                    results.append({"id": record_id, "error": str(e)})
             return results
         else:
             # Remote update

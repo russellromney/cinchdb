@@ -78,7 +78,7 @@ cinch branch create hotfix --from production
 # All operations work on current branch
 cinch table create profiles user_id:TEXT bio:TEXT avatar_url:TEXT
 cinch column add users profile_completed:BOOLEAN
-cinch query "INSERT INTO profiles (user_id, bio) VALUES ('user-123', 'Software developer')"
+cinch data insert profiles --data '{"user_id": "user-123", "bio": "Software developer"}'
 ```
 
 ### Merge Back
@@ -128,7 +128,7 @@ cinch branch create feature/orders --switch
 
 # 2. Develop iteratively
 cinch table create orders user_id:TEXT total:REAL
-cinch query "INSERT INTO orders (user_id, total) VALUES ('test-user', 29.99)"
+cinch data insert orders --data '{"user_id": "test-user", "total": 29.99}'
 cinch query "SELECT * FROM orders" # Test it works
 
 # 3. More changes

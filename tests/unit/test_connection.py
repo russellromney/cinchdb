@@ -7,6 +7,9 @@ import shutil
 import threading
 import time
 import sqlite3
+import uuid
+import os
+import psutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from cinchdb.core.connection import DatabaseConnection, ConnectionPool
@@ -22,6 +25,11 @@ class TestDatabaseConnection:
         db_path = Path(temp) / "test.db"
         yield db_path
         shutil.rmtree(temp)
+
+    @pytest.fixture
+    def test_encryption_key(self):
+        """Provide a test encryption key for SQLCipher."""
+        return "test_key_12345678901234567890"
 
     def test_connection_init(self, temp_db):
         """Test initializing a database connection."""
@@ -196,20 +204,23 @@ class TestConnectionEdgeCases:
     def test_concurrent_connections_stress(self, temp_dir):
         """Test many concurrent connections to same database."""
         db_path = temp_dir / "stress.db"
-        
+
+        # Pre-initialize the database to avoid WAL setup race conditions
+        init_conn = DatabaseConnection(db_path)
+        init_conn.execute("""
+            CREATE TABLE IF NOT EXISTS stress_test (
+                id INTEGER PRIMARY KEY,
+                worker_id INTEGER,
+                value TEXT
+            )
+        """)
+        init_conn.commit()
+        init_conn.close()
+
         def worker(worker_id):
             """Worker that creates connection and performs operations."""
             conn = DatabaseConnection(db_path)
             try:
-                # Create table if not exists
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS stress_test (
-                        id INTEGER PRIMARY KEY,
-                        worker_id INTEGER,
-                        value TEXT
-                    )
-                """)
-                
                 # Insert some data
                 for i in range(10):
                     conn.execute(
@@ -217,7 +228,7 @@ class TestConnectionEdgeCases:
                         (worker_id, f"worker_{worker_id}_value_{i}")
                     )
                     conn.commit()
-                
+
                 # Read data
                 result = conn.execute(
                     "SELECT COUNT(*) as count FROM stress_test WHERE worker_id = ?",
@@ -225,18 +236,18 @@ class TestConnectionEdgeCases:
                 )
                 count = result.fetchone()["count"]
                 assert count == 10
-                
+
                 return True
             finally:
                 conn.close()
-        
+
         # Run 50 concurrent workers
         with ThreadPoolExecutor(max_workers=50) as executor:
             futures = [executor.submit(worker, i) for i in range(50)]
             results = [f.result() for f in as_completed(futures)]
-        
+
         assert all(results)
-        
+
         # Verify total records
         conn = DatabaseConnection(db_path)
         result = conn.execute("SELECT COUNT(*) as count FROM stress_test")
@@ -318,17 +329,50 @@ class TestConnectionEdgeCases:
         pool = ConnectionPool()
         
         connections = []
+        created_count = 0
         try:
-            # Create many connections to different databases
+            # Create many connections to different databases with realistic paths
             for i in range(100):
-                db_path = temp_dir / f"db_{i}.db"
-                conn = pool.get_connection(db_path)
-                connections.append(conn)
-                
-                # Perform operation to ensure connection is active
-                conn.execute("CREATE TABLE test (id INTEGER)")
-            
+                try:
+                    db_id = str(uuid.uuid4())
+                    db_path = temp_dir / f"db_{db_id}.db"
+                    conn = pool.get_connection(db_path)
+                    connections.append(conn)
+
+                    # Perform operation to ensure connection is active
+                    conn.execute("CREATE TABLE test (id INTEGER)")
+                    created_count += 1
+
+                    if created_count % 10 == 0:
+                        # Monitor system resources every 10 connections
+                        process = psutil.Process(os.getpid())
+                        print(f"Successfully created {created_count} connections")
+                        print(f"  Open files: {process.num_fds()}")
+                        print(f"  Memory: {process.memory_info().rss / 1024 / 1024:.1f} MB")
+
+                except Exception as e:
+                    print(f"Failed at connection {i + 1}: {type(e).__name__}: {e}")
+                    print(f"Database path: {db_path}")
+                    print(f"Temp dir exists: {temp_dir.exists()}")
+                    print(f"Temp dir contents: {list(temp_dir.iterdir()) if temp_dir.exists() else 'N/A'}")
+
+                    # Try to get more specific error info
+                    if hasattr(e, 'sqlite_errorcode'):
+                        print(f"SQLite error code: {e.sqlite_errorcode}")
+                    if hasattr(e, 'sqlite_errorname'):
+                        print(f"SQLite error name: {e.sqlite_errorname}")
+
+                    # Check if it's a permission issue
+                    try:
+                        temp_dir.stat()
+                        print(f"Temp dir permissions: {oct(temp_dir.stat().st_mode)}")
+                    except Exception as perm_e:
+                        print(f"Can't check temp dir permissions: {perm_e}")
+
+                    raise
+
             # Pool should handle this gracefully
+            print(f"Final count: {len(pool._connections)} connections created")
             assert len(pool._connections) == 100
             
         finally:

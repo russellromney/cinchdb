@@ -59,7 +59,7 @@ class DatabaseConnection:
                 str(self.path),
                 detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
             )
-            
+
             # Try to set encryption key (this will fail if SQLCipher is not available)
             try:
                 self._conn.execute(f"PRAGMA key = '{self.encryption_key}'")
@@ -69,29 +69,30 @@ class DatabaseConnection:
                     "SQLCipher is required for encryption but not available. "
                     "Please install pysqlcipher3 or sqlite3 with SQLCipher support."
                 ) from e
-            
-            # Configure WAL mode and settings
-            self._conn.execute("PRAGMA journal_mode = WAL")
-            self._conn.execute("PRAGMA synchronous = NORMAL")
-            self._conn.execute("PRAGMA wal_autocheckpoint = 0")
         else:
-            # Fallback to standard SQLite connection
-            # Connect with row factory for dict-like access
-            # detect_types=PARSE_DECLTYPES tells SQLite to use our registered converters
+            # Standard SQLite connection (no encryption - default for open source)
             self._conn = sqlite3.connect(
                 str(self.path),
                 detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
             )
-            
-            # Configure WAL mode and settings
+
+        # CRITICAL: Configure WAL mode for ALL connection types - fail if any of these fail
+        try:
             self._conn.execute("PRAGMA journal_mode = WAL")
             self._conn.execute("PRAGMA synchronous = NORMAL")
             self._conn.execute("PRAGMA wal_autocheckpoint = 0")
+        except sqlite3.OperationalError as e:
+            self._conn.close()
+            raise
         
-        # Set row factory and foreign keys (both encrypted and unencrypted)
-        self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA foreign_keys = ON")
-        self._conn.commit()
+        # Set row factory and foreign keys (both encrypted and unencrypted) - fail if any of these fail
+        try:
+            self._conn.row_factory = sqlite3.Row
+            self._conn.execute("PRAGMA foreign_keys = ON")
+            self._conn.commit()
+        except sqlite3.OperationalError as e:
+            self._conn.close()
+            raise
 
     def execute(self, sql: str, params: Optional[tuple] = None) -> sqlite3.Cursor:
         """Execute a SQL statement.

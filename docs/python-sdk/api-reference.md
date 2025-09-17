@@ -778,13 +778,13 @@ class User(BaseModel):
         json_schema_extra = {"table_name": "users"}
 
 # Select users
-users = db.data.select(User, limit=10)
+users = db.select(User, limit=10)
 
 # With filters
-active_users = db.data.select(User, active=True)
+active_users = db.select(User, active=True)
 
 # With operators
-recent_users = db.data.select(User, created_at__gte="2024-01-01")
+recent_users = db.select(User, created_at__gte="2024-01-01")
 ```
 
 #### find_by_id()
@@ -1180,18 +1180,18 @@ get_index_info(name: str) -> Dict[str, Any]
 **Example:**
 ```python
 # Create indexes
-db.indexes.create_index("users", ["email"], unique=True)
-db.indexes.create_index("orders", ["user_id", "created_at"])
+db.create_index("users", ["email"], unique=True)
+db.create_index("orders", ["user_id", "created_at"])
 
 # List indexes
-all_indexes = db.indexes.list_indexes()
-user_indexes = db.indexes.list_indexes("users")
+all_indexes = db.list_indexes()
+user_indexes = db.list_indexes("users")
 
 # Get index info
-info = db.indexes.get_index_info("idx_users_email")
+info = db.get_index_info("idx_users_email")
 
 # Drop index
-db.indexes.drop_index("old_index")
+db.drop_index("old_index")
 ```
 
 ## Exceptions
@@ -1204,7 +1204,7 @@ Raised when a merge operation fails.
 from cinchdb.managers import MergeError
 
 try:
-    db.merge.merge("feature", "main")
+    db.merge("feature", "main")
 except MergeError as e:
     print(f"Merge failed: {e}")
 ```

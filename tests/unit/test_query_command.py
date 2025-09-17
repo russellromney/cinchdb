@@ -46,19 +46,12 @@ class TestQueryCommand:
             ],
         )
 
-        # Add some test data
-        from cinchdb.core.path_utils import get_tenant_db_path
-        from cinchdb.core.connection import DatabaseConnection
+        # Add some test data using CinchDB convenience functions
+        from cinchdb.core.database import CinchDB
 
-        db_path = get_tenant_db_path(project_path, "main", "main", "main")
-        with DatabaseConnection(db_path) as conn:
-            conn.execute(
-                "INSERT INTO users (id, created_at, name, email) VALUES ('1', '2023-01-01', 'Alice', 'alice@example.com')"
-            )
-            conn.execute(
-                "INSERT INTO users (id, created_at, name, email) VALUES ('2', '2023-01-02', 'Bob', 'bob@example.com')"
-            )
-            conn.commit()
+        db = CinchDB(database="main", project_dir=project_path, tenant="main")
+        db.insert("users", {"id": "1", "created_at": "2023-01-01", "name": "Alice", "email": "alice@example.com"})
+        db.insert("users", {"id": "2", "created_at": "2023-01-02", "name": "Bob", "email": "bob@example.com"})
 
         yield project_path
 
@@ -122,7 +115,7 @@ class TestQueryCommand:
         assert len(lines) == 1
 
     def test_query_insert(self, temp_project):
-        """Test INSERT query."""
+        """Test INSERT query is rejected."""
         result = self.run_query_command(
             [
                 "query",
@@ -131,20 +124,18 @@ class TestQueryCommand:
             temp_project,
         )
 
-        assert result.exit_code == 0
-        assert "Query executed successfully" in result.stdout
-        assert "Rows affected: 1" in result.stdout
+        assert result.exit_code == 1
+        assert "only supports SELECT queries" in result.stdout
 
     def test_query_update(self, temp_project):
-        """Test UPDATE query."""
+        """Test UPDATE query is rejected."""
         result = self.run_query_command(
             ["query", "UPDATE users SET name = 'Alice Updated' WHERE name = 'Alice'"],
             temp_project,
         )
 
-        assert result.exit_code == 0
-        assert "Query executed successfully" in result.stdout
-        assert "Rows affected: 1" in result.stdout
+        assert result.exit_code == 1
+        assert "only supports SELECT queries" in result.stdout
 
     def test_query_invalid_sql(self, temp_project):
         """Test query with invalid SQL."""

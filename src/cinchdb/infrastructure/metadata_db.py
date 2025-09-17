@@ -133,10 +133,58 @@ class MetadataDB:
                 pass
             
             self.conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_branches_cdc_enabled 
+                CREATE INDEX IF NOT EXISTS idx_branches_cdc_enabled
                 ON branches(cdc_enabled)
             """)
-    
+
+            # Change tracking tables
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS changes (
+                    id TEXT PRIMARY KEY,
+                    database_id TEXT NOT NULL,
+                    origin_branch_id TEXT,
+                    type TEXT NOT NULL,
+                    entity_type TEXT NOT NULL,
+                    entity_name TEXT NOT NULL,
+                    details JSON,
+                    sql TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE,
+                    FOREIGN KEY (origin_branch_id) REFERENCES branches(id) ON DELETE SET NULL
+                )
+            """)
+
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS branch_changes (
+                    branch_id TEXT NOT NULL,
+                    change_id TEXT NOT NULL,
+                    applied BOOLEAN DEFAULT FALSE,
+                    applied_order INTEGER NOT NULL,
+                    copied_from_branch_id TEXT,
+                    PRIMARY KEY (branch_id, change_id),
+                    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+                    FOREIGN KEY (change_id) REFERENCES changes(id) ON DELETE CASCADE,
+                    FOREIGN KEY (copied_from_branch_id) REFERENCES branches(id) ON DELETE SET NULL
+                )
+            """)
+
+            # Indexes for change tracking
+            self.conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_changes_database
+                ON changes(database_id)
+            """)
+
+            self.conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_branch_changes_order
+                ON branch_changes(branch_id, applied_order)
+            """)
+
+            self.conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_branch_changes_unapplied
+                ON branch_changes(branch_id, applied)
+            """)
+
     # Database operations
     def create_database(self, database_id: str, name: str, 
                        description: Optional[str] = None,
@@ -469,15 +517,149 @@ class MetadataDB:
             }
         return None
     
+    # Change tracking operations
+    def create_change(self, change_id: str, database_id: str,
+                     origin_branch_id: Optional[str], change_type: str,
+                     entity_type: str, entity_name: str,
+                     details: Optional[Dict[str, Any]] = None,
+                     sql: Optional[str] = None) -> None:
+        """Create a change record."""
+        with self.conn:
+            self.conn.execute("""
+                INSERT INTO changes (
+                    id, database_id, origin_branch_id, type,
+                    entity_type, entity_name, details, sql
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                change_id, database_id, origin_branch_id, change_type,
+                entity_type, entity_name,
+                json.dumps(details) if details else None, sql
+            ))
+
+    def get_change(self, change_id: str) -> Optional[Dict[str, Any]]:
+        """Get a change by ID."""
+        cursor = self.conn.execute("""
+            SELECT * FROM changes WHERE id = ?
+        """, (change_id,))
+        row = cursor.fetchone()
+        if row:
+            result = dict(row)
+            if result.get('details'):
+                result['details'] = json.loads(result['details'])
+            return result
+        return None
+
+    def link_change_to_branch(self, branch_id: str, change_id: str,
+                              applied: bool = False, applied_order: int = 0,
+                              copied_from_branch_id: Optional[str] = None) -> None:
+        """Link a change to a branch."""
+        with self.conn:
+            self.conn.execute("""
+                INSERT OR REPLACE INTO branch_changes (
+                    branch_id, change_id, applied, applied_order,
+                    copied_from_branch_id
+                )
+                VALUES (?, ?, ?, ?, ?)
+            """, (branch_id, change_id, applied, applied_order,
+                  copied_from_branch_id))
+
+    def get_branch_changes(self, branch_id: str) -> List[Dict[str, Any]]:
+        """Get all changes for a branch in order."""
+        cursor = self.conn.execute("""
+            SELECT c.*, bc.applied, bc.applied_order, bc.copied_from_branch_id
+            FROM branch_changes bc
+            JOIN changes c ON bc.change_id = c.id
+            WHERE bc.branch_id = ?
+            ORDER BY bc.applied_order
+        """, (branch_id,))
+
+        results = []
+        for row in cursor:
+            result = dict(row)
+            if result.get('details'):
+                result['details'] = json.loads(result['details'])
+            results.append(result)
+        return results
+
+    def update_change_applied_status(self, branch_id: str, change_id: str,
+                                     applied: bool) -> None:
+        """Update the applied status of a change in a branch."""
+        with self.conn:
+            self.conn.execute("""
+                UPDATE branch_changes
+                SET applied = ?
+                WHERE branch_id = ? AND change_id = ?
+            """, (applied, branch_id, change_id))
+
+    def get_next_change_order(self, branch_id: str) -> int:
+        """Get the next available order number for a branch."""
+        cursor = self.conn.execute("""
+            SELECT MAX(applied_order) as max_order
+            FROM branch_changes
+            WHERE branch_id = ?
+        """, (branch_id,))
+        row = cursor.fetchone()
+        return (row['max_order'] or -1) + 1 if row else 0
+
+    def mark_change_applied(self, branch_id: str, change_id: str) -> None:
+        """Mark a change as applied for a specific branch."""
+        with self.conn:
+            self.conn.execute("""
+                UPDATE branch_changes
+                SET applied = 1
+                WHERE branch_id = ? AND change_id = ?
+            """, (branch_id, change_id))
+
+    def clear_branch_changes(self, branch_id: str) -> None:
+        """Clear all changes from a branch."""
+        with self.conn:
+            self.conn.execute("""
+                DELETE FROM branch_changes
+                WHERE branch_id = ?
+            """, (branch_id,))
+
+    def unlink_change_from_branch(self, branch_id: str, change_id: str) -> None:
+        """Unlink a change from a branch (remove from branch_changes).
+
+        Args:
+            branch_id: Branch to unlink from
+            change_id: Change to unlink
+        """
+        with self.conn:
+            self.conn.execute("""
+                DELETE FROM branch_changes
+                WHERE branch_id = ? AND change_id = ?
+            """, (branch_id, change_id))
+
+    def copy_branch_changes(self, source_branch_id: str, target_branch_id: str) -> None:
+        """Copy all changes from source branch to target branch.
+
+        This is used when creating a new branch to inherit all changes from parent.
+        Uses efficient SQL INSERT...SELECT to copy in one operation.
+
+        Args:
+            source_branch_id: Branch to copy changes from
+            target_branch_id: Branch to copy changes to
+        """
+        with self.conn:
+            self.conn.execute("""
+                INSERT INTO branch_changes (branch_id, change_id, applied, applied_order, copied_from_branch_id)
+                SELECT ?, change_id, applied, applied_order, ?
+                FROM branch_changes
+                WHERE branch_id = ?
+                ORDER BY applied_order
+            """, (target_branch_id, source_branch_id, source_branch_id))
+
     def close(self):
         """Close the database connection."""
         if self.conn:
             self.conn.close()
-    
+
     def __enter__(self):
         """Context manager entry."""
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.close()

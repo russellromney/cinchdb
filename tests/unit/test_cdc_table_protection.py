@@ -42,7 +42,7 @@ class TestCDCTableProtection:
         table_manager.create_table("users", user_columns)
         table_manager.create_table("orders", user_columns)
         
-        # Manually create CDC tables in the database (simulating bdhcnic plugin)
+        # Manually create CDC tables in the database (simulating plugged plugin)
         from cinchdb.core.connection import DatabaseConnection
         with DatabaseConnection(table_manager.db_path) as conn:
             # Create CDC tables

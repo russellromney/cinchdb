@@ -1,6 +1,7 @@
 """Tests for the unified CinchDB interface."""
 
 import pytest
+from pathlib import Path
 from unittest.mock import Mock, patch, PropertyMock
 
 from cinchdb.core.database import CinchDB, connect, connect_api
@@ -56,16 +57,16 @@ class TestCinchDB:
         assert db._column_manager is None
         assert db._query_manager is None
 
-        # Access a manager
+        # Access a manager through private interface
         with patch("cinchdb.managers.table.TableManager") as mock_table_manager:
-            _ = db.tables
+            _ = db._managers.tables
             mock_table_manager.assert_called_once_with(
                 tmp_path, "test_db", "main", "main", None
             )
 
         # Should be cached
         with patch("cinchdb.managers.table.TableManager") as mock_table_manager:
-            _ = db.tables
+            _ = db._managers.tables
             mock_table_manager.assert_not_called()
 
     def test_remote_managers_raise_error(self):
@@ -74,30 +75,46 @@ class TestCinchDB:
             database="test_db", api_url="https://api.example.com", api_key="test-key"
         )
 
-        with pytest.raises(RuntimeError, match="Direct manager access not available"):
-            _ = db.tables
+        with pytest.raises(RuntimeError, match="Manager access not available"):
+            _ = db._managers.tables
 
-        with pytest.raises(RuntimeError, match="Direct manager access not available"):
-            _ = db.columns
+        with pytest.raises(RuntimeError, match="Manager access not available"):
+            _ = db._managers.columns
 
     def test_local_query(self, tmp_path):
         """Test query execution on local connection."""
+        # Initialize project first
+        from cinchdb.core.initializer import init_project
+        init_project(tmp_path)
+
         db = CinchDB(database="test_db", project_dir=tmp_path)
 
-        with patch("cinchdb.managers.query.QueryManager") as mock_query_manager:
-            mock_instance = Mock()
-            mock_instance.execute.return_value = [{"id": 1, "name": "test"}]
-            mock_query_manager.return_value = mock_instance
+        # Mock the tenant manager to return a valid path
+        with patch("cinchdb.managers.tenant.TenantManager.get_tenant_db_path_for_operation") as mock_get_path:
+            # Create a temporary database file for testing
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_db:
+                temp_db_path = Path(temp_db.name)
 
-            result = db.query("SELECT * FROM users WHERE id = ?", [1])
+            mock_get_path.return_value = temp_db_path
 
-            mock_query_manager.assert_called_once_with(
-                tmp_path, "test_db", "main", "main", None
-            )
-            mock_instance.execute.assert_called_once_with(
-                "SELECT * FROM users WHERE id = ?", [1], False
-            )
-            assert result == [{"id": 1, "name": "test"}]
+            # Mock DatabaseConnection to return test data
+            with patch("cinchdb.core.connection.DatabaseConnection") as mock_db_conn:
+                mock_conn = Mock()
+                mock_cursor = Mock()
+                mock_cursor.fetchall.return_value = [{"id": 1, "name": "test"}]
+                mock_conn.execute.return_value = mock_cursor
+                mock_db_conn.return_value.__enter__.return_value = mock_conn
+
+                result = db.query("SELECT * FROM users WHERE id = ?", [1])
+
+                mock_conn.execute.assert_called_once_with(
+                    "SELECT * FROM users WHERE id = ?", [1]
+                )
+                assert result == [{"id": 1, "name": "test"}]
+
+            # Clean up
+            temp_db_path.unlink(missing_ok=True)
 
     def test_remote_query(self):
         """Test query execution on remote connection."""
@@ -142,7 +159,7 @@ class TestCinchDB:
 
             db.create_table("users", columns)
 
-            mock_instance.create_table.assert_called_once_with("users", columns)
+            mock_instance.create_table.assert_called_once_with("users", columns, None)
 
     def test_remote_create_table(self):
         """Test table creation on remote connection."""
@@ -203,7 +220,7 @@ class TestCinchDB:
             result = db.insert("users", {"name": "Test User", "email": "test@example.com"})
             
             mock_data_manager.assert_called_once_with(
-                tmp_path, "test_db", "main", "main"
+                tmp_path, "test_db", "main", "main", None
             )
             mock_instance.create_from_dict.assert_called_once_with(
                 "users", {"name": "Test User", "email": "test@example.com"}

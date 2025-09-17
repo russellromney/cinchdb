@@ -29,7 +29,18 @@ class ViewModel:
         self.branch = branch
         self.tenant = tenant
         self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
-        self.change_tracker = ChangeTracker(project_root, database, branch)
+        self._change_tracker = None  # Lazy init - database might not exist yet
+
+    @property
+    def change_tracker(self):
+        """Lazy load change tracker only when needed for actual changes."""
+        if self._change_tracker is None:
+            try:
+                self._change_tracker = ChangeTracker(self.project_root, self.database, self.branch)
+            except ValueError:
+                # Database/branch doesn't exist yet - this is fine for read operations
+                return None
+        return self._change_tracker
 
     def list_views(self) -> List[View]:
         """List all views in the database.
@@ -93,7 +104,8 @@ class ViewModel:
             details={"sql_statement": sql_statement},
             sql=create_sql,
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -145,7 +157,8 @@ class ViewModel:
             },
             sql=create_sql,
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -189,7 +202,8 @@ class ViewModel:
             branch=self.branch,
             sql=drop_sql,
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier

@@ -36,8 +36,19 @@ class ColumnManager:
         self.tenant = tenant
         self.encryption_manager = encryption_manager
         self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
-        self.change_tracker = ChangeTracker(project_root, database, branch)
+        self._change_tracker = None  # Lazy init - database might not exist yet
         self.table_manager = TableManager(project_root, database, branch, tenant, encryption_manager)
+
+    @property
+    def change_tracker(self):
+        """Lazy load change tracker only when needed for actual changes."""
+        if self._change_tracker is None:
+            try:
+                self._change_tracker = ChangeTracker(self.project_root, self.database, self.branch)
+            except ValueError:
+                # Database/branch doesn't exist yet - this is fine for read operations
+                return None
+        return self._change_tracker
 
     def list_columns(self, table_name: str) -> List[Column]:
         """List all columns in a table.
@@ -103,7 +114,8 @@ class ColumnManager:
             details={"table": table_name, "column_def": column.model_dump()},
             sql=alter_sql,
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -193,7 +205,8 @@ class ColumnManager:
             },
             sql=f"-- DROP COLUMN {column_name} FROM {table_name}",
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -264,7 +277,8 @@ class ColumnManager:
             },
             sql=rename_sql,
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -571,7 +585,8 @@ class ColumnManager:
             },
             sql=f"-- ALTER COLUMN {column_name} {'NULL' if nullable else 'NOT NULL'}",
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier

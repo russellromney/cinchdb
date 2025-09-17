@@ -65,6 +65,7 @@ pip install cinchdb
 ## What's Next
 
 - **New to CinchDB?** → [Quick Start Guide](getting-started/quickstart.md)
-- **Need commands?** → [CLI Reference](cli/index.md) 
-- **Want to code?** → [Python SDK](python-sdk/index.md)
 - **How it works?** → [Core Concepts](getting-started/concepts.md)
+- **Why not just SQLite?** → [Constraints](concepts/constraints.md)
+- **Need commands?** → [CLI Reference](cli/index.md)
+- **Want to code?** → [Python SDK](python-sdk/index.md)

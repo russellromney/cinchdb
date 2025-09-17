@@ -22,7 +22,7 @@ def test_vacuum_tenant():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table and add data to materialize main tenant
-        db.tables.create_table("test_data", [
+        db.create_table("test_data", [
             Column(name="item_id", type="INTEGER", unique=True),
             Column(name="data", type="TEXT")
         ])
@@ -69,13 +69,13 @@ def test_vacuum_tenant_specific():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("users", [
+        db.create_table("users", [
             Column(name="user_id", type="INTEGER", unique=True),
             Column(name="name", type="TEXT")
         ])
         
         # Create a tenant
-        db.tenants.create_tenant("customer_a", lazy=False)
+        db.create_tenant("customer_a", lazy=False)
         
         # Switch to the new tenant and add data
         db_tenant = CinchDB("testdb", tenant="customer_a", project_dir=project_dir)
@@ -96,24 +96,32 @@ def test_vacuum_tenant_specific():
         assert result["duration_seconds"] >= 0
 
 
-def test_vacuum_lazy_tenant_fails():
-    """Test that vacuuming a lazy tenant fails with appropriate error."""
+def test_vacuum_lazy_tenant_returns_zeros():
+    """Test that vacuuming a lazy tenant returns zero values instead of failing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         project_dir = Path(tmpdir)
-        
+
         # Initialize project
         initializer = ProjectInitializer(project_dir)
         initializer.init_project("testdb", "main")
-        
+
         # Connect to database
         db = CinchDB("testdb", project_dir=project_dir)
-        
+
         # Create a lazy tenant
-        db.tenants.create_tenant("lazy_tenant", lazy=True)
-        
-        # Try to vacuum the lazy tenant - should fail
-        with pytest.raises(ValueError, match="Cannot vacuum lazy tenant"):
-            db.vacuum_tenant("lazy_tenant")
+        db.create_tenant("lazy_tenant", lazy=True)
+
+        # Vacuum the lazy tenant - should return zero values
+        result = db.vacuum_tenant("lazy_tenant")
+
+        # Verify result has zero values but success=True
+        assert result["success"] is True
+        assert result["tenant"] == "lazy_tenant"
+        assert result["size_before"] == 0
+        assert result["size_after"] == 0
+        assert result["space_reclaimed"] == 0
+        assert result["space_reclaimed_mb"] == 0.0
+        assert result["duration_seconds"] == 0.0
 
 
 def test_vacuum_nonexistent_tenant_fails():
@@ -146,7 +154,7 @@ def test_vacuum_current_tenant():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table and add data
-        db.tables.create_table("items", [
+        db.create_table("items", [
             Column(name="item_id", type="INTEGER", unique=True),
             Column(name="name", type="TEXT")
         ])
@@ -174,7 +182,7 @@ def test_vacuum_with_no_space_to_reclaim():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create minimal table but don't add/delete data
-        db.tables.create_table("simple", [
+        db.create_table("simple", [
             Column(name="simple_id", type="INTEGER", unique=True)
         ])
         

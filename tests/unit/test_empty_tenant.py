@@ -12,6 +12,7 @@ from cinchdb.managers.query import QueryManager
 from cinchdb.models import Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
+from cinchdb.core.database import CinchDB
 
 
 class TestEmptyTenant:
@@ -94,7 +95,7 @@ class TestEmptyTenant:
             entity_type="table",
             entity_name="test_table",
             branch="main",
-            sql="CREATE TABLE test_table (id TEXT PRIMARY KEY, value TEXT)",
+            sql="CREATE TABLE test_table (id TEXT PRIMARY KEY, value TEXT, created_at DATETIME, updated_at DATETIME)",
         )
         added = managers["tracker"].add_change(change)
         managers["applier"].apply_change(added.id)
@@ -107,22 +108,20 @@ class TestEmptyTenant:
         assert not tenant_db_path.exists()
         assert managers["tenant"].is_tenant_lazy("write-test")
         
-        # Perform a write operation
-        query_mgr = QueryManager(temp_project, "main", "main", "write-test")
-        query_mgr.execute_non_query(
-            "INSERT INTO test_table (id, value) VALUES ('1', 'test')"
-        )
+        # Perform a write operation using proper Database API
+        db = CinchDB(database="main", project_dir=temp_project, tenant="write-test")
+        db.insert("test_table", {"id": "1", "value": "test"})
         
         # Now tenant should be materialized
         assert tenant_db_path.exists()
         assert not managers["tenant"].is_tenant_lazy("write-test")
         
         # Verify data was written to the actual tenant
-        with DatabaseConnection(tenant_db_path) as conn:
-            cursor = conn.execute("SELECT * FROM test_table WHERE id = '1'")
-            row = cursor.fetchone()
-            assert row is not None
-            assert row["value"] == "test"
+        # Use CinchDB convenience function for verification
+        db_verify = CinchDB(database="main", project_dir=temp_project, tenant="write-test")
+        results = db_verify.query("SELECT * FROM test_table WHERE id = '1'")
+        assert len(results) == 1
+        assert results[0]["value"] == "test"
 
     def test_empty_tenant_has_schema_but_no_data(self, managers, temp_project):
         """Test that __empty__ tenant has schema but no data."""
@@ -133,14 +132,14 @@ class TestEmptyTenant:
                 entity_type="table",
                 entity_name="users",
                 branch="main",
-                sql="CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT)",
+                sql="CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT, created_at DATETIME, updated_at DATETIME)",
             ),
             Change(
                 type=ChangeType.CREATE_TABLE,
                 entity_type="table",
                 entity_name="posts",
                 branch="main",
-                sql="CREATE TABLE posts (id TEXT PRIMARY KEY, title TEXT, user_id TEXT)",
+                sql="CREATE TABLE posts (id TEXT PRIMARY KEY, title TEXT, user_id TEXT, created_at DATETIME, updated_at DATETIME)",
             ),
         ]
         
@@ -148,12 +147,10 @@ class TestEmptyTenant:
             added = managers["tracker"].add_change(change)
             managers["applier"].apply_change(added.id)
         
-        # Add some data to main
-        main_db_path = get_tenant_db_path(temp_project, "main", "main", "main")
-        with DatabaseConnection(main_db_path) as conn:
-            conn.execute("INSERT INTO users (id, name) VALUES ('u1', 'Alice')")
-            conn.execute("INSERT INTO posts (id, title, user_id) VALUES ('p1', 'First Post', 'u1')")
-            conn.commit()
+        # Add some data to main using CinchDB convenience functions
+        main_db = CinchDB(database="main", project_dir=temp_project, tenant="main")
+        main_db.insert("users", {"id": "u1", "name": "Alice"})
+        main_db.insert("posts", {"id": "p1", "title": "First Post", "user_id": "u1"})
         
         # Ensure __empty__ tenant exists
         managers["tenant"]._ensure_empty_tenant()
@@ -249,8 +246,9 @@ class TestEmptyTenant:
             )
             assert db_path == empty_db_path
             
-            # Verify we can read the schema
-            results = query_mgr.execute("SELECT * FROM shared_table")
+            # Verify we can read the schema using CinchDB
+            db_lazy = CinchDB(database="main", project_dir=temp_project, tenant=f"lazy-{i}")
+            results = db_lazy.query("SELECT * FROM shared_table")
             assert results == []  # No data, but query succeeds
 
     def test_lazy_tenant_isolation_after_materialization(self, managers, temp_project):
@@ -261,7 +259,7 @@ class TestEmptyTenant:
             entity_type="table",
             entity_name="data_table",
             branch="main",
-            sql="CREATE TABLE data_table (id TEXT PRIMARY KEY, tenant_data TEXT)",
+            sql="CREATE TABLE data_table (id TEXT PRIMARY KEY, tenant_data TEXT, created_at DATETIME, updated_at DATETIME)",
         )
         added = managers["tracker"].add_change(change)
         managers["applier"].apply_change(added.id)
@@ -271,22 +269,19 @@ class TestEmptyTenant:
         managers["tenant"].create_tenant("tenant-b", lazy=True)
         
         # Write different data to each (materializing them)
-        query_a = QueryManager(temp_project, "main", "main", "tenant-a")
-        query_a.execute_non_query(
-            "INSERT INTO data_table (id, tenant_data) VALUES ('1', 'Data for A')"
-        )
-        
-        query_b = QueryManager(temp_project, "main", "main", "tenant-b")
-        query_b.execute_non_query(
-            "INSERT INTO data_table (id, tenant_data) VALUES ('1', 'Data for B')"
-        )
+        # Insert data using proper Database API
+        db_a = CinchDB(database="main", project_dir=temp_project, tenant="tenant-a")
+        db_a.insert("data_table", {"id": "1", "tenant_data": "Data for A"})
+
+        db_b = CinchDB(database="main", project_dir=temp_project, tenant="tenant-b")
+        db_b.insert("data_table", {"id": "1", "tenant_data": "Data for B"})
         
         # Verify isolation - each has its own data
-        results_a = query_a.execute("SELECT * FROM data_table WHERE id = '1'")
+        results_a = db_a.query("SELECT * FROM data_table WHERE id = '1'")
         assert len(results_a) == 1
         assert results_a[0]["tenant_data"] == "Data for A"
-        
-        results_b = query_b.execute("SELECT * FROM data_table WHERE id = '1'")
+
+        results_b = db_b.query("SELECT * FROM data_table WHERE id = '1'")
         assert len(results_b) == 1
         assert results_b[0]["tenant_data"] == "Data for B"
 
@@ -299,7 +294,7 @@ class TestEmptyTenant:
                 entity_type="table",
                 entity_name="products",
                 branch="main",
-                sql="CREATE TABLE products (id TEXT PRIMARY KEY, name TEXT, price REAL)",
+                sql="CREATE TABLE products (id TEXT PRIMARY KEY, name TEXT, price REAL, created_at DATETIME, updated_at DATETIME)",
             ),
             Change(
                 type=ChangeType.CREATE_INDEX,
@@ -325,17 +320,16 @@ class TestEmptyTenant:
         managers["tenant"].create_tenant("cow-tenant", lazy=True)
         
         # Read operation - should use __empty__
-        query_mgr = QueryManager(temp_project, "main", "main", "cow-tenant")
-        results = query_mgr.execute("SELECT * FROM expensive_products")
+        db_cow_read = CinchDB(database="main", project_dir=temp_project, tenant="cow-tenant")
+        results = db_cow_read.query("SELECT * FROM expensive_products")
         assert results == []  # No data but view works
         
         # Tenant should still be lazy
         assert managers["tenant"].is_tenant_lazy("cow-tenant")
         
         # Write operation - should trigger materialization
-        query_mgr.execute_non_query(
-            "INSERT INTO products (id, name, price) VALUES ('p1', 'Luxury Item', 500)"
-        )
+        db_cow = CinchDB(database="main", project_dir=temp_project, tenant="cow-tenant")
+        db_cow.insert("products", {"id": "p1", "name": "Luxury Item", "price": 500})
         
         # Tenant should now be materialized
         assert not managers["tenant"].is_tenant_lazy("cow-tenant")

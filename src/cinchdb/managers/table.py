@@ -43,11 +43,25 @@ class TableManager:
         self.tenant = tenant
         self.encryption_manager = encryption_manager
         self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
-        self.change_tracker = ChangeTracker(project_root, database, branch)
+        self._change_tracker = None  # Lazy init - database might not exist yet
         self.tenant_manager = TenantManager(project_root, database, branch, encryption_manager)
 
-    def list_tables(self) -> List[Table]:
+    @property
+    def change_tracker(self):
+        """Lazy load change tracker only when needed for actual changes."""
+        if self._change_tracker is None:
+            try:
+                self._change_tracker = ChangeTracker(self.project_root, self.database, self.branch)
+            except ValueError:
+                # Database/branch doesn't exist yet - this is fine for read operations
+                return None
+        return self._change_tracker
+
+    def list_tables(self, include_system: bool = False) -> List[Table]:
         """List all tables in the tenant.
+
+        Args:
+            include_system: If True, include system tables (sqlite_* and __*)
 
         Returns:
             List of Table objects
@@ -58,20 +72,23 @@ class TableManager:
             # Get all tables first, then filter in Python (more reliable than SQL LIKE)
             cursor = conn.execute(
                 """
-                SELECT name FROM sqlite_master 
-                WHERE type='table' 
+                SELECT name FROM sqlite_master
+                WHERE type='table'
                 ORDER BY name
                 """
             )
-            
-            # Filter out system tables and protected tables using Python
-            all_table_names = [row["name"] for row in cursor.fetchall()]
-            user_table_names = [
-                name for name in all_table_names 
-                if not name.startswith('sqlite_') and not name.startswith('__')
-            ]
 
-            for table_name in user_table_names:
+            # Filter system tables unless requested
+            all_table_names = [row["name"] for row in cursor.fetchall()]
+            if include_system:
+                filtered_table_names = all_table_names
+            else:
+                filtered_table_names = [
+                    name for name in all_table_names
+                    if not name.startswith('sqlite_') and not name.startswith('__')
+                ]
+
+            for table_name in filtered_table_names:
                 table = self.get_table(table_name)
                 tables.append(table)
 
@@ -192,7 +209,8 @@ class TableManager:
             details={"columns": [col.model_dump() for col in all_columns]},
             sql=create_sql,
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -325,7 +343,8 @@ class TableManager:
             branch=self.branch,
             sql=drop_sql,
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -411,7 +430,8 @@ class TableManager:
             },
             sql=create_sql,
         )
-        self.change_tracker.add_change(change)
+        if self.change_tracker:
+            self.change_tracker.add_change(change)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier

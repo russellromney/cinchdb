@@ -113,6 +113,9 @@ class DataManager:
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
+        # Auto-materialize lazy tenant if needed
+        self._ensure_tenant_materialized()
+
         # Make a copy to avoid modifying the original
         record_data = data.copy()
 
@@ -162,6 +165,9 @@ class DataManager:
         """
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
+
+        # Auto-materialize lazy tenant if needed
+        self._ensure_tenant_materialized()
 
         if not data_list:
             return []
@@ -320,6 +326,10 @@ class DataManager:
         """
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
+
+        # Return 0 if tenant is not materialized (no records to delete)
+        if not self._is_tenant_materialized():
+            return 0
 
         if not filters:
             raise ValueError(
@@ -572,13 +582,13 @@ class DataManager:
         """
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
-        
+
+        # Return 0 if tenant is not materialized (no records to delete)
+        if not self._is_tenant_materialized():
+            return 0
+
         if not filters:
             raise ValueError("delete_where requires at least one filter condition")
-        
-        # If the database doesn't exist (lazy tenant), return 0 deleted
-        if not self.db_path.exists():
-            return 0
         
         # Build WHERE clause
         where_clause, params = self._build_where_clause(filters, operator)
@@ -625,7 +635,11 @@ class DataManager:
         """
         # Check maintenance mode
         check_maintenance_mode(self.project_root, self.database, self.branch)
-        
+
+        # Return 0 if tenant is not materialized (no records to update)
+        if not self._is_tenant_materialized():
+            return 0
+
         if not filters:
             raise ValueError("update_where requires at least one filter condition")
             
@@ -656,15 +670,22 @@ class DataManager:
 
     def update_by_id(self, table: str, record_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update a single record by ID.
-        
+
         Args:
             table: Table name
             record_id: Record ID to update
             data: Dictionary of column-value pairs to update
-            
+
         Returns:
             Updated record
+
+        Raises:
+            ValueError: If tenant is not materialized or record not found
         """
+        # Raise error if tenant is not materialized (record doesn't exist)
+        if not self._is_tenant_materialized():
+            raise ValueError(f"Record not found: {record_id}")
+
         # Build SET clause
         set_parts = []
         params = []
@@ -697,20 +718,54 @@ class DataManager:
     
     def delete_by_id(self, table: str, record_id: str) -> bool:
         """Delete a single record by ID using table name.
-        
+
         This method is used by the high-level database API.
-        
+
         Args:
             table: Table name
             record_id: Record ID to delete
-            
+
         Returns:
             True if record was deleted, False if not found
         """
+        # Return False if tenant is not materialized (no records to delete)
+        if not self._is_tenant_materialized():
+            return False
+
         sql = f"DELETE FROM {table} WHERE id = ?"
         
         with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
             cursor = conn.execute(sql, [record_id])
             conn.commit()
             return cursor.rowcount > 0
+
+    def _ensure_tenant_materialized(self) -> None:
+        """Ensure the tenant is materialized before performing data operations.
+
+        Materializes lazy tenants on their first data operation.
+        """
+        # Only materialize if we're not dealing with the main tenant
+        # The main tenant is always materialized
+        if self.tenant == "main":
+            return
+
+        # Check if tenant database file exists
+        if not self.db_path.exists():
+            # Tenant is lazy - materialize it
+            from cinchdb.managers.tenant import TenantManager
+            tenant_mgr = TenantManager(self.project_root, self.database, self.branch)
+            tenant_mgr.materialize_tenant(self.tenant)
+
+    def _is_tenant_materialized(self) -> bool:
+        """Check if the tenant is materialized (has a database file).
+
+        Returns:
+            True if tenant is materialized, False if lazy
+        """
+        # Main tenant is always materialized
+        if self.tenant == "main":
+            return True
+
+        # Check if database file exists
+        return self.db_path.exists()
 

@@ -25,6 +25,7 @@ dependencies = [
     "rich>=13.0.0",
     "requests>=2.28.0",
     "httpx>=0.25.0",
+    "psutil>=7.0.0",
 ]
 
 [project.optional-dependencies]
@@ -91,6 +92,7 @@ dev-dependencies = [
     "mkdocs-material>=9.6.19",
     "mkdocstrings[python]>=0.30.0",
     "pymdown-extensions>=10.16.1",
+    "psutil>=7.0.0",
 ]
 
 [tool.pytest.ini_options]

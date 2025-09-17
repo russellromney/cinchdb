@@ -21,7 +21,7 @@ def test_delete_where_in():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("test_items", [
+        db.create_table("test_items", [
             Column(name="item_id", type="INTEGER", unique=True),
             Column(name="name", type="TEXT")
         ])
@@ -64,7 +64,7 @@ def test_delete_where_gt():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("numbers", [
+        db.create_table("numbers", [
             Column(name="num_id", type="INTEGER", unique=True),
             Column(name="value", type="INTEGER")
         ])
@@ -97,7 +97,7 @@ def test_update_where():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("users", [
+        db.create_table("users", [
             Column(name="user_id", type="INTEGER", unique=True),
             Column(name="name", type="TEXT"),
             Column(name="status", type="TEXT")
@@ -134,7 +134,7 @@ def test_delete_where_no_filters():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("safe_table", [
+        db.create_table("safe_table", [
             Column(name="test_id", type="INTEGER", unique=True)
         ])
         
@@ -159,7 +159,7 @@ def test_bulk_update():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("users", [
+        db.create_table("users", [
             Column(name="name", type="TEXT"),
             Column(name="email", type="TEXT"),
             Column(name="status", type="TEXT")
@@ -212,7 +212,7 @@ def test_bulk_delete():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("items", [
+        db.create_table("items", [
             Column(name="name", type="TEXT"),
             Column(name="category", type="TEXT")
         ])
@@ -253,7 +253,7 @@ def test_bulk_insert_existing():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("products", [
+        db.create_table("products", [
             Column(name="name", type="TEXT"),
             Column(name="price", type="REAL")
         ])
@@ -294,7 +294,7 @@ def test_update_validation():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("test_table", [
+        db.create_table("test_table", [
             Column(name="name", type="TEXT")
         ])
         
@@ -326,7 +326,7 @@ def test_delete_validation():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("test_table", [
+        db.create_table("test_table", [
             Column(name="name", type="TEXT")
         ])
         
@@ -351,7 +351,7 @@ def test_or_operator():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create table
-        db.tables.create_table("users", [
+        db.create_table("users", [
             Column(name="name", type="TEXT"),
             Column(name="age", type="INTEGER"),
             Column(name="status", type="TEXT")

@@ -132,10 +132,9 @@ class TestCLIDataCommands:
             assert "Inserted 2 records" in result.stdout
             assert "IDs:" in result.stdout
 
-    @pytest.mark.skip(reason="Tenant creation requires more complex setup")
     def test_bulk_insert_with_tenant(self, runner, temp_project):
         """Test bulk-inserting data for a specific tenant."""
-        # Create the tenant first
+        # Create the tenant first (should auto-materialize on first use)
         from cinchdb.managers.tenant import TenantManager
         tenant_mgr = TenantManager(temp_project, "main", "main")
         tenant_mgr.create_tenant("customer_a")
@@ -152,7 +151,7 @@ class TestCLIDataCommands:
                 app,
                 ["bulk-insert", "users", "--data", json.dumps(data), "--tenant", "customer_a"],
             )
-            
+
             assert result.exit_code == 0
             assert "Inserted 1 record" in result.stdout
 

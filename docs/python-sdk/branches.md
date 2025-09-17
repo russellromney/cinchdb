@@ -12,9 +12,9 @@ Database branching with the Python SDK.
 | Operation | Method | Example |
 |-----------|--------|---------|
 | Connect to branch | `cinchdb.connect()` | `cinchdb.connect("myapp", branch="dev")` |
-| List branches | `db.branches.list_branches()` | Local only |
-| Create branch | `db.branches.create_branch()` | Local only |
-| Merge branches | `db.merge.merge_branches()` | Local only |
+| List branches | `db.list_branches()` | `db.list_branches()` |
+| Create branch | `db.create_branch()` | `db.create_branch("feature-1")` |
+| Merge branches | `db.merge_branches()` | `db.merge_branches("feature-1", "main")` |
 
 ## Connecting to Branches
 
@@ -37,18 +37,18 @@ print(f"New tables in feature branch: {new_tables}")
 db = cinchdb.connect("myapp")
 
 # List all branches
-branches = db.branches.list_branches()
+branches = db.list_branches()
 for branch in branches:
     print(f"Branch: {branch.name} (created: {branch.created_at})")
 
 # Create new branch
-db.branches.create_branch("feature.add-products")
+db.create_branch("feature.add-products")
 
 # Create from specific source
-db.branches.create_branch("hotfix.bug-123", source_branch="main")
+db.create_branch("hotfix.bug-123", source_branch="main")
 
 # Delete old branch (cannot delete main or active branch)
-db.branches.delete_branch("old-feature")
+db.delete_branch("old-feature")
 ```
 
 ## Tracking Changes
@@ -56,10 +56,10 @@ db.branches.delete_branch("old-feature")
 ```python
 # Make changes on feature branch
 feature_db = cinchdb.connect("myapp", branch="feature.new-schema")
-feature_db.tables.create_table("products", [Column(name="name", type="TEXT"), Column(name="price", type="REAL")])
+feature_db.create_table("products", [Column(name="name", type="TEXT"), Column(name="price", type="REAL")])
 
 # View changes
-changes = feature_db.branches.get_branch_changes("feature.new-schema")
+changes = feature_db.get_branch_changes("feature.new-schema")
 for change in changes:
     print(f"{change.type}: {change.description}")
 
@@ -86,25 +86,25 @@ print(f"New in feature: {diff['only_in_second']}")
 ```python
 # Simple merge
 db = cinchdb.connect("myapp")
-db.merge.merge_branches("feature.add-users", "main")
+db.merge_branches("feature.add-users", "main")
 
 # Safe merge with validation
 def safe_merge(db, source_branch: str, target_branch: str = "main"):
     """Safely merge with validation."""
     # Check if merge is possible
-    if not db.merge.can_merge(source_branch, target_branch):
+    if not db.can_merge(source_branch, target_branch):
         print("Cannot merge - branches have diverged")
         return False
     
     # Review changes first
-    changes = db.branches.get_branch_changes(source_branch)
+    changes = db.get_branch_changes(source_branch)
     print(f"Changes to merge: {len(changes)}")
     for change in changes:
         print(f"  - {change.description}")
     
     # Perform merge
     try:
-        db.merge.merge_branches(source_branch, target_branch)
+        db.merge_branches(source_branch, target_branch)
         print(f"Successfully merged {source_branch} into {target_branch}")
         return True
     except Exception as e:
@@ -119,11 +119,11 @@ def safe_merge(db, source_branch: str, target_branch: str = "main"):
 # Standard feature workflow
 db = cinchdb.connect("myapp")
 # 1. Create feature branch
-db.branches.create_branch("feature.shopping-cart")
+db.create_branch("feature.shopping-cart")
 
 # 2. Make changes
 feature_db = cinchdb.connect("myapp", branch="feature.shopping-cart")
-feature_db.tables.create_table("cart_items", [
+feature_db.create_table("cart_items", [
     Column(name="user_id", type="TEXT"),
     Column(name="product_id", type="TEXT"),
     Column(name="quantity", type="INTEGER")
@@ -133,7 +133,7 @@ feature_db.tables.create_table("cart_items", [
 test_data = feature_db.insert("cart_items", {"user_id": "test-user", "product_id": "test-product", "quantity": 2})
 
 # 4. Merge when ready
-db.merge.merge_branches("feature.shopping-cart", "main")
+db.merge_branches("feature.shopping-cart", "main")
 ```
 
 ### Hotfix Workflow
@@ -141,36 +141,36 @@ db.merge.merge_branches("feature.shopping-cart", "main")
 # Quick production fix
 db = cinchdb.connect("myapp")
 # 1. Create hotfix branch
-db.branches.create_branch("hotfix.critical-bug", source_branch="main")
+db.create_branch("hotfix.critical-bug", source_branch="main")
 
 # 2. Apply fix
 hotfix_db = cinchdb.connect("myapp", branch="hotfix.critical-bug")
-hotfix_db.tables.add_column("users", Column(name="email_verified", type="BOOLEAN", default=False))
+hotfix_db.add_column("users", Column(name="email_verified", type="BOOLEAN", default=False))
 
 # 3. Merge immediately
-db.merge.merge_branches("hotfix.critical-bug", "main")
+db.merge_branches("hotfix.critical-bug", "main")
 ```
 
 ### Experimental Development
 ```python
 # Safe experimentation
 db = cinchdb.connect("myapp")
-db.branches.create_branch("experimental.new-algorithm")
+db.create_branch("experimental.new-algorithm")
 exp_db = cinchdb.connect("myapp", branch="experimental.new-algorithm")
 
 try:
     # Try risky changes
-    exp_db.tables.create_table("experimental_data", [Column(name="result", type="TEXT")])
+    exp_db.create_table("experimental_data", [Column(name="result", type="TEXT")])
     results = exp_db.query("SELECT * FROM experimental_data")
     
     # Merge if successful, delete if not
     if validate_experiment(results):
-        db.merge.merge_branches("experimental.new-algorithm", "main")
+        db.merge_branches("experimental.new-algorithm", "main")
     else:
-        db.branches.delete_branch("experimental.new-algorithm")
+        db.delete_branch("experimental.new-algorithm")
 except Exception as e:
     print(f"Experiment failed: {e}")
-    db.branches.delete_branch("experimental.new-algorithm")
+    db.delete_branch("experimental.new-algorithm")
 ```
 
 ## Multi-Tenant Branching
@@ -180,11 +180,11 @@ except Exception as e:
 ```python
 # Schema changes affect all tenants
 db = cinchdb.connect("myapp")
-db.branches.create_branch("feature.tenant-settings")
+db.create_branch("feature.tenant-settings")
 
 # Make schema changes on branch
 feature_db = cinchdb.connect("myapp", branch="feature.tenant-settings")
-feature_db.tables.create_table("tenant_settings", [Column(name="key", type="TEXT"), Column(name="value", type="TEXT")])
+feature_db.create_table("tenant_settings", [Column(name="key", type="TEXT"), Column(name="value", type="TEXT")])
 
 # Verify schema exists for all tenants on this branch
 for tenant in ["main", "customer_a", "customer_b"]:
@@ -214,7 +214,7 @@ def feature_lifecycle(db, feature_name: str, implement_func):
     branch_name = f"feature.{feature_name}"
     
     # Create → Implement → Test → Merge → Clean up
-    db.branches.create_branch(branch_name)
+    db.create_branch(branch_name)
     feature_db = cinchdb.connect(db.database, branch=branch_name)
     
     try:
@@ -222,8 +222,8 @@ def feature_lifecycle(db, feature_name: str, implement_func):
         print(f"Testing {feature_name}...")
         
         # Merge if successful
-        db.merge.merge_branches(branch_name, "main")
-        db.branches.delete_branch(branch_name)
+        db.merge_branches(branch_name, "main")
+        db.delete_branch(branch_name)
         print(f"Feature {feature_name} completed")
     except Exception as e:
         print(f"Feature {feature_name} failed: {e}")

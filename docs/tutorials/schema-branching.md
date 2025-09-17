@@ -160,7 +160,7 @@ def staged_rollout(branch_name: str):
     
     # Stage 3: Full production rollout
     if input("Deploy to all customers? (y/n): ") == 'y':
-        db.branches.merge_branches(branch_name, "main")
+        db.merge_branches(branch_name, "main")
 ```
 ```
 

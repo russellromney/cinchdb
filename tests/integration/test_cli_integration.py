@@ -303,15 +303,36 @@ class TestCLIIntegration:
         )
         assert result.exit_code == 0
 
-        # Insert some data with NULL phone (need to include all required fields)
-        import uuid
-        import datetime
+        # Merge changes to main so the table actually exists for data operations
+        result = self.run_in_project(
+            ["branch", "merge-into-main", "feature"], temp_project
+        )
+        assert result.exit_code == 0
 
-        now = datetime.datetime.now(datetime.UTC).isoformat()
+        # Switch back to main for data operations
+        result = self.run_in_project(["branch", "switch", "main"], temp_project)
+        assert result.exit_code == 0
+
+        # Insert some data with NULL phone using structured data commands
         result = self.run_in_project(
             [
-                "query",
-                f"INSERT INTO users (id, name, age, phone, created_at, updated_at) VALUES ('{uuid.uuid4()}', 'John', 30, NULL, '{now}', '{now}'), ('{uuid.uuid4()}', 'Jane', 25, '555-1234', '{now}', '{now}')",
+                "data",
+                "insert",
+                "users",
+                "--data",
+                '{"name": "John", "age": 30, "phone": null}'
+            ],
+            temp_project,
+        )
+        assert result.exit_code == 0
+
+        result = self.run_in_project(
+            [
+                "data",
+                "insert",
+                "users",
+                "--data",
+                '{"name": "Jane", "age": 25, "phone": "555-1234"}'
             ],
             temp_project,
         )

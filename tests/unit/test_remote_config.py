@@ -91,7 +91,7 @@ class TestRemoteConfig:
             "staging": RemoteConfig(
                 url="https://staging.example.com", key="staging-key"
             ),
-            "development": RemoteConfig(url="http://localhost:8000", key="dev-key"),
+            "development": RemoteConfig(url="http://localhost:8002", key="dev-key"),
         }
 
         project_config.remotes = remotes

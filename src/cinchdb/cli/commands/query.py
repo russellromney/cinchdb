@@ -80,15 +80,16 @@ def execute_query(
         else:
             # For INSERT/UPDATE/DELETE, we need to handle local vs remote differently
             if db.is_local:
-                # For local connections, use the query manager directly
-                from cinchdb.managers.query import QueryManager
-
-                query_mgr = QueryManager(db.project_dir, db.database, db.branch, tenant)
-                affected_rows = query_mgr.execute_non_query(query_sql)
+                # Direct SQL execution for INSERT/UPDATE/DELETE is no longer supported
                 console.print(
-                    f"[green]✅ Query executed successfully[/green]\n"
-                    f"[cyan]Rows affected: {affected_rows}[/cyan]"
+                    "[red]❌ Error: INSERT/UPDATE/DELETE queries are not supported through 'cinch query'[/red]\n"
+                    "[yellow]Use the structured commands instead:[/yellow]\n"
+                    "  • cinch data insert <table> --data '{\"field\": \"value\"}'\n"
+                    "  • cinch data update <table> <id> --data '{\"field\": \"value\"}'\n"
+                    "  • cinch data delete <table> <id>\n"
+                    "\n[blue]The 'cinch query' command only supports SELECT queries.[/blue]"
                 )
+                raise typer.Exit(1)
             else:
                 # For remote connections, the API should handle all SQL types
                 # This might need API support - for now, try using query

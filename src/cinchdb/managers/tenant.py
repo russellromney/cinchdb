@@ -591,12 +591,11 @@ class TenantManager:
         Returns:
             Dictionary with size information:
             - name: Tenant name
-            - materialized: Whether tenant is materialized
-            - size_bytes: Size in bytes (0 if lazy)
+            - size_bytes: Size in bytes (0 if no data)
             - size_kb: Size in KB
             - size_mb: Size in MB
-            - page_size: SQLite page size (if materialized)
-            - page_count: Number of pages (if materialized)
+            - page_size: SQLite page size (if available)
+            - page_count: Number of pages (if available)
             
         Raises:
             ValueError: If tenant doesn't exist
@@ -614,7 +613,6 @@ class TenantManager:
             
         result = {
             "name": tenant_name,
-            "materialized": tenant_info['materialized'],
             "size_bytes": 0,
             "size_kb": 0.0,
             "size_mb": 0.0,
@@ -653,11 +651,10 @@ class TenantManager:
         
         Returns:
             Dictionary with:
-            - tenants: List of individual tenant size info
-            - total_size_bytes: Total size of all materialized tenants
+            - tenants: List of individual tenant size info (sorted by size)
+            - total_size_bytes: Total size of all tenants
             - total_size_mb: Total size in MB
-            - lazy_count: Number of lazy tenants
-            - materialized_count: Number of materialized tenants
+            - tenant_count: Total number of tenants
         """
         # Ensure initialization
         self._ensure_initialized()
@@ -667,8 +664,7 @@ class TenantManager:
                 "tenants": [],
                 "total_size_bytes": 0,
                 "total_size_mb": 0.0,
-                "lazy_count": 0,
-                "materialized_count": 0
+                "tenant_count": 0
             }
             
         # Get all tenants for this branch
@@ -678,20 +674,15 @@ class TenantManager:
             "tenants": [],
             "total_size_bytes": 0,
             "total_size_mb": 0.0,
-            "lazy_count": 0,
-            "materialized_count": 0
+            "tenant_count": 0
         }
-        
+
         for tenant_info in all_tenants:
             tenant_name = tenant_info['name']
             size_info = self.get_tenant_size(tenant_name)
             result["tenants"].append(size_info)
-            
-            if size_info["materialized"]:
-                result["materialized_count"] += 1
-                result["total_size_bytes"] += size_info["size_bytes"]
-            else:
-                result["lazy_count"] += 1
+            result["tenant_count"] += 1
+            result["total_size_bytes"] += size_info["size_bytes"]
                 
         result["total_size_mb"] = result["total_size_bytes"] / (1024 * 1024)
         
@@ -837,9 +828,17 @@ class TenantManager:
             if not tenant_info:
                 raise ValueError(f"Tenant '{tenant_name}' does not exist")
         
-        # Check if tenant is materialized
+        # Check if tenant is materialized - return zero values for lazy tenants
         if self.is_tenant_lazy(tenant_name):
-            raise ValueError(f"Cannot vacuum lazy tenant '{tenant_name}'. Tenant must be materialized first.")
+            return {
+                "success": True,
+                "tenant": tenant_name,
+                "size_before": 0,
+                "size_after": 0,
+                "space_reclaimed": 0,
+                "space_reclaimed_mb": 0.0,
+                "duration_seconds": 0.0
+            }
         
         # Get database path
         db_path = self._get_sharded_tenant_db_path(tenant_name)

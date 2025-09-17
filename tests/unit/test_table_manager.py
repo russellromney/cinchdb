@@ -11,6 +11,7 @@ from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column, ChangeType
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
+from cinchdb.core.database import CinchDB
 
 
 class TestTableManager:
@@ -185,14 +186,15 @@ class TestTableManager:
         ]
         table_manager.create_table("articles", columns)
 
-        # Add some data
-        db_path = get_tenant_db_path(temp_project, "main", "main", "main")
-        with DatabaseConnection(db_path) as conn:
-            conn.execute(
-                "INSERT INTO articles (id, title, views, created_at) VALUES (?, ?, ?, datetime('now'))",
-                ("1", "Test Article", 100),
-            )
-            conn.commit()
+        # Add some data using CinchDB convenience function
+        db = CinchDB(database="main", project_dir=temp_project, tenant="main")
+        from datetime import datetime
+        db.insert("articles", {
+            "id": "1",
+            "title": "Test Article",
+            "views": 100,
+            "created_at": datetime.now()
+        })
 
         # Copy table
         new_table = table_manager.copy_table("articles", "articles_backup")
@@ -201,15 +203,15 @@ class TestTableManager:
         assert new_table.name == "articles_backup"
         assert len(new_table.columns) == len(columns) + 3  # User columns + automatic
 
-        # Verify data was copied
-        with DatabaseConnection(db_path) as conn:
-            cursor = conn.execute("SELECT COUNT(*) as count FROM articles_backup")
-            assert cursor.fetchone()["count"] == 1
+        # Verify data was copied using CinchDB convenience function
+        results = db.query("SELECT COUNT(*) as count FROM articles_backup")
+        assert results[0]["count"] == 1
 
-            cursor = conn.execute("SELECT title, views FROM articles_backup")
-            row = cursor.fetchone()
-            assert row["title"] == "Test Article"
-            assert row["views"] == 100
+        results = db.query("SELECT title, views FROM articles_backup")
+        assert len(results) == 1
+        row = results[0]
+        assert row["title"] == "Test Article"
+        assert row["views"] == 100
 
         # Verify change was tracked
         tracker = ChangeTracker(temp_project, "main", "main")
@@ -225,14 +227,14 @@ class TestTableManager:
         columns = [Column(name="content", type="TEXT")]
         table_manager.create_table("messages", columns)
 
-        # Add data
-        db_path = get_tenant_db_path(temp_project, "main", "main", "main")
-        with DatabaseConnection(db_path) as conn:
-            conn.execute(
-                "INSERT INTO messages (id, content, created_at) VALUES (?, ?, datetime('now'))",
-                ("1", "Test message"),
-            )
-            conn.commit()
+        # Add data using CinchDB convenience function
+        db = CinchDB(database="main", project_dir=temp_project, tenant="main")
+        from datetime import datetime
+        db.insert("messages", {
+            "id": "1",
+            "content": "Test message",
+            "created_at": datetime.now()
+        })
 
         # Copy structure only
         new_table = table_manager.copy_table(
@@ -243,10 +245,9 @@ class TestTableManager:
         assert new_table.name == "messages_template"
         assert len(new_table.columns) == 4  # content + automatic fields
 
-        # Verify no data
-        with DatabaseConnection(db_path) as conn:
-            cursor = conn.execute("SELECT COUNT(*) as count FROM messages_template")
-            assert cursor.fetchone()["count"] == 0
+        # Verify no data using CinchDB convenience function
+        results = db.query("SELECT COUNT(*) as count FROM messages_template")
+        assert results[0]["count"] == 0
 
     def test_list_tables(self, table_manager):
         """Test listing all tables."""

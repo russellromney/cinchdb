@@ -181,7 +181,7 @@ class TestCinchDBIndexIntegration:
     def test_cinchdb_create_index_uses_index_model_internally(self, db):
         """Test that CinchDB.create_index uses Index model for validation."""
         # Create a simple table first
-        db.tables.create_table("test_table", [Column(name="name", type="TEXT")])
+        db.create_table("test_table", [Column(name="name", type="TEXT")])
         
         # Create index - this should internally use Index model for validation
         index_name = db.create_index("test_table", ["name"], unique=True)
@@ -189,13 +189,13 @@ class TestCinchDBIndexIntegration:
         assert index_name == "uniq_test_table_name"
         
         # Verify index exists
-        indexes = db.indexes.list_indexes("test_table")
+        indexes = db.list_indexes("test_table")
         assert len(indexes) == 1
         assert indexes[0]["name"] == "uniq_test_table_name"
     
     def test_enhanced_table_creation_with_cinchdb(self, db):
         """Test enhanced table creation through CinchDB instance."""
-        table = db.tables.create_table(
+        table = db.create_table(
             "products",
             columns=[
                 Column(name="name", type="TEXT", nullable=False),
@@ -212,7 +212,7 @@ class TestCinchDBIndexIntegration:
         assert table.name == "products"
         
         # Verify indexes were created
-        indexes = db.indexes.list_indexes("products")
+        indexes = db.list_indexes("products")
         assert len(indexes) == 3
         
         index_names = {idx["name"] for idx in indexes}
@@ -223,21 +223,21 @@ class TestCinchDBIndexIntegration:
     def test_backward_compatibility_still_works(self, db):
         """Test that old API continues to work alongside new API."""
         # Create table the new way with indexes
-        db.tables.create_table(
+        db.create_table(
             "new_table",
             columns=[Column(name="data", type="TEXT")],
             indexes=[Index(columns=["data"])]
         )
         
         # Create table the old way
-        db.tables.create_table("old_table", [Column(name="info", type="TEXT")])
+        db.create_table("old_table", [Column(name="info", type="TEXT")])
         
         # Add index the old way
         old_index = db.create_index("old_table", ["info"], unique=True)
         
         # Verify both approaches work
-        new_indexes = db.indexes.list_indexes("new_table")
-        old_indexes = db.indexes.list_indexes("old_table")
+        new_indexes = db.list_indexes("new_table")
+        old_indexes = db.list_indexes("old_table")
         
         assert len(new_indexes) == 1
         assert len(old_indexes) == 1

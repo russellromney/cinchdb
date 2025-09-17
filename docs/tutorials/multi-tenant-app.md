@@ -49,7 +49,7 @@ def create_customer(company_name: str, admin_email: str):
     
     # Create isolated tenant
     tenant_name = company_name.lower().replace(" ", "_")
-    db.tenants.create_tenant(tenant_name)
+    db.create_tenant(tenant_name)
     
     # Connect to tenant
     tenant_db = cinchdb.connect(db.database, tenant=tenant_name)
@@ -139,7 +139,7 @@ def get_tenant_stats():
     db = cinchdb.connect("project_manager")
     # Get statistics for all tenants
     
-    tenants = db.tenants.list_tenants()
+    tenants = db.list_tenants()
     stats = []
     
     for tenant in tenants:

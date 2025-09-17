@@ -222,6 +222,7 @@ products = db.query("SELECT * FROM products WHERE price > ?", [100])
 ## Next Steps
 
 - [Quick Start Guide](quickstart.md) - Build your first project
-- [Schema Branching](../concepts/branching.md) - Deep dive into branches  
+- [Constraints](../concepts/constraints.md) - How CinchDB uses SQLite
+- [Schema Branching](../concepts/branching.md) - Deep dive into branches
 - [Multi-Tenancy](../concepts/multi-tenancy.md) - Deep dive into tenants
 - [CLI Reference](../cli/index.md) - All available commands

@@ -14,7 +14,6 @@ Because it's so lightweight and its only dependencies are pydantic, requests, an
 
 On a meta level: I made this because I wanted a database structure that I felt comfortable letting AI agents take full control over.
 
-
 ```bash
 # Recommended: Install with uv (faster, better dependency resolution)
 uv add cinchdb
@@ -163,6 +162,277 @@ This architecture enables:
 
 - **Python SDK**: Core functionality for local development
 - **CLI**: Full-featured command-line interface
+
+## CinchDB API Reference
+
+### Core Methods
+
+#### Database Connection
+
+```python
+db = cinchdb.CinchDB(database="myapp", branch="main")
+```
+
+#### Query Execution
+
+##### `query(sql: str, params: List = None) -> List[Dict]`
+Execute a SQL query and return results.
+
+```python
+# Simple query
+users = db.query("SELECT * FROM users WHERE age > ?", [18])
+# Expected output: [{"id": 1, "name": "Alice", "age": 25}, ...]
+
+# Query with no results
+empty = db.query("SELECT * FROM users WHERE id = ?", [999])
+# Expected output: []
+```
+
+**Common Errors:**
+- `ValueError: Table 'users' does not exist` - Create the table first
+- `sqlite3.OperationalError` - Check SQL syntax
+
+#### Table Management
+
+##### `create_table(name: str, columns: List[Column], indexes: List[Index] = None) -> Table`
+Create a new table with specified columns.
+
+```python
+from cinchdb.models import Column
+
+table = db.create_table(
+    "products",
+    columns=[
+        Column(name="id", type="INTEGER", primary_key=True),
+        Column(name="name", type="TEXT", nullable=False),
+        Column(name="price", type="REAL", default=0.0)
+    ]
+)
+# Expected: Table 'products' created in ~5ms
+```
+
+##### `get_table(name: str) -> Table`
+Get table information and schema.
+
+```python
+table = db.get_table("users")
+# Returns: Table object with columns, indexes, row count
+```
+
+##### `list_tables() -> List[Table]`
+List all tables in the database.
+
+```python
+tables = db.list_tables()
+# Expected output: [Table(name="users"), Table(name="products")]
+```
+
+#### Data Operations
+
+##### `insert(table: str, *data: Dict) -> Dict | List[Dict]`
+Insert one or more records into a table.
+
+```python
+# Single insert
+user = db.insert("users", {"name": "Bob", "email": "bob@example.com"})
+# Expected output: {"id": 1, "name": "Bob", "email": "bob@example.com"}
+
+# Bulk insert
+users = db.insert("users",
+    {"name": "Alice", "email": "alice@example.com"},
+    {"name": "Charlie", "email": "charlie@example.com"}
+)
+# Expected output: [{"id": 2, ...}, {"id": 3, ...}]
+# Performance: ~1ms per record for small datasets
+```
+
+##### `update(table: str, record_id: str, data: Dict) -> Dict`
+Update a record by ID.
+
+```python
+updated = db.update("users", "1", {"email": "newemail@example.com"})
+# Expected output: {"id": 1, "name": "Bob", "email": "newemail@example.com"}
+```
+
+**Common Errors:**
+- `ValueError: Record with ID '999' not found` - Check if record exists
+
+##### `delete(table: str, *ids: str) -> int`
+Delete records by ID.
+
+```python
+deleted_count = db.delete("users", "1", "2", "3")
+# Expected output: 3 (number of deleted records)
+```
+
+##### `delete_where(table: str, **filters) -> int`
+Delete records matching filters.
+
+```python
+deleted = db.delete_where("users", age__lt=18)
+# Expected output: 5 (number of deleted records)
+```
+
+#### Branch Operations
+
+##### `create_branch(name: str, source_branch: str = "main") -> Branch`
+Create a new schema branch.
+
+```python
+branch = db.create_branch("feature/new-tables")
+# Expected: Branch created in ~10ms
+# Note: Does not copy tenant data, only schema
+```
+
+##### `list_branches() -> List[Branch]`
+List all branches.
+
+```python
+branches = db.list_branches()
+# Expected output: [Branch(name="main"), Branch(name="feature/new-tables")]
+```
+
+##### `merge_branches(source: str, target: str = "main") -> Dict`
+Merge schema changes between branches.
+
+```python
+result = db.merge_branches("feature/new-tables", "main")
+# Expected output: {
+#   "status": "success",
+#   "changes_applied": 3,
+#   "conflicts": []
+# }
+```
+
+**Common Errors:**
+- `ConflictError: Table 'users' has conflicting changes` - Resolve conflicts manually
+
+#### Tenant Management
+
+##### `create_tenant(name: str, lazy: bool = True) -> Tenant`
+Create a new tenant (isolated data store).
+
+```python
+tenant = db.create_tenant("customer_123")
+# Expected: Tenant created (lazy mode - database created on first access)
+# Performance: <1ms in lazy mode, ~10ms if immediate
+```
+
+##### `list_tenants() -> List[Tenant]`
+List all tenants.
+
+```python
+tenants = db.list_tenants()
+# Expected output: [Tenant(name="main"), Tenant(name="customer_123")]
+```
+
+##### `delete_tenant(name: str) -> None`
+Delete a tenant and all its data.
+
+```python
+db.delete_tenant("customer_123")
+# Warning: This permanently deletes all tenant data!
+```
+
+#### Index Management
+
+##### `create_index(name: str, table: str, columns: List[str], unique: bool = False) -> Index`
+Create an index for better query performance.
+
+```python
+index = db.create_index(
+    "idx_users_email",
+    table="users",
+    columns=["email"],
+    unique=True
+)
+# Expected: Index created in ~5ms
+# Performance impact: 10-100x faster lookups on indexed columns
+```
+
+##### `list_indexes(table: str = None) -> List[Dict]`
+List indexes, optionally filtered by table.
+
+```python
+indexes = db.list_indexes("users")
+# Expected output: [
+#   {"name": "idx_users_email", "unique": True, "columns": ["email"]}
+# ]
+```
+
+#### Column Operations
+
+##### `add_column(table: str, column: Column) -> None`
+Add a new column to an existing table.
+
+```python
+from cinchdb.models import Column
+
+db.add_column("users", Column(name="age", type="INTEGER", default=0))
+# Expected: Column added to all tenants in ~10ms
+```
+
+##### `drop_column(table: str, column: str) -> None`
+Remove a column from a table.
+
+```python
+db.drop_column("users", "age")
+# Warning: This removes the column from all tenants!
+```
+
+##### `rename_column(table: str, old_name: str, new_name: str) -> None`
+Rename a column.
+
+```python
+db.rename_column("users", "email", "email_address")
+# Expected: Column renamed across all tenants
+```
+
+#### View Management
+
+##### `create_view(name: str, sql: str) -> View`
+Create a SQL view.
+
+```python
+view = db.create_view(
+    "active_users",
+    "SELECT * FROM users WHERE last_login > datetime('now', '-30 days')"
+)
+# Expected: View created in ~5ms
+```
+
+##### `list_views() -> List[View]`
+List all views in the database.
+
+```python
+views = db.list_views()
+# Expected output: [View(name="active_users")]
+```
+
+### Performance Guidelines
+
+- **Query Performance**: Simple queries < 1ms, complex joins < 10ms
+- **Insert Performance**: ~1ms per record for single inserts, ~0.1ms per record for bulk
+- **Branch Operations**: Schema operations < 20ms
+- **Tenant Creation**: Lazy mode < 1ms, immediate mode ~10ms
+- **Analytics Overhead**: < 5% performance impact when enabled
+
+### Troubleshooting Common Issues
+
+#### "Table does not exist"
+- Check current database/branch: `db.current_branch`
+- List tables: `db.list_tables()`
+- Ensure tenant is active: `db.current_tenant`
+
+#### "Database is locked"
+- CinchDB uses WAL mode to minimize locking
+- Check for long-running transactions
+- Ensure connections are properly closed
+
+#### Performance Issues
+- Create indexes on frequently queried columns
+- Use `db.get_analytics_stats()` to identify slow queries
+- Consider tenant sharding for large datasets
 
 ## Security
 

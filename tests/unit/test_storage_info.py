@@ -21,7 +21,7 @@ def test_get_tenant_size():
         
         # Create a table to materialize the main tenant
         from cinchdb.models import Column
-        db.tables.create_table("users", [
+        db.create_table("users", [
             Column(name="user_id", type="INTEGER", unique=True),
             Column(name="name", type="TEXT", nullable=False)
         ])
@@ -30,33 +30,30 @@ def test_get_tenant_size():
         size = db.get_tenant_size("main")
         
         assert size["name"] == "main"
-        assert size["materialized"]  # Check truthiness, not identity
         assert size["size_bytes"] > 0
         assert size["size_kb"] > 0
         assert size["page_size"] == 4096  # Main uses default page size
         assert size["page_count"] >= 1
         
         # Create a lazy tenant
-        db.tenants.create_tenant("lazy_tenant", lazy=True)
+        db.create_tenant("lazy_tenant", lazy=True)
         
         # Get size of lazy tenant
         lazy_size = db.get_tenant_size("lazy_tenant")
         
         assert lazy_size["name"] == "lazy_tenant"
-        assert not lazy_size["materialized"]
         assert lazy_size["size_bytes"] == 0
         assert lazy_size["size_kb"] == 0
         assert lazy_size["page_size"] is None
         
         # Create an eager tenant
-        db.tenants.create_tenant("eager_tenant", lazy=False)
+        db.create_tenant("eager_tenant", lazy=False)
         
         # Get size of eager tenant
         eager_size = db.get_tenant_size("eager_tenant")
         
         assert eager_size["name"] == "eager_tenant"
-        assert eager_size["materialized"]
-        assert eager_size["size_bytes"] <= 20480  # Should be reasonably small with 4KB pages  
+        assert eager_size["size_bytes"] <= 20480  # Should be reasonably small with 4KB pages
         assert eager_size["page_size"] == 4096  # Should use 4KB pages (SQLite default)
         assert eager_size["page_count"] >= 1  # At least 1 page, possibly more for schema
 
@@ -74,17 +71,16 @@ def test_get_storage_info():
         db = CinchDB("testdb", project_dir=project_dir)
         
         # Create some tenants
-        db.tenants.create_tenant("tenant1", lazy=False)
-        db.tenants.create_tenant("tenant2", lazy=False)
-        db.tenants.create_tenant("lazy1", lazy=True)
-        db.tenants.create_tenant("lazy2", lazy=True)
+        db.create_tenant("tenant1", lazy=False)
+        db.create_tenant("tenant2", lazy=False)
+        db.create_tenant("lazy1", lazy=True)
+        db.create_tenant("lazy2", lazy=True)
         
         # Get storage info
         info = db.get_storage_info()
         
         # Check counts
-        assert info["materialized_count"] == 4  # main, __empty__, tenant1, tenant2
-        assert info["lazy_count"] == 2  # lazy1, lazy2
+        assert info["tenant_count"] == 6  # main, __empty__, tenant1, tenant2, lazy1, lazy2
         
         # Check total size
         assert info["total_size_bytes"] > 0
@@ -103,16 +99,13 @@ def test_get_storage_info():
         assert "tenant1" in tenant_names
         assert "lazy1" in tenant_names
         
-        # Check materialized vs lazy
-        materialized_tenants = [t for t in info["tenants"] if t["materialized"]]
-        lazy_tenants = [t for t in info["tenants"] if not t["materialized"]]
-        
-        assert len(materialized_tenants) == 4
-        assert len(lazy_tenants) == 2
-        
-        # All lazy tenants should have 0 size
-        for tenant in lazy_tenants:
-            assert tenant["size_bytes"] == 0
+        # Check that lazy tenants have 0 size (but we can't tell which ones are lazy from the API)
+        # Some tenants should have 0 size (the lazy ones)
+        zero_size_tenants = [t for t in info["tenants"] if t["size_bytes"] == 0]
+        non_zero_size_tenants = [t for t in info["tenants"] if t["size_bytes"] > 0]
+
+        assert len(zero_size_tenants) == 2  # lazy1, lazy2
+        assert len(non_zero_size_tenants) == 4  # main, __empty__, tenant1, tenant2
 
 
 def test_default_tenant_size():
@@ -129,7 +122,7 @@ def test_default_tenant_size():
         
         # Create a table to materialize the main tenant
         from cinchdb.models import Column
-        db.tables.create_table("test_table", [
+        db.create_table("test_table", [
             Column(name="value", type="TEXT", nullable=False)
         ])
         
@@ -138,11 +131,10 @@ def test_default_tenant_size():
         
         # Should return info for current tenant (main)
         assert size["name"] == "main"
-        assert size["materialized"]  # Check truthiness, not identity
         assert size["size_bytes"] > 0
         
         # Create another tenant and check its size directly
-        db.tenants.create_tenant("other", lazy=False)
+        db.create_tenant("other", lazy=False)
         
         # Get size of specific tenant
         size = db.get_tenant_size("other")

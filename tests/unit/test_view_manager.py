@@ -11,6 +11,7 @@ from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.models import Column, ChangeType
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
+from cinchdb.core.database import CinchDB
 
 
 class TestViewModel:
@@ -104,29 +105,36 @@ class TestViewModel:
         view = managers["view"].create_view("user_stats", sql)
         assert view.name == "user_stats"
 
-        # Verify view works
-        db_path = get_tenant_db_path(temp_project, "main", "main", "main")
-        with DatabaseConnection(db_path) as conn:
-            # Insert test data
-            conn.execute(
-                "INSERT INTO users (id, name, email, created_at) VALUES (?, ?, ?, datetime('now'))",
-                ("1", "John", "john@example.com"),
-            )
-            conn.execute(
-                "INSERT INTO posts (id, title, user_id, created_at) VALUES (?, ?, ?, datetime('now'))",
-                ("1", "Post 1", "1"),
-            )
-            conn.execute(
-                "INSERT INTO posts (id, title, user_id, created_at) VALUES (?, ?, ?, datetime('now'))",
-                ("2", "Post 2", "1"),
-            )
-            conn.commit()
+        # Verify view works using CinchDB convenience functions
+        db = CinchDB(database="main", project_dir=temp_project, tenant="main")
+        from datetime import datetime
 
-            # Query the view
-            cursor = conn.execute("SELECT * FROM user_stats")
-            row = cursor.fetchone()
-            assert row["user_name"] == "John"
-            assert row["post_count"] == 2
+        # Insert test data
+        db.insert("users", {
+            "id": "1",
+            "name": "John",
+            "email": "john@example.com",
+            "created_at": datetime.now()
+        })
+        db.insert("posts", {
+            "id": "1",
+            "title": "Post 1",
+            "user_id": "1",
+            "created_at": datetime.now()
+        })
+        db.insert("posts", {
+            "id": "2",
+            "title": "Post 2",
+            "user_id": "1",
+            "created_at": datetime.now()
+        })
+
+        # Query the view
+        results = db.query("SELECT * FROM user_stats")
+        assert len(results) == 1
+        row = results[0]
+        assert row["user_name"] == "John"
+        assert row["post_count"] == 2
 
     def test_update_view(self, managers, temp_project):
         """Test updating a view's SQL."""

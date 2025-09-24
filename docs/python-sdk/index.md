@@ -33,6 +33,10 @@ users = db.query("SELECT * FROM users WHERE name = ?", ["Alice"])
 # Update/delete
 db.update("users", user["id"], {"name": "Alice Smith"})
 db.delete("users", user["id"])
+
+# Key-Value Store (Redis-like)
+db.kv.set("session:123", {"user_id": 42}, ttl=3600)
+session = db.kv.get("session:123")
 ```
 
 ## Common Tasks
@@ -90,6 +94,9 @@ except Exception as e:
 | Delete | `db.delete(table, id)` |
 | Query | `db.query(sql, params)` |
 | Index | `db.create_index(table, columns, unique=False)` |
+| KV Set | `db.kv.set(key, value, ttl=None)` |
+| KV Get | `db.kv.get(key)` |
+| KV Increment | `db.kv.increment(key, amount=1)` |
 
 ## Column Types
 
@@ -106,7 +113,8 @@ Every table automatically includes:
 
 ## More Information
 
-- [Connection Details](connection.md)  
+- [Connection Details](connection.md)
 - [Table Operations](tables.md)
 - [Query Examples](queries.md)
+- [Key-Value Store](kv-store.md)
 - [Complete API](api-reference.md)

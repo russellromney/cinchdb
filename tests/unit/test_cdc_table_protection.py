@@ -41,7 +41,7 @@ class TestCDCTableProtection:
         user_columns = [Column(name="name", type="TEXT", nullable=False)]
         table_manager.create_table("users", user_columns)
         table_manager.create_table("orders", user_columns)
-        
+
         # Manually create CDC tables in the database (simulating plugged plugin)
         from cinchdb.core.connection import DatabaseConnection
         with DatabaseConnection(table_manager.db_path) as conn:
@@ -64,21 +64,37 @@ class TestCDCTableProtection:
                     value TEXT
                 )
             """)
+            # Create KV table (this is automatically created by KVManager)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS __kv (
+                    key TEXT PRIMARY KEY,
+                    value_type TEXT NOT NULL,
+                    value_text TEXT,
+                    value_number REAL,
+                    value_bool INTEGER,
+                    value_blob BLOB,
+                    value_json TEXT,
+                    value_size INTEGER,
+                    expires_at INTEGER,
+                    updated_at INTEGER NOT NULL
+                )
+            """)
             conn.commit()
-        
+
         # List tables should only return user tables
         tables = table_manager.list_tables()
         table_names = [table.name for table in tables]
-        
+
         # Should include user tables
         assert "users" in table_names
         assert "orders" in table_names
-        
+
         # Should exclude CDC/system tables
         assert "__cdc_log" not in table_names
         assert "__cdc_metadata" not in table_names
         assert "__tenant_metadata" not in table_names
-        
+        assert "__kv" not in table_names  # KV table should be excluded
+
         # Should have exactly 2 user tables
         assert len(table_names) == 2
     

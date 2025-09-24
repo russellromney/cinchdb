@@ -143,15 +143,16 @@ The current tenant name.
 
 #### query()
 
-Execute a SQL query.
+Execute a SQL query with optional column masking.
 
 ```python
-query(sql: str, params: Optional[List[Any]] = None) -> List[Dict[str, Any]]
+query(sql: str, params: Optional[List[Any]] = None, mask_columns: Optional[List[str]] = None) -> List[Dict[str, Any]]
 ```
 
 **Parameters:**
 - `sql` (str): SQL query to execute
 - `params` (List[Any], optional): Query parameters for parameterized queries
+- `mask_columns` (List[str], optional): Column names to mask in results
 
 **Returns:**
 - `List[Dict[str, Any]]`: List of result rows as dictionaries
@@ -169,7 +170,21 @@ results = db.query(
     "SELECT * FROM orders WHERE status = ? AND created_at > ?",
     ["pending", "2024-01-01"]
 )
+
+# Query with column masking for sensitive data
+results = db.query(
+    "SELECT * FROM users",
+    mask_columns=["email", "ssn", "password"]
+)
+# Returns: [{"id": 1, "name": "Alice", "email": "***REDACTED***", "ssn": "***REDACTED***"}, ...]
+# Note: NULL values are preserved (not masked)
 ```
+
+**Column Masking:**
+- Masks specified columns to `"***REDACTED***"` in results
+- NULL values are preserved (important for application logic)
+- Masking happens post-query on the result set
+- Useful for protecting sensitive data when sharing results
 
 ### Table Methods
 

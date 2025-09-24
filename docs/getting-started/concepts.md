@@ -140,6 +140,51 @@ Multi-tenant: SELECT * FROM users --tenant acme
 → Scans 10K users directly (100x faster!)
 ```
 
+## Key-Value Store
+
+**Redis-like storage alongside your relational data**
+
+Each database includes a built-in KV store for unstructured data:
+
+```bash
+# Sessions with auto-expiration
+cinch kv set session:123 '{"user_id": 42}' --ttl 3600
+
+# Application caching
+cinch kv set cache:products '[...]' --ttl 300
+
+# Atomic counters
+cinch kv increment page:views
+cinch kv increment api:calls --by 10
+```
+
+### When to Use KV Store vs Tables
+
+**Use KV Store for:**
+- **Sessions** - Temporary user state with TTL
+- **Caching** - Query results, API responses
+- **Feature flags** - Boolean toggles
+- **Counters** - Page views, API calls
+- **Rate limiting** - Request tracking
+- **Temporary data** - OTP codes, tokens
+
+**Use Tables for:**
+- **Structured data** - User profiles, products
+- **Relationships** - Foreign keys, joins
+- **Complex queries** - WHERE, GROUP BY, JOIN
+- **Reporting** - Analytics, aggregations
+- **Audit trails** - Permanent history
+- **Business logic** - Core application data
+
+### KV Store Benefits
+
+- **Sub-millisecond operations** - No query parsing
+- **Atomic operations** - Thread-safe increment/decrement
+- **Auto-expiration** - TTL for temporary data
+- **Multi-tenant** - Each tenant has isolated KV space
+- **No CDC overhead** - Not tracked by change capture
+- **Pattern matching** - Redis-style key patterns
+
 ## How They Work Together
 
 ### Complete Hierarchy

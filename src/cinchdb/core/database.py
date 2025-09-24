@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from cinchdb.managers.codegen import CodegenManager
     from cinchdb.managers.merge_manager import MergeManager
     from cinchdb.managers.index import IndexManager
+    from cinchdb.managers.kv import KVManager
 
 
 class _Managers:
@@ -118,6 +119,17 @@ class _Managers:
                 self._db.project_dir, self._db.database, self._db.branch
             )
         return self._db._index_manager
+
+    @property
+    def kv(self) -> "KVManager":
+        """Key-Value store operations."""
+        if self._db._kv_manager is None:
+            from cinchdb.managers.kv import KVManager
+            self._db._kv_manager = KVManager(
+                self._db.project_dir, self._db.database, self._db.branch, self._db.tenant,
+                self._db.encryption_manager
+            )
+        return self._db._kv_manager
 
 
 class CinchDB:
@@ -219,6 +231,7 @@ class CinchDB:
         self._codegen_manager: Optional["CodegenManager"] = None
         self._merge_manager: Optional["MergeManager"] = None
         self._index_manager: Optional["IndexManager"] = None
+        self._kv_manager: Optional["KVManager"] = None
 
         # Manager access class
         self._managers_instance: Optional["_Managers"] = None
@@ -347,6 +360,39 @@ class CinchDB:
 
         return self._managers_instance
 
+    @property
+    def kv(self) -> "KVManager":
+        """Key-Value store for fast unstructured data storage.
+
+        Examples:
+            # Set a key-value pair
+            db.kv.set("user:123", {"name": "Alice", "email": "alice@example.com"})
+
+            # Get a value
+            user = db.kv.get("user:123")
+
+            # Set with TTL (expires in 1 hour)
+            db.kv.set("session:abc", session_data, ttl=3600)
+
+            # Batch operations
+            db.kv.mset({"key1": "value1", "key2": "value2"})
+            values = db.kv.mget(["key1", "key2"])
+
+            # Pattern operations
+            user_keys = db.kv.keys("user:*")
+            db.kv.delete(*user_keys)
+
+            # Atomic increment
+            count = db.kv.increment("counter", 5)
+
+        Returns:
+            KVStore instance for this database/branch/tenant
+        """
+        if not self.is_local:
+            raise RuntimeError("KV store is not available for remote connections yet")
+
+        return self._managers.kv
+
     # Convenience methods for common operations
 
     def query(
@@ -354,6 +400,7 @@ class CinchDB:
         sql: str,
         params: Optional[List[Any]] = None,
         skip_validation: bool = False,
+        mask_columns: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         """Execute a SQL query.
 
@@ -361,6 +408,7 @@ class CinchDB:
             sql: SQL query to execute
             params: Query parameters (optional)
             skip_validation: Skip SQL validation (default: False)
+            mask_columns: List of column names to mask in results (optional)
 
         Returns:
             List of result rows as dictionaries
@@ -400,14 +448,32 @@ class CinchDB:
             with DatabaseConnection(db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
                 cursor = conn.execute(sql, params)
                 rows = cursor.fetchall()
-                return [dict(row) for row in rows]
+                results = [dict(row) for row in rows]
+
+                # Apply column masking if requested
+                if mask_columns and results:
+                    for row in results:
+                        for col in mask_columns:
+                            if col in row and row[col] is not None:
+                                row[col] = "***REDACTED***"
+
+                return results
         else:
             # Remote query
             data = {"sql": sql}
             if params:
                 data["params"] = params
             result = self._make_request("POST", "/query", json=data)
-            return result.get("data", [])
+            results = result.get("data", [])
+
+            # Apply column masking if requested
+            if mask_columns and results:
+                for row in results:
+                    for col in mask_columns:
+                        if col in row and row[col] is not None:
+                            row[col] = "***REDACTED***"
+
+            return results
 
     def create_table(self, name: str, columns: List[Column], indexes: Optional[List["Index"]] = None) -> "Table":
         """Create a new table.

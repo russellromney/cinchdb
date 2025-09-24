@@ -72,8 +72,8 @@ class MetadataDB:
                     metadata JSON,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE,
-                    UNIQUE(database_id, name)
+                    archived_at TIMESTAMP DEFAULT NULL,
+                    FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE
                 )
             """)
             
@@ -137,12 +137,19 @@ class MetadataDB:
                 ON branches(cdc_enabled)
             """)
 
+            # Create unique index for active branches only (allows name reuse when archived)
+            self.conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_branches_active_unique
+                ON branches(database_id, name) WHERE archived_at IS NULL
+            """)
+
             # Change tracking tables
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS changes (
                     id TEXT PRIMARY KEY,
                     database_id TEXT NOT NULL,
                     origin_branch_id TEXT,
+                    origin_branch_name TEXT,
                     type TEXT NOT NULL,
                     entity_type TEXT NOT NULL,
                     entity_name TEXT NOT NULL,
@@ -158,12 +165,14 @@ class MetadataDB:
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS branch_changes (
                     branch_id TEXT NOT NULL,
+                    branch_name TEXT NOT NULL,
                     change_id TEXT NOT NULL,
                     applied BOOLEAN DEFAULT FALSE,
                     applied_order INTEGER NOT NULL,
                     copied_from_branch_id TEXT,
+                    copied_from_branch_name TEXT,
                     PRIMARY KEY (branch_id, change_id),
-                    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+                    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
                     FOREIGN KEY (change_id) REFERENCES changes(id) ON DELETE CASCADE,
                     FOREIGN KEY (copied_from_branch_id) REFERENCES branches(id) ON DELETE SET NULL
                 )
@@ -237,18 +246,18 @@ class MetadataDB:
                   json.dumps(metadata) if metadata else None))
     
     def get_branch(self, database_id: str, name: str) -> Optional[Dict[str, Any]]:
-        """Get branch by database and name."""
+        """Get branch by database and name (active branches only)."""
         cursor = self.conn.execute("""
-            SELECT * FROM branches 
-            WHERE database_id = ? AND name = ?
+            SELECT * FROM branches
+            WHERE database_id = ? AND name = ? AND archived_at IS NULL
         """, (database_id, name))
         row = cursor.fetchone()
         return dict(row) if row else None
     
-    def list_branches(self, database_id: str, 
+    def list_branches(self, database_id: str,
                      materialized_only: bool = False) -> List[Dict[str, Any]]:
-        """List branches for a database."""
-        query = "SELECT * FROM branches WHERE database_id = ?"
+        """List branches for a database (active branches only)."""
+        query = "SELECT * FROM branches WHERE database_id = ? AND archived_at IS NULL"
         params = [database_id]
         if materialized_only:
             query += " AND materialized = TRUE"
@@ -330,23 +339,42 @@ class MetadataDB:
             if cursor.rowcount == 0:
                 raise ValueError(f"Database '{name}' not found")
     
-    def delete_branch(self, branch_id: str) -> None:
-        """Delete a branch and all its tenants (cascading delete)."""
+    def archive_branch(self, branch_id: str) -> None:
+        """Archive a branch (soft delete) and hard delete all its tenants."""
         with self.conn:
+            # Soft delete the branch
             cursor = self.conn.execute("""
-                DELETE FROM branches WHERE id = ?
+                UPDATE branches
+                SET archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND archived_at IS NULL
             """, (branch_id,))
             if cursor.rowcount == 0:
-                raise ValueError(f"Branch with id {branch_id} not found")
+                raise ValueError(f"Branch with id {branch_id} not found or already archived")
+
+            # Hard delete all tenants for this branch
+            self.conn.execute("""
+                DELETE FROM tenants WHERE branch_id = ?
+            """, (branch_id,))
+
+    def delete_branch(self, branch_id: str) -> None:
+        """Delete a branch and all its tenants (cascading delete).
+
+        Note: This is now implemented as archive_branch to preserve change history.
+        """
+        self.archive_branch(branch_id)
     
     def delete_branch_by_name(self, database_id: str, branch_name: str) -> None:
-        """Delete a branch by name and all its tenants (cascading delete)."""
-        with self.conn:
-            cursor = self.conn.execute("""
-                DELETE FROM branches WHERE database_id = ? AND name = ?
-            """, (database_id, branch_name))
-            if cursor.rowcount == 0:
-                raise ValueError(f"Branch '{branch_name}' not found in database")
+        """Delete a branch by name and all its tenants (cascading delete).
+
+        Note: This is now implemented as archive to preserve change history.
+        """
+        # First get the branch info to get the ID
+        branch_info = self.get_branch(database_id, branch_name)
+        if not branch_info:
+            raise ValueError(f"Branch '{branch_name}' not found in database")
+
+        # Use archive_branch method
+        self.archive_branch(branch_info['id'])
     
     def delete_tenant(self, tenant_id: str) -> None:
         """Delete a tenant."""
@@ -519,20 +547,20 @@ class MetadataDB:
     
     # Change tracking operations
     def create_change(self, change_id: str, database_id: str,
-                     origin_branch_id: Optional[str], change_type: str,
-                     entity_type: str, entity_name: str,
+                     origin_branch_id: Optional[str], origin_branch_name: Optional[str],
+                     change_type: str, entity_type: str, entity_name: str,
                      details: Optional[Dict[str, Any]] = None,
                      sql: Optional[str] = None) -> None:
         """Create a change record."""
         with self.conn:
             self.conn.execute("""
                 INSERT INTO changes (
-                    id, database_id, origin_branch_id, type,
+                    id, database_id, origin_branch_id, origin_branch_name, type,
                     entity_type, entity_name, details, sql
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                change_id, database_id, origin_branch_id, change_type,
+                change_id, database_id, origin_branch_id, origin_branch_name, change_type,
                 entity_type, entity_name,
                 json.dumps(details) if details else None, sql
             ))
@@ -550,29 +578,46 @@ class MetadataDB:
             return result
         return None
 
-    def link_change_to_branch(self, branch_id: str, change_id: str,
+    def link_change_to_branch(self, branch_id: str, branch_name: str, change_id: str,
                               applied: bool = False, applied_order: int = 0,
-                              copied_from_branch_id: Optional[str] = None) -> None:
+                              copied_from_branch_id: Optional[str] = None,
+                              copied_from_branch_name: Optional[str] = None) -> None:
         """Link a change to a branch."""
         with self.conn:
             self.conn.execute("""
                 INSERT OR REPLACE INTO branch_changes (
-                    branch_id, change_id, applied, applied_order,
-                    copied_from_branch_id
+                    branch_id, branch_name, change_id, applied, applied_order,
+                    copied_from_branch_id, copied_from_branch_name
                 )
-                VALUES (?, ?, ?, ?, ?)
-            """, (branch_id, change_id, applied, applied_order,
-                  copied_from_branch_id))
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (branch_id, branch_name, change_id, applied, applied_order,
+                  copied_from_branch_id, copied_from_branch_name))
 
-    def get_branch_changes(self, branch_id: str) -> List[Dict[str, Any]]:
-        """Get all changes for a branch in order."""
-        cursor = self.conn.execute("""
-            SELECT c.*, bc.applied, bc.applied_order, bc.copied_from_branch_id
-            FROM branch_changes bc
-            JOIN changes c ON bc.change_id = c.id
-            WHERE bc.branch_id = ?
-            ORDER BY bc.applied_order
-        """, (branch_id,))
+    def get_branch_changes(self, branch_name: str = None, branch_id: str = None) -> List[Dict[str, Any]]:
+        """Get all changes for a branch in order.
+
+        Args:
+            branch_name: Branch name (used if branch_id not provided)
+            branch_id: Branch ID (preferred for performance)
+        """
+        if branch_id:
+            cursor = self.conn.execute("""
+                SELECT c.*, bc.applied, bc.applied_order, bc.copied_from_branch_id, bc.copied_from_branch_name
+                FROM branch_changes bc
+                JOIN changes c ON bc.change_id = c.id
+                WHERE bc.branch_id = ?
+                ORDER BY bc.applied_order
+            """, (branch_id,))
+        elif branch_name:
+            cursor = self.conn.execute("""
+                SELECT c.*, bc.applied, bc.applied_order, bc.copied_from_branch_id, bc.copied_from_branch_name
+                FROM branch_changes bc
+                JOIN changes c ON bc.change_id = c.id
+                WHERE bc.branch_name = ?
+                ORDER BY bc.applied_order
+            """, (branch_name,))
+        else:
+            raise ValueError("Must provide either branch_name or branch_id")
 
         results = []
         for row in cursor:
@@ -582,74 +627,131 @@ class MetadataDB:
             results.append(result)
         return results
 
-    def update_change_applied_status(self, branch_id: str, change_id: str,
-                                     applied: bool) -> None:
+    def update_change_applied_status(self, branch_name: str, change_id: str,
+                                     applied: bool, branch_id: str = None) -> None:
         """Update the applied status of a change in a branch."""
         with self.conn:
-            self.conn.execute("""
-                UPDATE branch_changes
-                SET applied = ?
-                WHERE branch_id = ? AND change_id = ?
-            """, (applied, branch_id, change_id))
+            if branch_id:
+                self.conn.execute("""
+                    UPDATE branch_changes
+                    SET applied = ?
+                    WHERE branch_id = ? AND change_id = ?
+                """, (applied, branch_id, change_id))
+            else:
+                self.conn.execute("""
+                    UPDATE branch_changes
+                    SET applied = ?
+                    WHERE branch_name = ? AND change_id = ?
+                """, (applied, branch_name, change_id))
 
-    def get_next_change_order(self, branch_id: str) -> int:
+    def get_next_change_order(self, branch_name: str = None, branch_id: str = None) -> int:
         """Get the next available order number for a branch."""
-        cursor = self.conn.execute("""
-            SELECT MAX(applied_order) as max_order
-            FROM branch_changes
-            WHERE branch_id = ?
-        """, (branch_id,))
+        if branch_id:
+            cursor = self.conn.execute("""
+                SELECT MAX(applied_order) as max_order
+                FROM branch_changes
+                WHERE branch_id = ?
+            """, (branch_id,))
+        elif branch_name:
+            cursor = self.conn.execute("""
+                SELECT MAX(applied_order) as max_order
+                FROM branch_changes
+                WHERE branch_name = ?
+            """, (branch_name,))
+        else:
+            raise ValueError("Must provide either branch_name or branch_id")
+
         row = cursor.fetchone()
         return (row['max_order'] or -1) + 1 if row else 0
 
-    def mark_change_applied(self, branch_id: str, change_id: str) -> None:
+    def mark_change_applied(self, branch_name: str, change_id: str, branch_id: str = None) -> None:
         """Mark a change as applied for a specific branch."""
         with self.conn:
-            self.conn.execute("""
-                UPDATE branch_changes
-                SET applied = 1
-                WHERE branch_id = ? AND change_id = ?
-            """, (branch_id, change_id))
+            if branch_id:
+                self.conn.execute("""
+                    UPDATE branch_changes
+                    SET applied = 1
+                    WHERE branch_id = ? AND change_id = ?
+                """, (branch_id, change_id))
+            else:
+                self.conn.execute("""
+                    UPDATE branch_changes
+                    SET applied = 1
+                    WHERE branch_name = ? AND change_id = ?
+                """, (branch_name, change_id))
 
-    def clear_branch_changes(self, branch_id: str) -> None:
+    def clear_branch_changes(self, branch_name: str = None, branch_id: str = None) -> None:
         """Clear all changes from a branch."""
         with self.conn:
-            self.conn.execute("""
-                DELETE FROM branch_changes
-                WHERE branch_id = ?
-            """, (branch_id,))
+            if branch_id:
+                self.conn.execute("""
+                    DELETE FROM branch_changes
+                    WHERE branch_id = ?
+                """, (branch_id,))
+            elif branch_name:
+                self.conn.execute("""
+                    DELETE FROM branch_changes
+                    WHERE branch_name = ?
+                """, (branch_name,))
+            else:
+                raise ValueError("Must provide either branch_name or branch_id")
 
-    def unlink_change_from_branch(self, branch_id: str, change_id: str) -> None:
+    def unlink_change_from_branch(self, branch_name: str, change_id: str, branch_id: str = None) -> None:
         """Unlink a change from a branch (remove from branch_changes).
 
         Args:
-            branch_id: Branch to unlink from
+            branch_name: Branch to unlink from
             change_id: Change to unlink
+            branch_id: Branch ID (optional, for performance)
         """
         with self.conn:
-            self.conn.execute("""
-                DELETE FROM branch_changes
-                WHERE branch_id = ? AND change_id = ?
-            """, (branch_id, change_id))
+            if branch_id:
+                self.conn.execute("""
+                    DELETE FROM branch_changes
+                    WHERE branch_id = ? AND change_id = ?
+                """, (branch_id, change_id))
+            else:
+                self.conn.execute("""
+                    DELETE FROM branch_changes
+                    WHERE branch_name = ? AND change_id = ?
+                """, (branch_name, change_id))
 
-    def copy_branch_changes(self, source_branch_id: str, target_branch_id: str) -> None:
+    def copy_branch_changes(self, source_branch_name: str, target_branch_name: str,
+                           source_branch_id: str = None, target_branch_id: str = None) -> None:
         """Copy all changes from source branch to target branch.
 
         This is used when creating a new branch to inherit all changes from parent.
         Uses efficient SQL INSERT...SELECT to copy in one operation.
 
         Args:
-            source_branch_id: Branch to copy changes from
-            target_branch_id: Branch to copy changes to
+            source_branch_name: Branch to copy changes from
+            target_branch_name: Branch to copy changes to
+            source_branch_id: Source branch ID (optional, for performance)
+            target_branch_id: Target branch ID (optional, for performance)
         """
         with self.conn:
-            self.conn.execute("""
-                INSERT INTO branch_changes (branch_id, change_id, applied, applied_order, copied_from_branch_id)
-                SELECT ?, change_id, applied, applied_order, ?
-                FROM branch_changes
-                WHERE branch_id = ?
-                ORDER BY applied_order
-            """, (target_branch_id, source_branch_id, source_branch_id))
+            if source_branch_id and target_branch_id:
+                self.conn.execute("""
+                    INSERT INTO branch_changes (
+                        branch_id, branch_name, change_id, applied, applied_order,
+                        copied_from_branch_id, copied_from_branch_name
+                    )
+                    SELECT ?, ?, change_id, applied, applied_order, ?, ?
+                    FROM branch_changes
+                    WHERE branch_id = ?
+                    ORDER BY applied_order
+                """, (target_branch_id, target_branch_name, source_branch_id, source_branch_name, source_branch_id))
+            else:
+                self.conn.execute("""
+                    INSERT INTO branch_changes (
+                        branch_id, branch_name, change_id, applied, applied_order,
+                        copied_from_branch_id, copied_from_branch_name
+                    )
+                    SELECT NULL, ?, change_id, applied, applied_order, NULL, ?
+                    FROM branch_changes
+                    WHERE branch_name = ?
+                    ORDER BY applied_order
+                """, (target_branch_name, source_branch_name, source_branch_name))
 
     def close(self):
         """Close the database connection."""

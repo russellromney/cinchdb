@@ -61,19 +61,19 @@ dev-docs:
 
 # Python-specific targets
 test-python:
-	uv run pytest tests/
-	cd ../plugged && uv run pytest tests/ -vv
+	ulimit -n 4096 && uv run pytest tests/
+	cd ../plugged && ulimit -n 4096 && uv run pytest tests/ -vv
 
 test-unit:
-	uv run pytest -vv tests/unit/ -v
-	cd ../plugged && uv run pytest -vv tests/ -vv
+	ulimit -n 4096 && uv run pytest -vv tests/unit/ -v
+	cd ../plugged && ulimit -n 4096 && uv run pytest -vv tests/ -vv
 
 test-python-integration:
-	uv run pytest -vv tests/integration/ -v
+	ulimit -n 4096 && uv run pytest -vv tests/integration/ -v
 
 coverage:
-	uv run pytest -vv --cov=cinchdb --cov-report=html --cov-report=term tests/
-	cd ../plugged && uv run pytest -vv --cov=plugged --cov-report=html --cov-report=term tests/
+	ulimit -n 4096 && uv run pytest -vv --cov=cinchdb --cov-report=html --cov-report=term tests/
+	cd ../plugged && ulimit -n 4096 && uv run pytest -vv --cov=plugged --cov-report=html --cov-report=term tests/
 
 lint-python:
 	uv run ruff check src/ tests/

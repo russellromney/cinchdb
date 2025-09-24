@@ -26,6 +26,7 @@ cinch status
 
 ### Data Operations
 - [`cinch data`](data.md) - Bulk data operations (insert, update, delete)
+- [`cinch kv`](kv.md) - Key-value store operations (Redis-like API)
 
 ### Branching & Tenancy
 - [`cinch branch`](branch.md) - Branch operations (create, switch, merge, delete)
@@ -45,6 +46,8 @@ cinch status
 | Query data | `cinch query "SELECT * FROM users"` |
 | Delete records | `cinch data delete users --where "status=inactive"` |
 | Update records | `cinch data update users --set "status=active" --where "plan=free"` |
+| Set KV pair | `cinch kv set session:123 '{"user_id": 42}'` |
+| Get KV value | `cinch kv get session:123` |
 | Create branch | `cinch branch create feature-auth --switch` |
 | Merge to main | `cinch branch merge-into-main feature-auth` |
 | Multi-tenant query | `cinch query "SELECT * FROM users" --tenant customer_a` |

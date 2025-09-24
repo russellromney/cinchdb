@@ -156,7 +156,11 @@ class BranchManager:
 
         # Copy all changes from source branch to new branch
         # This ensures the new branch has all the change history from its parent
-        self.metadata_db.copy_branch_changes(source_branch_info['id'], branch_id)
+        self.metadata_db.copy_branch_changes(
+            source_branch, new_branch_name,
+            source_branch_id=source_branch_info['id'],
+            target_branch_id=branch_id
+        )
 
         # Copy entire branch directory (branches should copy ALL files including tenants)
         source_path = get_branch_path(self.project_root, self.database, source_branch)

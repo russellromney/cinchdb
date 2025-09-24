@@ -40,7 +40,7 @@ class ChangeTracker:
         Returns:
             List of Change objects
         """
-        changes_data = self.metadata_db.get_branch_changes(self.branch_id)
+        changes_data = self.metadata_db.get_branch_changes(branch_id=self.branch_id)
 
         changes = []
         for data in changes_data:
@@ -96,6 +96,7 @@ class ChangeTracker:
                 change_id=change.id,
                 database_id=self.database_id,
                 origin_branch_id=self.branch_id,
+                origin_branch_name=self.branch,
                 change_type=change.type,
                 entity_type=change.entity_type,
                 entity_name=change.entity_name,
@@ -104,11 +105,12 @@ class ChangeTracker:
             )
 
         # Link change to branch if not already linked
-        existing_branch_changes = self.metadata_db.get_branch_changes(self.branch_id)
+        existing_branch_changes = self.metadata_db.get_branch_changes(branch_id=self.branch_id)
         if not any(c["id"] == change.id for c in existing_branch_changes):
             applied_order = len(existing_branch_changes)
             self.metadata_db.link_change_to_branch(
                 branch_id=self.branch_id,
+                branch_name=self.branch,
                 change_id=change.id,
                 applied=change.applied,
                 applied_order=applied_order,
@@ -131,7 +133,7 @@ class ChangeTracker:
         Args:
             change_id: ID of change to mark as applied
         """
-        self.metadata_db.mark_change_applied(self.branch_id, change_id)
+        self.metadata_db.mark_change_applied(self.branch, change_id, branch_id=self.branch_id)
 
     def get_changes_since(self, change_id: str) -> List[Change]:
         """Get all changes after a specific change.
@@ -158,7 +160,7 @@ class ChangeTracker:
 
     def clear_changes(self) -> None:
         """Clear all changes from the branch."""
-        self.metadata_db.clear_branch_changes(self.branch_id)
+        self.metadata_db.clear_branch_changes(branch_id=self.branch_id)
 
     def has_change_id(self, change_id: str) -> bool:
         """Check if a change ID exists.

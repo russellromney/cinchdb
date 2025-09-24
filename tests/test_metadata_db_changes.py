@@ -46,6 +46,7 @@ class TestMetadataDBChangeTracking:
             change_id=change_id,
             database_id=sample_database,
             origin_branch_id=sample_branch,
+            origin_branch_name="main",
             change_type="CREATE_TABLE",
             entity_type="table",
             entity_name="users",
@@ -69,6 +70,7 @@ class TestMetadataDBChangeTracking:
             change_id=change_id,
             database_id=sample_database,
             origin_branch_id=sample_branch,
+            origin_branch_name="main",
             change_type="CREATE_TABLE",
             entity_type="table",
             entity_name="products"
@@ -77,13 +79,14 @@ class TestMetadataDBChangeTracking:
         # Link to branch
         metadata_db.link_change_to_branch(
             branch_id=sample_branch,
+            branch_name="main",
             change_id=change_id,
             applied=False,
             applied_order=0
         )
 
         # Get branch changes
-        changes = metadata_db.get_branch_changes(sample_branch)
+        changes = metadata_db.get_branch_changes("main")
         assert len(changes) == 1
         assert changes[0]["id"] == change_id
         assert changes[0]["applied"] == 0  # False
@@ -100,6 +103,7 @@ class TestMetadataDBChangeTracking:
                 change_id=change_id,
                 database_id=sample_database,
                 origin_branch_id=sample_branch,
+            origin_branch_name="main",
                 change_type="CREATE_TABLE",
                 entity_type="table",
                 entity_name=f"table_{i}"
@@ -108,13 +112,14 @@ class TestMetadataDBChangeTracking:
             # Link with specific order
             metadata_db.link_change_to_branch(
                 branch_id=sample_branch,
+                branch_name="main",
                 change_id=change_id,
                 applied=False,
                 applied_order=i
             )
 
         # Get changes - should be in order
-        changes = metadata_db.get_branch_changes(sample_branch)
+        changes = metadata_db.get_branch_changes("main")
         assert len(changes) == 3
         for i, change in enumerate(changes):
             assert change["id"] == change_ids[i]
@@ -129,6 +134,7 @@ class TestMetadataDBChangeTracking:
             change_id=change_id,
             database_id=sample_database,
             origin_branch_id=sample_branch,
+            origin_branch_name="main",
             change_type="CREATE_TABLE",
             entity_type="table",
             entity_name="orders"
@@ -136,20 +142,21 @@ class TestMetadataDBChangeTracking:
 
         metadata_db.link_change_to_branch(
             branch_id=sample_branch,
+            branch_name="main",
             change_id=change_id,
             applied=False,
             applied_order=0
         )
 
         # Initially not applied
-        changes = metadata_db.get_branch_changes(sample_branch)
+        changes = metadata_db.get_branch_changes("main")
         assert changes[0]["applied"] == 0
 
         # Mark as applied
-        metadata_db.mark_change_applied(sample_branch, change_id)
+        metadata_db.mark_change_applied("main", change_id)
 
         # Now should be applied
-        changes = metadata_db.get_branch_changes(sample_branch)
+        changes = metadata_db.get_branch_changes("main")
         assert changes[0]["applied"] == 1
 
     def test_clear_branch_changes(self, metadata_db, sample_database, sample_branch):
@@ -161,26 +168,28 @@ class TestMetadataDBChangeTracking:
                 change_id=change_id,
                 database_id=sample_database,
                 origin_branch_id=sample_branch,
+            origin_branch_name="main",
                 change_type="CREATE_TABLE",
                 entity_type="table",
                 entity_name=f"table_{i}"
             )
             metadata_db.link_change_to_branch(
                 branch_id=sample_branch,
+                branch_name="main",
                 change_id=change_id,
                 applied=False,
                 applied_order=i
             )
 
         # Verify changes exist
-        changes = metadata_db.get_branch_changes(sample_branch)
+        changes = metadata_db.get_branch_changes("main")
         assert len(changes) == 3
 
         # Clear branch changes
-        metadata_db.clear_branch_changes(sample_branch)
+        metadata_db.clear_branch_changes("main")
 
         # Verify changes are gone from branch
-        changes = metadata_db.get_branch_changes(sample_branch)
+        changes = metadata_db.get_branch_changes("main")
         assert len(changes) == 0
 
         # But the change records themselves still exist
@@ -203,6 +212,7 @@ class TestMetadataDBChangeTracking:
                 change_id=change_id,
                 database_id=sample_database,
                 origin_branch_id=sample_branch,
+            origin_branch_name="main",
                 change_type="CREATE_TABLE",
                 entity_type="table",
                 entity_name=f"table_{i}"
@@ -210,16 +220,21 @@ class TestMetadataDBChangeTracking:
 
             metadata_db.link_change_to_branch(
                 branch_id=sample_branch,
+                branch_name="main",
                 change_id=change_id,
                 applied=(i == 0),  # First one is applied
                 applied_order=i
             )
 
         # Copy changes to target branch
-        metadata_db.copy_branch_changes(sample_branch, target_branch_id)
+        metadata_db.copy_branch_changes(
+            "main", "feature",
+            source_branch_id=sample_branch,
+            target_branch_id=target_branch_id
+        )
 
         # Verify target has all changes
-        target_changes = metadata_db.get_branch_changes(target_branch_id)
+        target_changes = metadata_db.get_branch_changes("feature")
         assert len(target_changes) == 3
 
         # Verify order and applied status preserved
@@ -228,6 +243,7 @@ class TestMetadataDBChangeTracking:
             assert change["applied"] == (1 if i == 0 else 0)
             # Check that copied_from is set correctly
             assert change["copied_from_branch_id"] == sample_branch
+            assert change["copied_from_branch_name"] == "main"
 
     def test_unlink_change_from_branch(self, metadata_db, sample_database, sample_branch):
         """Test unlinking a change from a branch."""
@@ -238,6 +254,7 @@ class TestMetadataDBChangeTracking:
             change_id=change_id,
             database_id=sample_database,
             origin_branch_id=sample_branch,
+            origin_branch_name="main",
             change_type="DROP_TABLE",
             entity_type="table",
             entity_name="temp_table"
@@ -245,20 +262,21 @@ class TestMetadataDBChangeTracking:
 
         metadata_db.link_change_to_branch(
             branch_id=sample_branch,
+            branch_name="main",
             change_id=change_id,
             applied=False,
             applied_order=0
         )
 
         # Verify change is linked
-        changes = metadata_db.get_branch_changes(sample_branch)
+        changes = metadata_db.get_branch_changes("main")
         assert len(changes) == 1
 
         # Unlink the change
-        metadata_db.unlink_change_from_branch(sample_branch, change_id)
+        metadata_db.unlink_change_from_branch("main", change_id)
 
         # Verify change is unlinked
-        changes = metadata_db.get_branch_changes(sample_branch)
+        changes = metadata_db.get_branch_changes("main")
         assert len(changes) == 0
 
         # But change record still exists
@@ -274,6 +292,7 @@ class TestMetadataDBChangeTracking:
             change_id=change_id,
             database_id=sample_database,
             origin_branch_id=sample_branch,
+            origin_branch_name="main",
             change_type="DROP_TABLE",
             entity_type="table",
             entity_name="old_table",
@@ -299,6 +318,7 @@ class TestMetadataDBChangeTracking:
             change_id=change_id,
             database_id=sample_database,
             origin_branch_id=sample_branch,
+            origin_branch_name="main",
             change_type="CREATE_INDEX",
             entity_type="index",
             entity_name="idx_users_email"
@@ -307,6 +327,7 @@ class TestMetadataDBChangeTracking:
         # Link to both branches
         metadata_db.link_change_to_branch(
             branch_id=sample_branch,
+            branch_name="main",
             change_id=change_id,
             applied=True,
             applied_order=0
@@ -314,15 +335,17 @@ class TestMetadataDBChangeTracking:
 
         metadata_db.link_change_to_branch(
             branch_id=branch2_id,
+            branch_name="feature2",
             change_id=change_id,
             applied=False,
             applied_order=0,
-            copied_from_branch_id=sample_branch
+            copied_from_branch_id=sample_branch,
+            copied_from_branch_name="main"
         )
 
         # Verify both branches have the change
-        branch1_changes = metadata_db.get_branch_changes(sample_branch)
-        branch2_changes = metadata_db.get_branch_changes(branch2_id)
+        branch1_changes = metadata_db.get_branch_changes("main")
+        branch2_changes = metadata_db.get_branch_changes("feature2")
 
         assert len(branch1_changes) == 1
         assert len(branch2_changes) == 1
@@ -337,8 +360,12 @@ class TestMetadataDBChangeTracking:
         metadata_db.create_branch(target_branch_id, sample_database, "empty_feature")
 
         # Copy from empty source (should not error)
-        metadata_db.copy_branch_changes(sample_branch, target_branch_id)
+        metadata_db.copy_branch_changes(
+            "main", "feature",
+            source_branch_id=sample_branch,
+            target_branch_id=target_branch_id
+        )
 
         # Verify target is still empty
-        changes = metadata_db.get_branch_changes(target_branch_id)
+        changes = metadata_db.get_branch_changes("feature")
         assert len(changes) == 0

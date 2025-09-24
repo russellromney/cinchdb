@@ -40,6 +40,25 @@ cinch data insert users --data '{"name": "Alice", "email": "alice@example.com", 
 cinch query "SELECT * FROM users"
 ```
 
+## Use the Key-Value Store
+
+CinchDB includes a built-in Redis-like KV store for high-performance caching and session management:
+
+```bash
+# Set a session with auto-expiration
+cinch kv set session:123 '{"user_id": 1, "ip": "192.168.1.1"}' --ttl 3600
+
+# Get the session
+cinch kv get session:123
+
+# Use atomic counters
+cinch kv increment page:views
+cinch kv increment api:calls --by 5
+
+# List all sessions
+cinch kv keys "session:*"
+```
+
 ## Work with Branches
 
 ```bash
@@ -99,6 +118,12 @@ post = db.insert("posts", {
 posts = db.query("SELECT * FROM posts WHERE published = ?", [True])
 for post in posts:
     print(f"{post['title']}: {post['content']}")
+
+# Use the built-in KV store for caching and sessions
+db.kv.set("session:user123", {"user_id": 123, "role": "admin"}, ttl=3600)
+db.kv.set("cache:posts", posts, ttl=300)  # Cache query results
+session = db.kv.get("session:user123")
+db.kv.increment("post:views:1")  # Atomic counter
 
 # Work with branches
 dev_db = cinchdb.connect("myblog", branch="development")

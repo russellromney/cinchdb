@@ -147,6 +147,120 @@ class TestCinchDB:
             )
             assert result == [{"id": 1, "name": "test"}]
 
+    def test_local_query_with_masking(self, tmp_path):
+        """Test query with column masking on local connection."""
+        # Initialize project first
+        from cinchdb.core.initializer import init_project
+        init_project(tmp_path)
+
+        db = CinchDB(database="test_db", project_dir=tmp_path)
+
+        # Mock the tenant manager to return a valid path
+        with patch("cinchdb.managers.tenant.TenantManager.get_tenant_db_path_for_operation") as mock_get_path:
+            # Create a temporary database file for testing
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_db:
+                temp_db_path = Path(temp_db.name)
+
+            mock_get_path.return_value = temp_db_path
+
+            # Mock DatabaseConnection to return test data
+            with patch("cinchdb.core.connection.DatabaseConnection") as mock_db_conn:
+                mock_conn = Mock()
+                mock_cursor = Mock()
+                # Return data with sensitive columns
+                mock_cursor.fetchall.return_value = [
+                    {"id": 1, "name": "Alice", "email": "alice@example.com", "ssn": "123-45-6789"},
+                    {"id": 2, "name": "Bob", "email": "bob@example.com", "ssn": "987-65-4321"},
+                    {"id": 3, "name": "Charlie", "email": None, "ssn": None}  # Test NULL values
+                ]
+                mock_conn.execute.return_value = mock_cursor
+                mock_db_conn.return_value.__enter__.return_value = mock_conn
+
+                # Query with masking
+                result = db.query(
+                    "SELECT * FROM users",
+                    mask_columns=["email", "ssn"]
+                )
+
+                # Check that sensitive columns are masked but NULLs preserved
+                assert result == [
+                    {"id": 1, "name": "Alice", "email": "***REDACTED***", "ssn": "***REDACTED***"},
+                    {"id": 2, "name": "Bob", "email": "***REDACTED***", "ssn": "***REDACTED***"},
+                    {"id": 3, "name": "Charlie", "email": None, "ssn": None}  # NULLs preserved
+                ]
+
+            # Clean up
+            temp_db_path.unlink(missing_ok=True)
+
+    def test_remote_query_with_masking(self):
+        """Test query with column masking on remote connection."""
+        # Create a mock session
+        mock_session = Mock()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [
+                {"id": 1, "name": "Alice", "email": "alice@example.com", "password": "secret123"},
+                {"id": 2, "name": "Bob", "email": None, "password": "pass456"}
+            ]
+        }
+        mock_session.request.return_value = mock_response
+
+        # Patch the session property to return our mock
+        with patch.object(
+            CinchDB, "session", new_callable=PropertyMock
+        ) as mock_session_prop:
+            mock_session_prop.return_value = mock_session
+
+            db = CinchDB(
+                database="test_db",
+                api_url="https://api.example.com",
+                api_key="test-key",
+            )
+
+            # Query with masking
+            result = db.query(
+                "SELECT * FROM users",
+                mask_columns=["email", "password"]
+            )
+
+            # Check that sensitive columns are masked
+            assert result == [
+                {"id": 1, "name": "Alice", "email": "***REDACTED***", "password": "***REDACTED***"},
+                {"id": 2, "name": "Bob", "email": None, "password": "***REDACTED***"}  # NULL preserved
+            ]
+
+    def test_query_without_masking(self, tmp_path):
+        """Test that query works normally without mask_columns parameter."""
+        from cinchdb.core.initializer import init_project
+        init_project(tmp_path)
+
+        db = CinchDB(database="test_db", project_dir=tmp_path)
+
+        with patch("cinchdb.managers.tenant.TenantManager.get_tenant_db_path_for_operation") as mock_get_path:
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as temp_db:
+                temp_db_path = Path(temp_db.name)
+
+            mock_get_path.return_value = temp_db_path
+
+            with patch("cinchdb.core.connection.DatabaseConnection") as mock_db_conn:
+                mock_conn = Mock()
+                mock_cursor = Mock()
+                mock_cursor.fetchall.return_value = [
+                    {"id": 1, "name": "Alice", "email": "alice@example.com"}
+                ]
+                mock_conn.execute.return_value = mock_cursor
+                mock_db_conn.return_value.__enter__.return_value = mock_conn
+
+                # Query without masking - data should be unchanged
+                result = db.query("SELECT * FROM users")
+
+                assert result == [{"id": 1, "name": "Alice", "email": "alice@example.com"}]
+
+            temp_db_path.unlink(missing_ok=True)
+
     def test_local_create_table(self, tmp_path):
         """Test table creation on local connection."""
         db = CinchDB(database="test_db", project_dir=tmp_path)

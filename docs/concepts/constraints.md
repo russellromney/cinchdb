@@ -12,9 +12,12 @@ Unlike traditional development where code defines the database structure through
 **Traditional**: Code → Migrations → Database
 **CinchDB**: Database → Codegen → Type-Safe Code
 
-This inversion is important because it means the database schema is always the source of truth. Your code is generated from what actually exists in the database, not the other way around. This eliminates an entire category of bugs where your code thinks the database looks one way but it actually looks different.
+This fundamental inversion drives most of CinchDB's constraints. The database isn't just storage - it's the authoritative source from which all code is generated. 
 
-CinchDB modifies SQLite's default behavior to create a safer, more predictable development experience. 
+**Why CinchDB modifies SQLite's default behavior**
+
+CinchDB constrains in some key ways SQLite to create a safer, more consistent database experience. 
+It incorporates some best practices and makes some very opinionated design choices. 
 
 ## Schema Constraints
 
@@ -25,7 +28,11 @@ CinchDB modifies SQLite's default behavior to create a safer, more predictable d
 id TEXT PRIMARY KEY,  -- UUID4, not AUTOINCREMENT
 ```
 
-AUTOINCREMENT exposes information about your data (like row counts and creation order) and makes it easy to enumerate through your records. UUIDs prevent ID collisions across different databases and tenants, and they work better in distributed systems.
+**Why not AUTOINCREMENT?**
+- **Security**: AUTOINCREMENT reveals creation order and row counts
+- **No enumeration attacks**: Can't guess valid IDs by incrementing
+- **Multi-tenant safe**: No ID collisions between tenants
+- **Distributed-friendly**: UUIDs work across multiple databases
 
 ### Mandatory Timestamps
 
@@ -62,9 +69,9 @@ CinchDB purposefully exposes a limited set of SQLite data operations:
 
 **What**: Strict API routing
 - `db.query()` - Only SELECT statements
-- `db.insert()`, `db.update()`, `db.delete()` - Structured data operations
+- `db.insert()`, `db.update()`, `db.delete()` - Structured data operations with parameters
 
-**Why**: Prevents accidental data modification, enables better analytics
+**Why**: Prevents accidental data modification 
 
 ### System Table Protection
 
@@ -116,7 +123,7 @@ PRAGMA synchronous = NORMAL
     └── ef/tenant3.db
 ```
 
-**Why**: True data isolation means each tenant's queries only touch their own data, improving performance and security. The hash-based sharding prevents filesystem issues when you have thousands of tenants.
+**Why**: True data isolation, performance (queries only scan relevant data), horizontal scaling without hitting system file limits
 
 ### No Cross-Tenant Queries
 
@@ -138,15 +145,40 @@ ORM Models → Migrations → Database Schema
 Database Branch → Schema Changes → Codegen → Type-Safe SDK
 ```
 
-CinchDB reverses the traditional development flow. Instead of defining models in code and then migrating the database, you make changes directly to the database schema and generate type-safe code from it. This means there are no ORM model definitions that can drift from the actual schema and no migration files to manage.
+**What**: CinchDB reverses the traditional development flow
+- Database schema is the single source of truth
+- Code is generated FROM the database, not vice versa
+- No ORM model definitions that drift from actual schema
+- No migration files to manage or coordinate
+
+**Why**:
+- **Zero drift**: Generated code always matches actual database schema
+- **Branch safety**: Test schema changes in isolation before merging
+- **AI-friendly**: Safe for automated tools to modify database directly
+- **Team coordination**: Changes merge atomically in both database and code
 
 ### Codegen-Driven SDK
 
-The SDK is always generated from your database schema, never hand-written. After making schema changes, you run `cinch codegen generate python models/` to create type-safe Python models that exactly match your database structure. This ensures your code always knows the exact types and constraints of your data.
+**What**: SDK is always generated, never hand-written
+```bash
+# After schema changes:
+cinch codegen generate python models/
+# This creates type-safe Python models matching your exact schema
+```
+
+**Why**: Eliminates the entire class of type mismatches between code and database
 
 ### Git-Like Workflow Required
 
-Database changes follow the same patterns as version control. You create a feature branch in the database, make schema changes there, generate a new SDK from that branch's schema, test everything in isolation, then merge the database branch which atomically updates the schema. Finally you commit the regenerated SDK to Git. This keeps both database and code changes synchronized through parallel branch and merge workflows.
+**What**: Database changes follow version control patterns
+1. Create feature branch in database
+2. Make schema changes on branch
+3. Generate new SDK from branch schema
+4. Test changes in isolation
+5. Merge database branch (atomically updates schema)
+6. Commit generated SDK to Git
+
+**Why**: Database and code changes are coordinated through parallel workflows
 
 ## Branch-Based Schema Management
 
@@ -162,7 +194,9 @@ Database changes follow the same patterns as version control. You create a featu
 
 ### Atomic Merge Operations
 
-Schema merges are atomic operations that either completely succeed or completely fail. There's no possibility of ending up with a partially-merged schema or having to manually resolve conflicts in the database itself.
+**What**: Schema merges are atomic - either fully succeed or fully fail
+
+**Why**: No partial states, no corrupted schemas, no manual conflict resolution in database
 
 ## Comparison to Traditional Approaches
 

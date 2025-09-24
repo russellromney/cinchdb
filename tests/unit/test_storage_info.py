@@ -53,7 +53,7 @@ def test_get_tenant_size():
         eager_size = db.get_tenant_size("eager_tenant")
         
         assert eager_size["name"] == "eager_tenant"
-        assert eager_size["size_bytes"] <= 20480  # Should be reasonably small with 4KB pages
+        assert eager_size["size_bytes"] <= 36864  # Should be reasonably small with 4KB pages (increased due to schema additions)
         assert eager_size["page_size"] == 4096  # Should use 4KB pages (SQLite default)
         assert eager_size["page_count"] >= 1  # At least 1 page, possibly more for schema
 

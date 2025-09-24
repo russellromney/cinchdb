@@ -110,47 +110,86 @@ class TestMetadataDBDeletes:
         with pytest.raises(ValueError, match="not found"):
             metadata_db.delete_tenant_by_name(data['branch1_id'], "non-existent")
     
-    def test_delete_branch_cascades_to_tenants(self, populated_metadata_db):
-        """Test that deleting a branch deletes all its tenants."""
+    def test_delete_branch_archives_branch_deletes_tenants(self, populated_metadata_db):
+        """Test that deleting a branch archives the branch and deletes all its tenants."""
         data = populated_metadata_db
         metadata_db = data['metadata_db']
-        
+
         # Verify branch has tenants
         tenants = metadata_db.list_tenants(data['branch1_id'])
         assert len(tenants) == 2
-        
-        # Delete branch
+
+        # Delete branch (now archives)
         metadata_db.delete_branch(data['branch1_id'])
-        
-        # Verify branch is deleted
+
+        # Verify branch is archived (not visible in normal queries)
         branch = metadata_db.get_branch(data['db1_id'], "main")
         assert branch is None
-        
-        # Verify all tenants are deleted (cascade)
+
+        # But should exist with archived_at set when queried directly
+        with metadata_db.conn:
+            cursor = metadata_db.conn.execute(
+                "SELECT * FROM branches WHERE id = ?",
+                (data['branch1_id'],)
+            )
+            archived_branch = cursor.fetchone()
+            assert archived_branch is not None
+            assert archived_branch['archived_at'] is not None
+
+        # Verify all tenants are deleted (hard delete)
         tenants = metadata_db.list_tenants(data['branch1_id'])
         assert len(tenants) == 0
-        
+
         # Other branches should still exist
         branches = metadata_db.list_branches(data['db1_id'])
         assert len(branches) == 1
         assert branches[0]['name'] == 'feature'
     
     def test_delete_branch_by_name(self, populated_metadata_db):
-        """Test deleting a branch by name."""
+        """Test deleting a branch by name (now archives)."""
         data = populated_metadata_db
         metadata_db = data['metadata_db']
-        
+
         # Delete branch by name
         metadata_db.delete_branch_by_name(data['db1_id'], "feature")
-        
-        # Verify branch is deleted
+
+        # Verify branch is archived (not visible in normal queries)
         branch = metadata_db.get_branch(data['db1_id'], "feature")
         assert branch is None
-        
+
         # Main branch should still exist
         branches = metadata_db.list_branches(data['db1_id'])
         assert len(branches) == 1
         assert branches[0]['name'] == 'main'
+
+    def test_archived_branch_name_can_be_reused(self, populated_metadata_db):
+        """Test that archived branch names can be reused for new branches."""
+        data = populated_metadata_db
+        metadata_db = data['metadata_db']
+
+        # Archive the feature branch
+        metadata_db.delete_branch_by_name(data['db1_id'], "feature")
+
+        # Verify branch is archived
+        branch = metadata_db.get_branch(data['db1_id'], "feature")
+        assert branch is None
+
+        # Create a new branch with the same name
+        new_branch_id = str(uuid.uuid4())
+        metadata_db.create_branch(
+            new_branch_id, data['db1_id'], "feature",
+            parent_branch="main"
+        )
+
+        # Verify new branch exists and is active
+        new_branch = metadata_db.get_branch(data['db1_id'], "feature")
+        assert new_branch is not None
+        assert new_branch['id'] == new_branch_id
+        assert new_branch['archived_at'] is None
+
+        # Should have 2 active branches now
+        branches = metadata_db.list_branches(data['db1_id'])
+        assert len(branches) == 2
     
     def test_delete_database_cascades_to_all(self, populated_metadata_db):
         """Test that deleting a database deletes all branches and tenants."""

@@ -193,6 +193,6 @@ def get_user_data(database, user_id, user_tenant, requested_tenant):
 
 ## Next Steps
 
-- [Database Operations](database.md) - Managing databases and branches
+- [Connection Management](connection.md) - Managing database connections
 - [Query Operations](queries.md) - Running SQL queries
 - [CLI Reference](../cli/tenant.md) - Command line tenant management

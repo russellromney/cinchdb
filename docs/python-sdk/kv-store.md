@@ -623,5 +623,4 @@ db.kv.increment("counter")  # Works: returns 11
 
 - [Multi-Tenancy](../concepts/multi-tenancy.md) - Tenant isolation for KV stores
 - [Python SDK Reference](./api-reference.md) - Complete API documentation
-- [Performance Guide](../production/performance.md) - Optimization tips
 - [CLI KV Commands](../cli/kv.md) - Command-line KV operations

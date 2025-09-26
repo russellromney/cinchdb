@@ -103,7 +103,7 @@ build-ts:
 
 # Documentation targets
 build-docs:
-	uv run mkdocs build
+	uv run mkdocs build --strict
 
 update-docs:
 	@echo "Updating documentation with current version..."

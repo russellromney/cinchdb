@@ -125,7 +125,7 @@ cinch data insert orders --data '{"user_id": "user-123", "total": 29.99}' --tena
 
 # 4. Merge back (schema change applies to all tenants on main)  
 cinch branch switch main
-cinch branch merge-into-main add-orders
+cinch branch merge add-orders main
 ```
 
 ## Performance Benefits

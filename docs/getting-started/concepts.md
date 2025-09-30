@@ -65,7 +65,7 @@ cinch db create logs        # Application logs
 cinch branch create add-payments --switch
 cinch table create payments user_id:TEXT amount:REAL
 cinch branch switch main
-cinch branch merge-into-main add-payments
+cinch branch merge add-payments main
 ```
 
 ### When to Create Branches
@@ -223,7 +223,7 @@ cinch query "SELECT * FROM inventory" --tenant customer_b  # Only customer_b's d
 
 # 6. Merge when ready (applies to ALL tenants on main)
 cinch branch switch main
-cinch branch merge-into-main add-inventory
+cinch branch merge add-inventory main
 ```
 
 ## CLI vs Python SDK

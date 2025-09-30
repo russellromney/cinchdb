@@ -113,7 +113,7 @@ class TestFullWorkflow:
         assert preview["changes_to_merge"] > 0
 
         # Perform merge into main
-        result = merge_mgr.merge_into_main("feature")
+        result = merge_mgr.merge_branches("feature", "main")
         assert result["success"]
         assert result["changes_merged"] > 0
 
@@ -153,7 +153,7 @@ class TestFullWorkflow:
 
         # Merge users feature first
         merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
-        users_result = merge_mgr.merge_into_main("feature_users")
+        users_result = merge_mgr.merge_branches("feature_users", "main")
         assert users_result["success"]
 
         # Create second feature branch from updated main
@@ -172,7 +172,7 @@ class TestFullWorkflow:
         )
 
         # Merge products feature
-        products_result = merge_mgr.merge_into_main("feature_products")
+        products_result = merge_mgr.merge_branches("feature_products", "main")
         assert products_result["success"]
 
         # Verify both features are in main
@@ -219,7 +219,7 @@ class TestFullWorkflow:
 
         # Merge to main
         merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
-        result = merge_mgr.merge_into_main("feature")
+        result = merge_mgr.merge_branches("feature", "main")
         assert result["success"]
 
         # Verify structure exists in all tenants in main

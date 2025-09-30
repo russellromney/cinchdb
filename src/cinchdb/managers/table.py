@@ -196,11 +196,8 @@ class TableManager(BaseManager):
 
         # Create indexes if specified
         if indexes:
-            from cinchdb.managers.index import IndexManager
-            index_manager = IndexManager(self.context)
-            
             for index in indexes:
-                index_manager.create_index(
+                self.context.indexes.create_index(
                     table=table_name,
                     columns=index.columns,
                     name=index.name,

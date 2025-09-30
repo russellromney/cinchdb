@@ -24,15 +24,7 @@ class ColumnManager(BaseManager):
         super().__init__(context)
 
         # Lazy-loaded table manager
-        self._table_manager = None
 
-    @property
-    def table_manager(self):
-        """Lazy load table manager to avoid circular dependencies."""
-        if self._table_manager is None:
-            from cinchdb.managers.table import TableManager
-            self._table_manager = TableManager(self.context)
-        return self._table_manager
 
     def list_columns(self, table_name: str) -> List[Column]:
         """List all columns in a table.
@@ -46,7 +38,7 @@ class ColumnManager(BaseManager):
         Raises:
             ValueError: If table doesn't exist
         """
-        table = self.table_manager.get_table(table_name)
+        table = self.context.tables.get_table(table_name)
         return table.columns
 
     def add_column(self, table_name: str, column: Column) -> None:
@@ -64,7 +56,7 @@ class ColumnManager(BaseManager):
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
         # Validate table exists
-        if not self.table_manager._table_exists(table_name):
+        if not self.context.tables._table_exists(table_name):
             raise ValueError(f"Table '{table_name}' does not exist")
 
         # Check for protected column names
@@ -122,7 +114,7 @@ class ColumnManager(BaseManager):
             else:
                 # Table exists but not in snapshot yet (backwards compat)
                 # Get current table schema and add it
-                table = self.table_manager.get_table(table_name)
+                table = self.context.tables.get_table(table_name)
                 snapshot.add_table(table_name, table.columns)
                 snapshot.add_column(table_name, normalized_column)
 
@@ -167,7 +159,7 @@ class ColumnManager(BaseManager):
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
         # Validate table exists
-        if not self.table_manager._table_exists(table_name):
+        if not self.context.tables._table_exists(table_name):
             raise ValueError(f"Table '{table_name}' does not exist")
 
         # Check if column is protected
@@ -253,7 +245,7 @@ class ColumnManager(BaseManager):
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
         # Validate table exists
-        if not self.table_manager._table_exists(table_name):
+        if not self.context.tables._table_exists(table_name):
             raise ValueError(f"Table '{table_name}' does not exist")
 
         # Check if old column is protected
@@ -497,7 +489,7 @@ class ColumnManager(BaseManager):
         check_maintenance_mode(self.project_root, self.database, self.branch)
 
         # Validate table exists
-        if not self.table_manager._table_exists(table_name):
+        if not self.context.tables._table_exists(table_name):
             raise ValueError(f"Table '{table_name}' does not exist")
 
         # Check if column is protected
@@ -614,7 +606,7 @@ class ColumnManager(BaseManager):
         if self.change_tracker:
             # Build updated schema by getting all tables and updating the modified column
             snapshot = SchemaSnapshot()
-            tables = self.table_manager.list_tables(include_system=False)
+            tables = self.context.tables.list_tables(include_system=False)
             for tbl in tables:
                 if tbl.name == table_name:
                     # Update the nullable value for the target column in the snapshot

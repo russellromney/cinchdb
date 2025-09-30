@@ -305,7 +305,7 @@ class TestCLIIntegration:
 
         # Merge changes to main so the table actually exists for data operations
         result = self.run_in_project(
-            ["branch", "merge-into-main", "feature"], temp_project
+            ["branch", "merge", "feature", "--target", "main"], temp_project
         )
         assert result.exit_code == 0
 
@@ -397,7 +397,7 @@ class TestCLIIntegration:
 
         # Merge into main
         result = self.run_in_project(
-            ["branch", "merge-into-main", "feature"], temp_project
+            ["branch", "merge", "feature", "--target", "main"], temp_project
         )
         assert result.exit_code == 0
         assert "Successfully merged" in result.stdout

@@ -49,45 +49,37 @@ class TestCinchDB:
             CinchDB(database="test_db")
 
     def test_local_managers_lazy_load(self, tmp_path):
-        """Test that local managers are lazy loaded."""
+        """Test that managers are accessible through context."""
         db = CinchDB(database="test_db", project_dir=tmp_path)
 
-        # Managers should not be loaded yet
-        assert db._table_manager is None
-        assert db._column_manager is None
-        assert db._query_manager is None
+        # Verify context exists and has correct configuration
+        from cinchdb.managers.base import ConnectionContext
+        assert hasattr(db, '_context')
+        assert isinstance(db._context, ConnectionContext)
+        assert db._context.project_root == tmp_path
+        assert db._context.database == "test_db"
+        assert db._context.branch == "main"
+        assert db._context.tenant == "main"
+        assert db._context.encryption_manager is None
 
-        # Access a manager through private interface
+        # Access managers through context
         with patch("cinchdb.managers.table.TableManager") as mock_table_manager:
-            _ = db._managers.tables
-            # Now TableManager is called with ConnectionContext
-            from cinchdb.managers.base import ConnectionContext
+            _ = db._context.tables
+            # TableManager is called with ConnectionContext
             mock_table_manager.assert_called_once()
             call_args = mock_table_manager.call_args[0]
             assert len(call_args) == 1
             assert isinstance(call_args[0], ConnectionContext)
-            assert call_args[0].project_root == tmp_path
-            assert call_args[0].database == "test_db"
-            assert call_args[0].branch == "main"
-            assert call_args[0].tenant == "main"
-            assert call_args[0].encryption_manager is None
-
-        # Should be cached
-        with patch("cinchdb.managers.table.TableManager") as mock_table_manager:
-            _ = db._managers.tables
-            mock_table_manager.assert_not_called()
 
     def test_remote_managers_raise_error(self):
-        """Test that accessing managers on remote connection raises error."""
+        """Test that remote connections don't have context."""
         db = CinchDB(
             database="test_db", api_url="https://api.example.com", api_key="test-key"
         )
 
-        with pytest.raises(RuntimeError, match="Manager access not available"):
-            _ = db._managers.tables
-
-        with pytest.raises(RuntimeError, match="Manager access not available"):
-            _ = db._managers.columns
+        # Remote connections should not have _context
+        assert db._context is None
+        assert not db.is_local
 
     def test_local_query(self, tmp_path):
         """Test query execution on local connection."""

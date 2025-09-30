@@ -13,7 +13,7 @@ cinch branch create add-payments --switch
 cinch table create payments user_id:TEXT amount:REAL status:TEXT
 # Test thoroughly...
 cinch branch switch main  
-cinch branch merge-into-main add-payments  # Atomic merge
+cinch branch merge add-payments main  # Atomic merge
 ```
 
 ## When to Use Branches
@@ -56,7 +56,7 @@ myapp/
 |-------------|-------------------|
 | `git branch feature` | `cinch branch create feature` |
 | `git checkout feature` | `cinch branch switch feature` |
-| `git merge feature` | `cinch branch merge-into-main feature` |
+| `git merge feature` | `cinch branch merge feature main` |
 | Files + history | Schema + data + change history |
 
 ## Branch Operations
@@ -84,7 +84,7 @@ cinch data insert profiles --data '{"user_id": "user-123", "bio": "Software deve
 ### Merge Back
 ```bash
 cinch branch switch main
-cinch branch merge-into-main user-profiles
+cinch branch merge user-profiles main
 
 # Branch is automatically deleted after successful merge
 ```
@@ -140,7 +140,7 @@ cinch query "SELECT o.*, COUNT(oi.id) FROM orders o LEFT JOIN order_items oi ON 
 
 # 5. Merge when confident
 cinch branch switch main
-cinch branch merge-into-main feature.orders
+cinch branch merge feature main.orders
 ```
 
 ### Multi-Developer Teams

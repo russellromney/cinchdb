@@ -31,15 +31,7 @@ class MergeManager(BaseManager):
         self.comparator = ChangeComparator(self.project_root, self.database)
 
         # Lazy-loaded branch manager
-        self._branch_manager = None
 
-    @property
-    def branch_manager(self):
-        """Get branch manager instance (lazy-loaded)."""
-        if self._branch_manager is None:
-            from cinchdb.managers.branch import BranchManager
-            self._branch_manager = BranchManager(self.context)
-        return self._branch_manager
 
     def can_merge(self, source_branch: str, target_branch: str) -> Dict[str, Any]:
         """Check if source branch can be merged into target branch.
@@ -52,13 +44,13 @@ class MergeManager(BaseManager):
             Dictionary with merge status and details
         """
         # Check if branches exist
-        if not self.branch_manager.branch_exists(source_branch):
+        if not self.context.branches.branch_exists(source_branch):
             return {
                 "can_merge": False,
                 "reason": f"Source branch '{source_branch}' does not exist",
             }
 
-        if not self.branch_manager.branch_exists(target_branch):
+        if not self.context.branches.branch_exists(target_branch):
             return {
                 "can_merge": False,
                 "reason": f"Target branch '{target_branch}' does not exist",
@@ -189,11 +181,20 @@ class MergeManager(BaseManager):
         Raises:
             MergeError: If merge cannot be completed
         """
-        # Protect main branch from direct changes
+        # Special validation when merging into main
         if target_branch == "main":
-            raise MergeError(
-                "Cannot merge directly into main branch. Main branch is protected."
+            if source_branch == "main":
+                raise MergeError("Cannot merge main branch into itself")
+
+            # Ensure source branch has all changes from main (is up to date)
+            main_only, source_only = self.comparator.get_divergent_changes(
+                "main", source_branch
             )
+            if main_only:
+                raise MergeError(
+                    f"Source branch '{source_branch}' is not up to date with main. "
+                    f"Pull latest changes from main first."
+                )
 
         # Use internal method for actual merge
         return self._merge_branches_internal(
@@ -349,43 +350,6 @@ class MergeManager(BaseManager):
 
         return sql_statements
 
-    def merge_into_main(
-        self, source_branch: str, dry_run: bool = False
-    ) -> Dict[str, Any]:
-        """Merge a branch into main branch with additional validation.
-
-        This is the primary way to get changes into main branch.
-
-        Args:
-            source_branch: Name of the source branch to merge
-            dry_run: If True, return SQL statements without executing
-
-        Returns:
-            Dictionary with merge result details
-
-        Raises:
-            MergeError: If merge cannot be completed
-        """
-        if source_branch == "main":
-            raise MergeError("Cannot merge main branch into itself")
-
-        # Additional validation for main branch merges
-        merge_check = self.can_merge(source_branch, "main")
-        if not merge_check["can_merge"]:
-            raise MergeError(f"Cannot merge into main: {merge_check['reason']}")
-
-        # Ensure source branch has all changes from main (is up to date)
-        main_only, source_only = self.comparator.get_divergent_changes(
-            "main", source_branch
-        )
-        if main_only:
-            raise MergeError(
-                f"Source branch '{source_branch}' is not up to date with main. "
-                f"Pull latest changes from main first."
-            )
-
-        # Perform the merge (bypass protection for official merge into main)
-        return self._merge_branches_internal(source_branch, "main", dry_run=dry_run)
 
     def get_merge_preview(
         self, source_branch: str, target_branch: str

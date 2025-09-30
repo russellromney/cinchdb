@@ -147,8 +147,8 @@ class TestMergeManager:
         assert len(target_changes) == 1
         assert target_changes[0].entity_name == "users"
 
-    def test_merge_branches_into_main_blocked(self, temp_project):
-        """Test that merging into main branch is blocked."""
+    def test_merge_branches_into_main_succeeds_when_up_to_date(self, temp_project):
+        """Test that merging into main succeeds when source is up to date."""
         branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
@@ -165,10 +165,9 @@ class TestMergeManager:
 
         merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
-        with pytest.raises(MergeError) as exc_info:
-            merge_mgr.merge_branches("feature", "main")
-
-        assert "protected" in str(exc_info.value)
+        # Should succeed since feature is up to date with main
+        result = merge_mgr.merge_branches("feature", "main")
+        assert result["success"]
 
     def test_merge_branches_with_conflicts_fails(self, temp_project):
         """Test merge fails when conflicts exist."""
@@ -221,7 +220,7 @@ class TestMergeManager:
         tracker.add_change(change)
 
         merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
-        result = merge_mgr.merge_into_main("feature")
+        result = merge_mgr.merge_branches("feature", "main")
 
         assert result["success"]
         assert result["changes_merged"] == 1
@@ -237,7 +236,7 @@ class TestMergeManager:
         merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         with pytest.raises(MergeError) as exc_info:
-            merge_mgr.merge_into_main("main")
+            merge_mgr.merge_branches("main", "main")
 
         assert "into itself" in str(exc_info.value)
 
@@ -272,9 +271,9 @@ class TestMergeManager:
         merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         with pytest.raises(MergeError) as exc_info:
-            merge_mgr.merge_into_main("feature")
+            merge_mgr.merge_branches("feature", "main")
 
-        assert "No changes to merge" in str(exc_info.value)
+        assert "not up to date" in str(exc_info.value)
 
     def test_get_merge_preview(self, temp_project):
         """Test getting merge preview."""
@@ -402,7 +401,7 @@ class TestMergeManager:
         tracker.add_change(change)
 
         merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
-        result = merge_mgr.merge_into_main("feature", dry_run=True)
+        result = merge_mgr.merge_branches("feature", "main", dry_run=True)
 
         assert result["success"]
         assert result["dry_run"] is True

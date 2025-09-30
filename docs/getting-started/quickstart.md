@@ -75,7 +75,7 @@ cinch table create products name:TEXT price:REAL category:TEXT
 cinch branch switch main
 
 # Merge changes
-cinch branch merge-into-main add-products
+cinch branch merge add-products main
 ```
 
 ## Multi-Tenant Operations

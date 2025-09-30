@@ -25,24 +25,8 @@ class CodegenManager(BaseManager):
         super().__init__(context)
 
         # Lazy-loaded managers
-        self._table_manager = None
-        self._view_manager = None
 
-    @property
-    def table_manager(self):
-        """Get table manager instance (lazy-loaded)."""
-        if self._table_manager is None:
-            from cinchdb.managers.table import TableManager
-            self._table_manager = TableManager(self.context)
-        return self._table_manager
 
-    @property
-    def view_manager(self):
-        """Get view manager instance (lazy-loaded)."""
-        if self._view_manager is None:
-            from cinchdb.managers.view import ViewModel
-            self._view_manager = ViewModel(self.context)
-        return self._view_manager
 
     def get_supported_languages(self) -> List[str]:
         """Get list of supported code generation languages.
@@ -116,7 +100,7 @@ class CodegenManager(BaseManager):
 
         if include_tables:
             # Get all tables
-            tables = self.table_manager.list_tables()
+            tables = self.context.tables.list_tables()
 
             for table in tables:
                 # Generate model for each table
@@ -138,7 +122,7 @@ class CodegenManager(BaseManager):
 
         if include_views:
             # Get all views
-            views = self.view_manager.list_views()
+            views = self.context.views.list_views()
 
             for view in views:
                 # Generate model for each view (read-only)
@@ -387,7 +371,7 @@ class CodegenManager(BaseManager):
         """Generate TypeScript interface models."""
         # Generate interfaces for tables
         if include_tables:
-            tables = self.table_manager.list_tables()
+            tables = self.context.tables.list_tables()
             for table in tables:
                 interface_content = self._generate_typescript_table_interface(table)
                 file_name = f"{self._to_pascal_case(table.name)}.ts"
@@ -401,7 +385,7 @@ class CodegenManager(BaseManager):
         
         # Generate interfaces for views
         if include_views:
-            views = self.view_manager.list_views()
+            views = self.context.views.list_views()
             for view in views:
                 interface_content = self._generate_typescript_view_interface(view)
                 file_name = f"{self._to_pascal_case(view.name)}View.ts"

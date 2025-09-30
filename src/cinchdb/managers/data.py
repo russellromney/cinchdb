@@ -26,24 +26,8 @@ class DataManager(BaseManager):
         super().__init__(context)
 
         # Lazy-loaded managers
-        self._table_manager = None
-        self._query_manager = None
 
-    @property
-    def table_manager(self):
-        """Lazy load table manager."""
-        if self._table_manager is None:
-            from cinchdb.managers.table import TableManager
-            self._table_manager = TableManager(self.context)
-        return self._table_manager
 
-    @property
-    def query_manager(self):
-        """Lazy load query manager."""
-        if self._query_manager is None:
-            from cinchdb.managers.query import QueryManager
-            self._query_manager = QueryManager(self.context)
-        return self._query_manager
 
     def select(
         self,
@@ -134,7 +118,7 @@ class DataManager(BaseManager):
 
         # Get table schema to know column types
         try:
-            table = self.table_manager.get_table(table_name)
+            table = self.context.tables.get_table(table_name)
             column_types = {col.name: col.type for col in table.columns}
         except (ValueError, FileNotFoundError):
             # If we can't get schema, proceed without conversion
@@ -769,9 +753,7 @@ class DataManager(BaseManager):
         # Check if tenant database file exists
         if not self.db_path.exists():
             # Tenant is lazy - materialize it
-            from cinchdb.managers.tenant import TenantManager
-            tenant_mgr = TenantManager(self.context)
-            tenant_mgr.materialize_tenant(self.tenant)
+            self.context.tenants.materialize_tenant(self.tenant)
 
     def _is_tenant_materialized(self) -> bool:
         """Check if the tenant is materialized (has a database file).

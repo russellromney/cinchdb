@@ -70,7 +70,7 @@ class TestBranchChangeIntegration:
         # Merge feature1 to main
         from cinchdb.managers.merge_manager import MergeManager
         merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
-        result = merge_mgr.merge_into_main("feature1")
+        result = merge_mgr.merge_branches("feature1", "main")
         assert result["success"]
 
         # Create feature2 from updated main

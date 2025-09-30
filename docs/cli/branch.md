@@ -110,48 +110,34 @@ cinch branch delete feature.old-feature --force
 Merge changes from one branch into another.
 
 ```bash
-cinch branch merge SOURCE_BRANCH TARGET_BRANCH
+cinch branch merge SOURCE_BRANCH [TARGET_BRANCH]
 ```
 
 ### Arguments
 - `SOURCE_BRANCH` - Branch with changes to merge
-- `TARGET_BRANCH` - Branch to merge into
+- `TARGET_BRANCH` - Branch to merge into (defaults to current branch)
+
+### Options
+- `--force` - Force merge even with conflicts
+- `--preview` - Preview merge without executing
+- `--dry-run` - Show SQL statements without applying
 
 ### Examples
 ```bash
 # Merge feature into main
 cinch branch merge feature.add-users main
 
-# Merge while on target branch
-cinch branch switch main
-cinch branch merge feature.add-users .
+# Preview merge before executing
+cinch branch merge feature.add-users main --preview
+
+# Merge with explicit target
+cinch branch merge feature.add-users --target main
 ```
 
 ### Notes
-- Target branch must have all changes from source
-- Changes are applied to all tenants
-- Cannot merge if there are conflicts
-
-## merge-into-main
-
-Shortcut to merge current branch into main.
-
-```bash
-cinch branch merge-into-main
-```
-
-### Example
-```bash
-# On feature branch
-cinch branch switch feature.add-users
-# Make changes...
-cinch branch merge-into-main
-```
-
-### Equivalent to:
-```bash
-cinch branch merge feature.add-users main
-```
+- When merging to main, source branch must be up-to-date with main
+- Changes are automatically applied to all tenants
+- Cannot merge if there are conflicts (unless using --force)
 
 ## changes
 
@@ -187,7 +173,7 @@ cinch table create orders user_id:TEXT total:REAL
 cinch branch changes
 
 # Merge to main
-cinch branch merge-into-main
+cinch branch merge feature.shopping-cart main
 ```
 
 ### Hotfix Workflow
@@ -249,7 +235,7 @@ cinch branch merge feature.products main
 ## Protection Rules
 
 - The `main` branch cannot be deleted
-- Direct changes to `main` are not allowed (merge only)
+- When merging to main, source branch must be up-to-date with main
 - All schema changes must go through branches
 
 ## Remote Operations

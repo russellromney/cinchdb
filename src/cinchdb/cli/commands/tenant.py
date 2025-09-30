@@ -7,9 +7,8 @@ from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.config import Config
-from cinchdb.managers.base import ConnectionContext
 from cinchdb.core.path_utils import get_project_root
-from cinchdb.managers.tenant import TenantManager
+from cinchdb.core.database import CinchDB
 from cinchdb.cli.utils import get_config_with_data, validate_required_arg
 from cinchdb.utils.name_validator import validate_name, InvalidNameError
 
@@ -41,8 +40,8 @@ def list_tenants():
     db_name = config_data.active_database
     branch_name = config_data.active_branch
 
-    tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-    tenants = tenant_mgr.list_tenants()
+    db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+    tenants = db.list_tenants()
 
     if not tenants:
         console.print("[yellow]No tenants found[/yellow]")
@@ -100,8 +99,8 @@ def create(
     branch_name = config_data.active_branch
 
     try:
-        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        tenant_mgr.create_tenant(name, description, encrypt=encrypt, encryption_key=key)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        db.create_tenant(name, description=description, encrypt=encrypt, encryption_key=key)
         
         if encrypt:
             console.print(f"[green]✅ Created encrypted tenant '{name}'[/green]")
@@ -141,8 +140,8 @@ def delete(
             raise typer.Exit(0)
 
     try:
-        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        tenant_mgr.delete_tenant(name)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        db.delete_tenant(name)
         console.print(f"[green]✅ Deleted tenant '{name}'[/green]")
 
     except ValueError as e:
@@ -167,8 +166,8 @@ def copy(
     branch_name = config_data.active_branch
 
     try:
-        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        tenant_mgr.copy_tenant(source, target, description)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        db.copy_tenant(source, target, description)
         console.print(f"[green]✅ Copied tenant '{source}' to '{target}'[/green]")
 
     except ValueError as e:
@@ -202,8 +201,8 @@ def rename(
         raise typer.Exit(1)
 
     try:
-        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        tenant_mgr.rename_tenant(old_name, new_name)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        db.rename_tenant(old_name, new_name)
         console.print(f"[green]✅ Renamed tenant '{old_name}' to '{new_name}'[/green]")
 
     except ValueError as e:
@@ -230,11 +229,11 @@ def vacuum(
     branch_name = config_data.active_branch
 
     try:
-        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
 
         console.print(f"[yellow]🔧 Starting VACUUM operation on tenant '{tenant_name}'...[/yellow]")
         
-        result = tenant_mgr.vacuum_tenant(tenant_name)
+        result = db.vacuum_tenant(tenant_name)
         
         if result['success']:
             console.print("[green]✅ VACUUM completed successfully[/green]")
@@ -270,11 +269,11 @@ def rotate_key(
     branch_name = config_data.active_branch
 
     try:
-        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
 
         console.print(f"[yellow]🔐 Rotating encryption key for tenant '{tenant_name}'...[/yellow]")
         
-        new_key = tenant_mgr.rotate_tenant_key(tenant_name)
+        new_key = db.rotate_tenant_key(tenant_name)
         
         console.print("[green]✅ Encryption key rotated successfully[/green]")
         console.print(f"  Tenant: {tenant_name}")

@@ -33,7 +33,7 @@ cinch column add users avatar_url:TEXT
 
 # Merge to main
 cinch branch switch main
-cinch branch merge-into-main add-users
+cinch branch merge add-users main
 
 # Generate type-safe SDK
 cinch codegen generate python models/

@@ -124,7 +124,7 @@ class TestMaintenanceMode:
 
         # Perform merge
         merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
-        result = merge_mgr.merge_into_main("feature")
+        result = merge_mgr.merge_branches("feature", "main")
         assert result["success"]
 
         # Wait for monitoring to complete

@@ -19,9 +19,11 @@ help:
 	@echo "  make dev-docs         - Run documentation site in development mode"
 	@echo ""
 	@echo "Testing:"
-	@echo "  make test             - Run all tests (CinchDB + plugged plugin)"
-	@echo "  make test-python      - Run all Python tests (CinchDB + plugged plugin)"
-	@echo "  make test-unit        - Run Python unit tests (CinchDB + plugged plugin)"
+	@echo "  make test             - Run all tests (CinchDB + plugged plugin, skip slow)"
+	@echo "  make test-python      - Run Python tests (skip slow tests)"
+	@echo "  make test-python-all  - Run ALL Python tests (including slow)"
+	@echo "  make test-slow        - Run only slow/stress tests in parallel"
+	@echo "  make test-unit        - Run Python unit tests (skip slow)"
 	@echo "  make test-integration - Run Python integration tests only"
 	@echo "  make test-ts          - Run TypeScript SDK tests"
 	@echo "  make test-docs        - Verify documented API signatures work"
@@ -64,11 +66,11 @@ dev-docs:
 
 # Python-specific targets
 test-python:
-	ulimit -n 4096 && uv run pytest tests/
+	ulimit -n 4096 && uv run pytest tests/ -n auto
 	cd ../plugged && ulimit -n 4096 && uv run pytest tests/ -vv
 
 test-unit:
-	ulimit -n 4096 && uv run pytest -vv tests/unit/ -v
+	ulimit -n 4096 && uv run pytest -vv tests/unit/ -v -n auto
 	cd ../plugged && ulimit -n 4096 && uv run pytest -vv tests/ -vv
 
 test-python-integration:

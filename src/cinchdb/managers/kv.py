@@ -24,35 +24,24 @@ class KVManager(BaseManager):
         """
         super().__init__(context)
 
-        # Lazy-loaded tenant manager
-        self._tenant_manager = None
-
-    @property
-    def tenant_manager(self):
-        """Get tenant manager instance (lazy-loaded)."""
-        if self._tenant_manager is None:
-            from cinchdb.managers.tenant import TenantManager
-            self._tenant_manager = TenantManager(self.context)
-        return self._tenant_manager
-
     def _is_tenant_materialized(self) -> bool:
         """Check if the tenant is materialized (has actual database file)."""
-        return not self.tenant_manager.is_tenant_lazy(self.tenant)
+        return not self.context.tenants.is_tenant_lazy(self.tenant)
 
     def _ensure_tenant_materialized(self) -> None:
         """Ensure tenant is materialized for write operations."""
         if not self._is_tenant_materialized():
             if self.tenant == "main":
                 # Main tenant should always exist, but might need materialization
-                self.tenant_manager.materialize_tenant(self.tenant)
+                self.context.tenants.materialize_tenant(self.tenant)
             else:
                 # Create lazy tenant first if it doesn't exist, then materialize
                 try:
-                    self.tenant_manager.create_tenant(self.tenant, lazy=True)
+                    self.context.tenants.create_tenant(self.tenant, lazy=True)
                 except ValueError:
                     # Tenant already exists, just materialize it
                     pass
-                self.tenant_manager.materialize_tenant(self.tenant)
+                self.context.tenants.materialize_tenant(self.tenant)
 
     def _ensure_kv_table(self, conn: DatabaseConnection) -> None:
         """Ensure the __kv table exists with the multi-type schema."""

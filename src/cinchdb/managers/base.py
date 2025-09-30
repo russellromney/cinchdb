@@ -30,6 +30,87 @@ class ConnectionContext:
         if not isinstance(self.project_root, Path):
             self.project_root = Path(self.project_root)
 
+    # Manager properties for convenient access
+    # These use lazy imports to avoid circular dependencies
+
+    @property
+    def tables(self) -> "TableManager":
+        """Access TableManager for this context."""
+        from cinchdb.managers.table import TableManager
+        return TableManager(self)
+
+    @property
+    def columns(self) -> "ColumnManager":
+        """Access ColumnManager for this context."""
+        from cinchdb.managers.column import ColumnManager
+        return ColumnManager(self)
+
+    @property
+    def views(self) -> "ViewModel":
+        """Access ViewModel for this context."""
+        from cinchdb.managers.view import ViewModel
+        return ViewModel(self)
+
+    @property
+    def indexes(self) -> "IndexManager":
+        """Access IndexManager for this context."""
+        from cinchdb.managers.index import IndexManager
+        return IndexManager(self)
+
+    @property
+    def data(self) -> "DataManager":
+        """Access DataManager for this context."""
+        from cinchdb.managers.data import DataManager
+        return DataManager(self)
+
+    @property
+    def query(self) -> "QueryManager":
+        """Access QueryManager for this context."""
+        from cinchdb.managers.query import QueryManager
+        return QueryManager(self)
+
+    @property
+    def branches(self) -> "BranchManager":
+        """Access BranchManager for this context."""
+        from cinchdb.managers.branch import BranchManager
+        return BranchManager(self)
+
+    @property
+    def tenants(self) -> "TenantManager":
+        """Access TenantManager for this context."""
+        from cinchdb.managers.tenant import TenantManager
+        return TenantManager(self)
+
+    @property
+    def codegen(self) -> "CodegenManager":
+        """Access CodegenManager for this context."""
+        from cinchdb.managers.codegen import CodegenManager
+        return CodegenManager(self)
+
+    @property
+    def kv(self) -> "KVManager":
+        """Access KVManager for this context."""
+        from cinchdb.managers.kv import KVManager
+        return KVManager(self)
+
+    @property
+    def change_tracker(self) -> "ChangeTracker":
+        """Access ChangeTracker for this context."""
+        from cinchdb.managers.change_tracker import ChangeTracker
+        return ChangeTracker(self.project_root, self.database, self.branch)
+
+    @property
+    def change_applier(self) -> "ChangeApplier":
+        """Access ChangeApplier for this context."""
+        from cinchdb.managers.change_applier import ChangeApplier
+        return ChangeApplier(self.project_root, self.database, self.branch)
+
+    @property
+    def merge(self) -> "MergeManager":
+        """Access MergeManager for this context."""
+        from cinchdb.managers.merge_manager import MergeManager
+        return MergeManager(self)
+
 
 class BaseManager:
     """Base class for all CinchDB managers.

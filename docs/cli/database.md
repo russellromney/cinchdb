@@ -131,7 +131,7 @@ cinch branch create v2_schema
 # ... make changes ...
 cinch db use staging
 cinch branch create v2_schema
-cinch branch merge-into-main v2_schema
+cinch branch merge v2_schema main
 ```
 
 ### Service-Oriented Architecture
@@ -163,7 +163,7 @@ cinch table create onboarding_steps step:TEXT completed:BOOLEAN
 cinch db use user_management
 cinch branch create new_user_onboarding
 # ... replicate changes ...
-cinch branch merge-into-main new_user_onboarding
+cinch branch merge new_user_onboarding main
 ```
 
 ### Data Migration Pattern

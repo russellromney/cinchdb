@@ -23,15 +23,7 @@ class QueryManager(BaseManager):
         super().__init__(context)
 
         # Lazy-loaded tenant manager
-        self._tenant_manager = None
 
-    @property
-    def tenant_manager(self):
-        """Get tenant manager instance (lazy-loaded)."""
-        if self._tenant_manager is None:
-            from cinchdb.managers.tenant import TenantManager
-            self._tenant_manager = TenantManager(self.context)
-        return self._tenant_manager
     
     def _is_write_query(self, sql: str) -> bool:
         """Check if a SQL query is a write operation.
@@ -86,7 +78,7 @@ class QueryManager(BaseManager):
             raise ValueError("execute_typed can only be used with SELECT queries")
 
         # Get appropriate database path based on operation type (read for SELECT)
-        db_path = self.tenant_manager.get_tenant_db_path_for_operation(
+        db_path = self.context.tenants.get_tenant_db_path_for_operation(
             self.tenant, is_write=False
         )
 

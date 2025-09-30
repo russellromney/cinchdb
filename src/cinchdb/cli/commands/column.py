@@ -5,9 +5,7 @@ from typing import Optional
 from rich.console import Console
 from rich.table import Table as RichTable
 
-from cinchdb.managers.column import ColumnManager
-from cinchdb.managers.base import ConnectionContext
-from cinchdb.managers.change_applier import ChangeApplier
+from cinchdb.core.database import CinchDB
 from cinchdb.models import Column
 from cinchdb.cli.utils import get_config_with_data, validate_required_arg
 
@@ -34,8 +32,8 @@ def list_columns(
     branch_name = config_data.active_branch
 
     try:
-        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        columns = column_mgr.list_columns(table)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        columns = db.list_columns(table)
 
         # Create a table
         col_table = RichTable(title=f"Columns in '{table}'")
@@ -72,9 +70,6 @@ def add(
     default: Optional[str] = typer.Option(
         None, "--default", "-d", help="Default value"
     ),
-    apply: bool = typer.Option(
-        True, "--apply/--no-apply", help="Apply changes to all tenants"
-    ),
 ):
     """Add a new column to a table."""
     table = validate_required_arg(table, "table", ctx)
@@ -94,18 +89,12 @@ def add(
         raise typer.Exit(1)
 
     try:
-        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
         column = Column(name=name, type=type, nullable=nullable, default=default)
-        column_mgr.add_column(table, column)
+        db.add_column(table, column)
 
         console.print(f"[green]✅ Added column '{name}' to table '{table}'[/green]")
-
-        if apply:
-            # Apply to all tenants
-            applier = ChangeApplier(config.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
-            if applied > 0:
-                console.print("[green]✅ Applied changes to all tenants[/green]")
+        # Changes are automatically applied to all tenants by CinchDB
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -119,9 +108,6 @@ def drop(
     name: Optional[str] = typer.Argument(None, help="Column name to drop"),
     force: bool = typer.Option(
         False, "--force", "-f", help="Force deletion without confirmation"
-    ),
-    apply: bool = typer.Option(
-        True, "--apply/--no-apply", help="Apply changes to all tenants"
     ),
 ):
     """Drop a column from a table."""
@@ -141,17 +127,11 @@ def drop(
             raise typer.Exit(0)
 
     try:
-        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        column_mgr.drop_column(table, name)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        db.drop_column(table, name)
 
         console.print(f"[green]✅ Dropped column '{name}' from table '{table}'[/green]")
-
-        if apply:
-            # Apply to all tenants
-            applier = ChangeApplier(config.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
-            if applied > 0:
-                console.print("[green]✅ Applied changes to all tenants[/green]")
+        # Changes are automatically applied to all tenants by CinchDB
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -164,9 +144,6 @@ def rename(
     table: Optional[str] = typer.Argument(None, help="Table name"),
     old_name: Optional[str] = typer.Argument(None, help="Current column name"),
     new_name: Optional[str] = typer.Argument(None, help="New column name"),
-    apply: bool = typer.Option(
-        True, "--apply/--no-apply", help="Apply changes to all tenants"
-    ),
 ):
     """Rename a column in a table."""
     table = validate_required_arg(table, "table", ctx)
@@ -177,19 +154,13 @@ def rename(
     branch_name = config_data.active_branch
 
     try:
-        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        column_mgr.rename_column(table, old_name, new_name)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        db.rename_column(table, old_name, new_name)
 
         console.print(
             f"[green]✅ Renamed column '{old_name}' to '{new_name}' in table '{table}'[/green]"
         )
-
-        if apply:
-            # Apply to all tenants
-            applier = ChangeApplier(config.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
-            if applied > 0:
-                console.print("[green]✅ Applied changes to all tenants[/green]")
+        # Changes are automatically applied to all tenants by CinchDB
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -210,8 +181,8 @@ def info(
     branch_name = config_data.active_branch
 
     try:
-        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        column = column_mgr.get_column_info(table, name)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        column = db.get_column_info(table, name)
 
         # Display info
         console.print(f"\n[bold]Column: {column.name}[/bold]")
@@ -239,9 +210,6 @@ def alter_nullable(
         "--fill-value",
         "-f",
         help="Value to use for NULL values when making NOT NULL",
-    ),
-    apply: bool = typer.Option(
-        True, "--apply/--no-apply", help="Apply changes to all tenants"
     ),
 ):
     """Change the nullable constraint on a column."""

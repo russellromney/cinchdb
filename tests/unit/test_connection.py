@@ -201,6 +201,7 @@ class TestConnectionEdgeCases:
         yield Path(temp)
         shutil.rmtree(temp, ignore_errors=True)
 
+    @pytest.mark.slow
     def test_concurrent_connections_stress(self, temp_dir):
         """Test many concurrent connections to same database."""
         db_path = temp_dir / "stress.db"
@@ -295,6 +296,7 @@ class TestConnectionEdgeCases:
             # Restore permissions for cleanup
             db_path.chmod(0o644)
 
+    @pytest.mark.slow
     def test_very_large_transaction(self, temp_dir):
         """Test handling of very large transactions."""
         db_path = temp_dir / "large_transaction.db"
@@ -310,24 +312,25 @@ class TestConnectionEdgeCases:
         
         # Insert 10,000 records in single transaction
         large_data = "x" * 1000  # 1KB per record
-        
+
         with conn.transaction():
             for i in range(10000):
                 conn.execute(
                     "INSERT INTO large_test (id, data) VALUES (?, ?)",
                     (i, large_data)
                 )
-        
+
         # Verify all inserted
         result = conn.execute("SELECT COUNT(*) as count FROM large_test")
         assert result.fetchone()["count"] == 10000
         
         conn.close()
 
+    @pytest.mark.slow
     def test_connection_pool_exhaustion(self, temp_dir):
         """Test connection pool behavior when exhausted."""
         pool = ConnectionPool()
-        
+
         connections = []
         created_count = 0
         try:
@@ -419,6 +422,7 @@ class TestConnectionEdgeCases:
         
         conn.close()
 
+    @pytest.mark.slow
     def test_wal_checkpoint_behavior(self, temp_dir):
         """Test WAL checkpoint behavior under load."""
         db_path = temp_dir / "wal_test.db"
@@ -522,6 +526,7 @@ class TestConnectionEdgeCases:
             # Some systems have path length limits
             assert "too long" in str(e).lower() or "name too long" in str(e).lower()
 
+    @pytest.mark.slow
     def test_connection_memory_leak(self, temp_dir):
         """Test for memory leaks with many connections."""
         db_path = temp_dir / "memory_test.db"

@@ -7,15 +7,15 @@ from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.config import Config
-from cinchdb.managers.base import ConnectionContext
 from cinchdb.core.path_utils import get_project_root
-from cinchdb.managers.branch import BranchManager
+from cinchdb.core.database import CinchDB
 from cinchdb.cli.utils import (
     get_config_with_data,
     set_active_branch,
     validate_required_arg,
 )
 from cinchdb.utils.name_validator import validate_name, InvalidNameError
+from cinchdb.managers.merge_manager import MergeError
 
 app = typer.Typer(help="Branch management commands", invoke_without_command=True)
 console = Console()
@@ -44,8 +44,8 @@ def list_branches():
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-    branches = branch_mgr.list_branches()
+    db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+    branches = db.list_branches()
 
     if not branches:
         console.print("[yellow]No branches found[/yellow]")
@@ -93,10 +93,10 @@ def create(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     source_branch = source or config_data.active_branch
-    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=source_branch))
+    db = CinchDB(project_dir=config.project_dir, database=db_name, branch=source_branch)
 
     try:
-        branch_mgr.create_branch(source_branch, name)
+        db.create_branch(name, source_branch)
         console.print(
             f"[green]✅ Created branch '{name}' from '{source_branch}'[/green]"
         )
@@ -135,10 +135,10 @@ def delete(
             console.print("[yellow]Cancelled[/yellow]")
             raise typer.Exit(0)
 
-    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+    db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
 
     try:
-        branch_mgr.delete_branch(name)
+        db.delete_branch(name)
         console.print(f"[green]✅ Deleted branch '{name}'[/green]")
 
     except ValueError as e:
@@ -156,11 +156,11 @@ def switch(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
-    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+    db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
 
     try:
         # Verify branch exists
-        branches = branch_mgr.list_branches()
+        branches = db.list_branches()
         if not any(b.name == name for b in branches):
             raise ValueError(f"Branch '{name}' does not exist")
 
@@ -180,9 +180,9 @@ def info(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = name or config_data.active_branch
-    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+    db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
 
-    branches = branch_mgr.list_branches()
+    branches = db.list_branches()
 
     branch = next((b for b in branches if b.name == branch_name), None)
     if not branch:
@@ -205,21 +205,12 @@ def info(
     console.print(f"Created: {created_at}")
     console.print(f"Protected: {'Yes' if branch.name == 'main' else 'No'}")
 
-    # Count tenants
-    from cinchdb.managers.tenant import TenantManager
-
-    tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-    tenants = tenant_mgr.list_tenants()
+    # Use CinchDB for tenant and change counts
+    db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+    tenants = db.list_tenants()
+    changes = db.list_changes()
     console.print(f"Tenants: {len(tenants)}")
-
-    # Count changes
-    from cinchdb.managers.change_tracker import ChangeTracker
-
-    tracker = ChangeTracker(config.project_dir, db_name, branch_name)
-    changes = tracker.get_changes()
-    unapplied = tracker.get_unapplied_changes()
-    console.print(f"Total Changes: {len(changes)}")
-    console.print(f"Unapplied Changes: {len(unapplied)}")
+    console.print(f"Changes: {len(changes)}")
 
 
 @app.command()
@@ -247,14 +238,12 @@ def merge(
     db_name = config_data.active_database
     target_branch = target or config_data.active_branch
 
-    from cinchdb.managers.merge_manager import MergeManager
-
-    merge_mgr = MergeManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=target_branch))
+    db = CinchDB(project_dir=config.project_dir, database=db_name, branch=target_branch)
 
     try:
         if preview:
             # Show merge preview
-            preview_result = merge_mgr.get_merge_preview(source, target_branch)
+            preview_result = db.get_merge_preview(source, target_branch)
 
             if not preview_result["can_merge"]:
                 console.print(f"[red]❌ Cannot merge: {preview_result['reason']}[/red]")
@@ -286,7 +275,7 @@ def merge(
 
         # Handle dry-run
         if dry_run:
-            result = merge_mgr.merge_branches(
+            result = db.merge_branches(
                 source, target_branch, force=force, dry_run=True
             )
 
@@ -309,7 +298,7 @@ def merge(
             return
 
         # Perform actual merge
-        result = merge_mgr.merge_branches(source, target_branch, force=force)
+        result = db.merge_branches(source, target_branch, force=force)
 
         if result["success"]:
             console.print(f"[green]✅ {result['message']}[/green]")
@@ -341,10 +330,8 @@ def changes(
     branch_name = name or config_data.active_branch
 
     try:
-        from cinchdb.managers.change_tracker import ChangeTracker
-
-        tracker = ChangeTracker(config.project_dir, db_name, branch_name)
-        changes = tracker.get_changes()
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        changes = db.list_changes()
 
         if not changes:
             console.print(
@@ -405,97 +392,3 @@ def changes(
         raise typer.Exit(1)
 
 
-@app.command()
-def merge_into_main(
-    ctx: typer.Context,
-    source: Optional[str] = typer.Argument(
-        None, help="Source branch to merge into main"
-    ),
-    preview: bool = typer.Option(
-        False, "--preview", "-p", help="Show merge preview without executing"
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        help="Show SQL statements that would be executed without applying them",
-    ),
-):
-    """Merge a branch into main branch (the primary way to get changes into main)."""
-    source = validate_required_arg(source, "source", ctx)
-    config, config_data = get_config_with_data()
-    db_name = config_data.active_database
-
-    from cinchdb.managers.merge_manager import MergeManager
-
-    merge_mgr = MergeManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch="main"))
-
-    try:
-        if preview:
-            # Show merge preview for main branch
-            preview_result = merge_mgr.get_merge_preview(source, "main")
-
-            if not preview_result["can_merge"]:
-                console.print(
-                    f"[red]❌ Cannot merge into main: {preview_result['reason']}[/red]"
-                )
-                if "conflicts" in preview_result:
-                    console.print("[yellow]Conflicts:[/yellow]")
-                    for conflict in preview_result["conflicts"]:
-                        console.print(f"  • {conflict}")
-                raise typer.Exit(1)
-
-            console.print(f"\n[bold]Merge Preview: {source} → main[/bold]")
-            console.print(f"Merge Type: {preview_result['merge_type']}")
-            console.print(f"Changes to merge: {preview_result['changes_to_merge']}")
-
-            if preview_result["changes_by_type"]:
-                console.print("\n[bold]Changes to be merged:[/bold]")
-                for entity_type, changes in preview_result["changes_by_type"].items():
-                    console.print(f"  {entity_type}: {len(changes)} changes")
-                    for change in changes:
-                        console.print(
-                            f"    • {change['operation']} {change['entity_name']}"
-                        )
-
-            return
-
-        # Handle dry-run
-        if dry_run:
-            result = merge_mgr.merge_into_main(source, dry_run=True)
-
-            console.print(f"\n[bold]Dry Run: {source} → main[/bold]")
-            console.print(f"Merge Type: {result.get('merge_type', 'unknown')}")
-            console.print(f"Changes to merge: {result.get('changes_to_merge', 0)}")
-
-            if result.get("sql_statements"):
-                console.print("\n[bold]SQL statements that would be executed:[/bold]")
-                for stmt in result["sql_statements"]:
-                    console.print(
-                        f"\n[cyan]Change {stmt['change_id']} ({stmt['change_type']}): {stmt['entity_name']}[/cyan]"
-                    )
-                    if "step" in stmt:
-                        console.print(f"  Step: {stmt['step']}")
-                    console.print(f"  SQL: [yellow]{stmt['sql']}[/yellow]")
-            else:
-                console.print("\n[yellow]No SQL statements to execute[/yellow]")
-
-            return
-
-        # Perform merge into main
-        result = merge_mgr.merge_into_main(source)
-
-        if result["success"]:
-            console.print(f"[green]✅ {result['message']}[/green]")
-            console.print("[green]Main branch has been updated![/green]")
-        else:
-            console.print(
-                f"[red]❌ Merge into main failed: {result.get('message', 'Unknown error')}[/red]"
-            )
-            raise typer.Exit(1)
-
-    except MergeError as e:
-        console.print(f"[red]❌ {e}[/red]")
-        raise typer.Exit(1)
-    except ValueError as e:
-        console.print(f"[red]❌ {e}[/red]")
-        raise typer.Exit(1)

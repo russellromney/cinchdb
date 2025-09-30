@@ -49,7 +49,7 @@ cinch status
 | Set KV pair | `cinch kv set session:123 '{"user_id": 42}'` |
 | Get KV value | `cinch kv get session:123` |
 | Create branch | `cinch branch create feature-auth --switch` |
-| Merge to main | `cinch branch merge-into-main feature-auth` |
+| Merge to main | `cinch branch merge feature-auth main` |
 | Multi-tenant query | `cinch query "SELECT * FROM users" --tenant customer_a` |
 | Generate SDK | `cinch codegen generate python models/` |
 
@@ -69,7 +69,7 @@ cinch query "SELECT * FROM products"
 
 # Merge when ready
 cinch branch switch main
-cinch branch merge-into-main add-products
+cinch branch merge add-products main
 ```
 
 ### Multi-Tenant Setup

@@ -24,98 +24,6 @@ if TYPE_CHECKING:
     from cinchdb.managers.kv import KVManager
 
 
-class _Managers:
-    """Internal manager access - for internal use only. 
-
-    This class provides typed access to managers for internal convenience method implementations
-    and advanced use cases only. Users should use the direct methods like create_table(),
-    list_tenants(), etc.
-    """
-
-    def __init__(self, db: "CinchDB"):
-        self._db = db
-
-    @property
-    def tables(self) -> "TableManager":
-        """Table management operations."""
-        if self._db._table_manager is None:
-            from cinchdb.managers.table import TableManager
-            self._db._table_manager = TableManager(self._db._context)
-        return self._db._table_manager
-
-    @property
-    def columns(self) -> "ColumnManager":
-        """Column management operations."""
-        if self._db._column_manager is None:
-            from cinchdb.managers.column import ColumnManager
-            self._db._column_manager = ColumnManager(self._db._context)
-        return self._db._column_manager
-
-    @property
-    def views(self) -> "ViewModel":
-        """View management operations."""
-        if self._db._view_manager is None:
-            from cinchdb.managers.view import ViewModel
-            self._db._view_manager = ViewModel(self._db._context)
-        return self._db._view_manager
-
-    @property
-    def branches(self) -> "BranchManager":
-        """Branch management operations."""
-        if self._db._branch_manager is None:
-            from cinchdb.managers.branch import BranchManager
-            self._db._branch_manager = BranchManager(self._db._context)
-        return self._db._branch_manager
-
-    @property
-    def tenants(self) -> "TenantManager":
-        """Tenant management operations."""
-        if self._db._tenant_manager is None:
-            from cinchdb.managers.tenant import TenantManager
-            self._db._tenant_manager = TenantManager(self._db._context)
-        return self._db._tenant_manager
-
-    @property
-    def data(self) -> "DataManager":
-        """Data management operations."""
-        if self._db._data_manager is None:
-            from cinchdb.managers.data import DataManager
-            self._db._data_manager = DataManager(self._db._context)
-        return self._db._data_manager
-
-    @property
-    def codegen(self) -> "CodegenManager":
-        """Code generation operations."""
-        if self._db._codegen_manager is None:
-            from cinchdb.managers.codegen import CodegenManager
-            self._db._codegen_manager = CodegenManager(self._db._context)
-        return self._db._codegen_manager
-
-    @property
-    def merge(self) -> "MergeManager":
-        """Merge operations."""
-        if self._db._merge_manager is None:
-            from cinchdb.managers.merge_manager import MergeManager
-            self._db._merge_manager = MergeManager(self._db._context)
-        return self._db._merge_manager
-
-    @property
-    def indexes(self) -> "IndexManager":
-        """Index management operations."""
-        if self._db._index_manager is None:
-            from cinchdb.managers.index import IndexManager
-            self._db._index_manager = IndexManager(self._db._context)
-        return self._db._index_manager
-
-    @property
-    def kv(self) -> "KVManager":
-        """Key-Value store operations."""
-        if self._db._kv_manager is None:
-            from cinchdb.managers.kv import KVManager
-            self._db._kv_manager = KVManager(self._db._context)
-        return self._db._kv_manager
-
-
 class CinchDB:
     """Unified interface for CinchDB operations.
 
@@ -214,21 +122,6 @@ class CinchDB:
                 "or both api_url and api_key for remote connection"
             )
 
-        # Lazy-loaded managers (local only)
-        self._table_manager: Optional["TableManager"] = None
-        self._column_manager: Optional["ColumnManager"] = None
-        self._query_manager: Optional["QueryManager"] = None
-        self._data_manager: Optional["DataManager"] = None
-        self._view_manager: Optional["ViewModel"] = None
-        self._branch_manager: Optional["BranchManager"] = None
-        self._tenant_manager: Optional["TenantManager"] = None
-        self._codegen_manager: Optional["CodegenManager"] = None
-        self._merge_manager: Optional["MergeManager"] = None
-        self._index_manager: Optional["IndexManager"] = None
-        self._kv_manager: Optional["KVManager"] = None
-
-        # Manager access class
-        self._managers_instance: Optional["_Managers"] = None
 
     def _materialize_database_if_lazy(self) -> None:
         """Auto-materialize a lazy database if accessing it."""
@@ -339,22 +232,6 @@ class CinchDB:
         return response.json()
 
     @property
-    def _managers(self) -> "_Managers":
-        """Internal manager access - For CinchDB internal only. Use convenience methods instead.
-
-        This property provides typed access to managers for internal convenience method implementations
-        and advanced use cases only. Users should use the direct methods like create_table(),
-        list_tenants(), etc.
-        """
-        if not self.is_local:
-            raise RuntimeError("Manager access not available for remote connections")
-
-        if self._managers_instance is None:
-            self._managers_instance = _Managers(self)
-
-        return self._managers_instance
-
-    @property
     def kv(self) -> "KVManager":
         """Key-Value store for fast unstructured data storage.
 
@@ -385,7 +262,7 @@ class CinchDB:
         if not self.is_local:
             raise RuntimeError("KV store is not available for remote connections yet")
 
-        return self._managers.kv
+        return self._context.kv
 
     # Convenience methods for common operations
 
@@ -416,23 +293,15 @@ class CinchDB:
             validate_query_safe(sql)
 
         if self.is_local:
-            if self._query_manager is None:
-                from cinchdb.managers.query import QueryManager
-                self._query_manager = QueryManager(self._context)
-            # Execute SELECT query directly (replacing removed execute method)
-            from cinchdb.utils.sql_validator import validate_query_safe
+            # Execute SELECT query directly
             from cinchdb.core.connection import DatabaseConnection
-
-            # Validate query unless explicitly skipped
-            if not skip_validation:
-                validate_query_safe(sql)
 
             # Ensure this is a SELECT query
             if not sql.strip().upper().startswith("SELECT"):
                 raise ValueError("query() can only be used with SELECT queries. Use insert(), update(), delete() for data modifications.")
 
             # Get appropriate database path
-            db_path = self._query_manager.tenant_manager.get_tenant_db_path_for_operation(
+            db_path = self._context.tenants.get_tenant_db_path_for_operation(
                 self.tenant, is_write=False
             )
 
@@ -517,7 +386,7 @@ class CinchDB:
             Table object with metadata
         """
         if self.is_local:
-            return self._managers.tables.create_table(name, columns, indexes)
+            return self._context.tables.create_table(name, columns, indexes)
         else:
             # Remote table creation
             columns_data = [
@@ -589,10 +458,10 @@ class CinchDB:
         if self.is_local:            
             # Single record
             if len(data) == 1:
-                return self._managers.data.create_from_dict(table, data[0])
+                return self._context.data.create_from_dict(table, data[0])
             
             # Multiple records - use bulk insert
-            return self._managers.data.bulk_create_from_dict(table, list(data))
+            return self._context.data.bulk_create_from_dict(table, list(data))
         else:
             # Remote insert
             if len(data) == 1:
@@ -649,7 +518,7 @@ class CinchDB:
             if len(updates) == 1:
                 update_data = updates[0].copy()
                 record_id = update_data.pop('id')
-                return self._managers.data.update_by_id(table, record_id, update_data)
+                return self._context.data.update_by_id(table, record_id, update_data)
 
             # Multiple records - batch update
             results = []
@@ -657,7 +526,7 @@ class CinchDB:
                 update_copy = update_data.copy()
                 record_id = update_copy.pop('id')
                 try:
-                    result = self._managers.data.update_by_id(table, record_id, update_copy)
+                    result = self._context.data.update_by_id(table, record_id, update_copy)
                     results.append(result)
                 except ValueError as e:
                     # Record not found - include error in results
@@ -707,13 +576,13 @@ class CinchDB:
         if self.is_local:
             # Single record
             if len(ids) == 1:
-                success = self._managers.data.delete_by_id(table, ids[0])
+                success = self._context.data.delete_by_id(table, ids[0])
                 return 1 if success else 0
 
             # Multiple records - batch delete
             deleted_count = 0
             for record_id in ids:
-                success = self._managers.data.delete_by_id(table, record_id)
+                success = self._context.data.delete_by_id(table, record_id)
                 if success:
                     deleted_count += 1
             return deleted_count
@@ -756,7 +625,7 @@ class CinchDB:
             count = db.delete_where('items', item_id__in=[1, 2, 3])
         """
         if self.is_local:
-            return self._managers.data.delete_where(table, operator=operator, **filters)
+            return self._context.data.delete_where(table, operator=operator, **filters)
         else:
             raise NotImplementedError("Remote bulk delete not implemented")
 
@@ -791,7 +660,7 @@ class CinchDB:
             )
         """
         if self.is_local:
-            return self._managers.data.update_where(table, data, operator=operator, **filters)
+            return self._context.data.update_where(table, data, operator=operator, **filters)
         else:
             raise NotImplementedError("Remote bulk update not implemented")
 
@@ -831,7 +700,7 @@ class CinchDB:
         index = Index(columns=columns, name=name, unique=unique)
         
         if self.is_local:
-            return self._managers.indexes.create_index(table, index.columns, index.name, index.unique)
+            return self._context.indexes.create_index(table, index.columns, index.name, index.unique)
         else:
             # Remote index creation
             result = self._make_request(
@@ -908,7 +777,7 @@ class CinchDB:
         """
         if self.is_local:
             tenant_to_check = tenant_name or self.tenant
-            return self._managers.tenants.get_tenant_size(tenant_to_check)
+            return self._context.tenants.get_tenant_size(tenant_to_check)
         else:
             raise NotImplementedError("Remote tenant size query not implemented")
     
@@ -948,7 +817,7 @@ class CinchDB:
         """
         if self.is_local:
             tenant_to_vacuum = tenant_name or self.tenant
-            return self._managers.tenants.vacuum_tenant(tenant_to_vacuum)
+            return self._context.tenants.vacuum_tenant(tenant_to_vacuum)
         else:
             raise NotImplementedError("Remote tenant vacuum not implemented")
     
@@ -974,7 +843,7 @@ class CinchDB:
                     print(f"{tenant['name']}: {tenant['size_mb']:.2f} MB")
         """
         if self.is_local:
-            return self._managers.tenants.get_all_tenant_sizes()
+            return self._context.tenants.get_all_tenant_sizes()
         else:
             raise NotImplementedError("Remote storage info not implemented")
 
@@ -999,17 +868,28 @@ class CinchDB:
             all_tenants = db.list_tenants(include_system=True)
         """
         if self.is_local:
-            return self._managers.tenants.list_tenants(include_system=include_system)
+            return self._context.tenants.list_tenants(include_system=include_system)
         else:
             raise NotImplementedError("Remote tenant listing not implemented")
 
-    def create_tenant(self, name: str, copy_from: Optional[str] = None, lazy: bool = True) -> "Tenant":
+    def create_tenant(
+        self,
+        name: str,
+        description: Optional[str] = None,
+        copy_from: Optional[str] = None,
+        lazy: bool = True,
+        encrypt: bool = False,
+        encryption_key: Optional[str] = None
+    ) -> "Tenant":
         """Create a new tenant.
 
         Args:
             name: Tenant name
+            description: Optional description for the tenant
             copy_from: Optional tenant to copy data from
             lazy: Whether to create as lazy tenant (default: True)
+            encrypt: Whether to encrypt the tenant database
+            encryption_key: Encryption key for encrypted tenant (required if encrypt=True)
 
         Returns:
             Created Tenant object
@@ -1023,12 +903,21 @@ class CinchDB:
 
             # Create tenant with data copied from template
             tenant = db.create_tenant("new_customer", copy_from="template")
+
+            # Create encrypted tenant
+            tenant = db.create_tenant("secure_corp", encrypt=True, encryption_key="my-secret-key")
         """
         if self.is_local:
             if copy_from:
-                return self._managers.tenants.copy_tenant(copy_from, name)
+                return self._context.tenants.copy_tenant(copy_from, name, description)
             else:
-                return self._managers.tenants.create_tenant(name, lazy=lazy)
+                return self._context.tenants.create_tenant(
+                    name,
+                    description=description,
+                    lazy=lazy,
+                    encrypt=encrypt,
+                    encryption_key=encryption_key
+                )
         else:
             raise NotImplementedError("Remote tenant creation not implemented")
 
@@ -1043,7 +932,7 @@ class CinchDB:
             db.delete_tenant("old_customer")
         """
         if self.is_local:
-            self._managers.tenants.delete_tenant(name)
+            self._context.tenants.delete_tenant(name)
         else:
             raise NotImplementedError("Remote tenant deletion not implemented")
 
@@ -1062,7 +951,7 @@ class CinchDB:
             new_tenant = db.copy_tenant("template", "new_customer")
         """
         if self.is_local:
-            return self._managers.tenants.copy_tenant(source, target)
+            return self._context.tenants.copy_tenant(source, target)
         else:
             raise NotImplementedError("Remote tenant copying not implemented")
 
@@ -1078,7 +967,7 @@ class CinchDB:
             db.rename_tenant("old_customer", "acme_corp")
         """
         if self.is_local:
-            self._managers.tenants.rename_tenant(old_name, new_name)
+            self._context.tenants.rename_tenant(old_name, new_name)
         else:
             raise NotImplementedError("Remote tenant renaming not implemented")
 
@@ -1097,7 +986,7 @@ class CinchDB:
                 print(f"Branch: {branch.name} (created: {branch.created_at})")
         """
         if self.is_local:
-            return self._managers.branches.list_branches()
+            return self._context.branches.list_branches()
         else:
             raise NotImplementedError("Remote branch listing not implemented")
 
@@ -1119,7 +1008,7 @@ class CinchDB:
             branch = db.create_branch("hotfix-123", source_branch="production")
         """
         if self.is_local:
-            return self._managers.branches.create_branch(source_branch, name)
+            return self._context.branches.create_branch(source_branch, name)
         else:
             raise NotImplementedError("Remote branch creation not implemented")
 
@@ -1134,7 +1023,7 @@ class CinchDB:
             db.delete_branch("old-feature")
         """
         if self.is_local:
-            self._managers.branches.delete_branch(name)
+            self._context.branches.delete_branch(name)
         else:
             raise NotImplementedError("Remote branch deletion not implemented")
 
@@ -1181,16 +1070,46 @@ class CinchDB:
                 print(f"Conflicts: {result['conflicts']}")
         """
         if self.is_local:
-            return self._managers.merge.can_merge(source_branch, target_branch)
+            return self._context.merge.can_merge(source_branch, target_branch)
         else:
             raise NotImplementedError("Remote merge checking not implemented")
 
-    def merge_branches(self, source_branch: str, target_branch: str = "main") -> Dict[str, Any]:
+    def get_merge_preview(self, source_branch: str, target_branch: str) -> Dict[str, Any]:
+        """Get a preview of what would happen during a merge.
+
+        Args:
+            source_branch: Source branch name
+            target_branch: Target branch name
+
+        Returns:
+            Dictionary with merge preview details including:
+            - can_merge: bool
+            - merge_type: str
+            - changes_to_merge: int
+            - changes_by_type: dict
+            - conflicts: list (if any)
+
+        Examples:
+            # Preview a merge
+            preview = db.get_merge_preview("feature-auth", "main")
+            if preview['can_merge']:
+                print(f"Will merge {preview['changes_to_merge']} changes")
+            else:
+                print(f"Cannot merge: {preview['reason']}")
+        """
+        if self.is_local:
+            return self._context.merge.get_merge_preview(source_branch, target_branch)
+        else:
+            raise NotImplementedError("Remote merge preview not implemented")
+
+    def merge_branches(self, source_branch: str, target_branch: str = "main", force: bool = False, dry_run: bool = False) -> Dict[str, Any]:
         """Merge one branch into another.
 
         Args:
             source_branch: Source branch name
             target_branch: Target branch name (default: main)
+            force: Force merge even if conflicts exist
+            dry_run: Show what would be merged without applying changes
 
         Returns:
             Dictionary with merge results
@@ -1199,36 +1118,16 @@ class CinchDB:
             # Merge feature into main
             result = db.merge_branches("feature-auth", "main")
             print(f"Merged {result['changes_applied']} changes")
+
+            # Preview merge with dry run
+            result = db.merge_branches("feature-auth", "main", dry_run=True)
+            print(f"Would merge {result['changes_to_merge']} changes")
         """
         if self.is_local:
-            return self._managers.merge.merge_branches(source_branch, target_branch)
+            return self._context.merge.merge_branches(source_branch, target_branch, force=force, dry_run=dry_run)
         else:
             raise NotImplementedError("Remote merging not implemented")
 
-    def merge_into_main(self, source_branch: str, force: bool = False, dry_run: bool = False) -> Dict[str, Any]:
-        """Merge a branch into main with advanced options.
-
-        Args:
-            source_branch: Source branch name
-            force: Force merge even if conflicts exist
-            dry_run: Show what would be merged without applying changes
-
-        Returns:
-            Dictionary with merge results and preview
-
-        Examples:
-            # Preview merge
-            result = db.merge_into_main("feature-auth", dry_run=True)
-            print(f"Would merge {len(result['changes'])} changes")
-
-            # Force merge with conflicts
-            result = db.merge_into_main("hotfix", force=True)
-            print(f"Force merged {result['changes_applied']} changes")
-        """
-        if self.is_local:
-            return self._managers.merge.merge_into_main(source_branch, force=force, dry_run=dry_run)
-        else:
-            raise NotImplementedError("Remote advanced merging not implemented")
 
     # Index convenience methods
 
@@ -1249,7 +1148,7 @@ class CinchDB:
             user_indexes = db.list_indexes("users")
         """
         if self.is_local:
-            return self._managers.indexes.list_indexes(table)
+            return self._context.indexes.list_indexes(table)
         else:
             raise NotImplementedError("Remote index listing not implemented")
 
@@ -1268,7 +1167,7 @@ class CinchDB:
             db.drop_index("idx_old", if_exists=False)
         """
         if self.is_local:
-            self._managers.indexes.drop_index(name, if_exists)
+            self._context.indexes.drop_index(name, if_exists)
         else:
             raise NotImplementedError("Remote index dropping not implemented")
 
@@ -1287,7 +1186,7 @@ class CinchDB:
             print(f"Columns: {info['columns']}")
         """
         if self.is_local:
-            return self._managers.indexes.get_index_info(name)
+            return self._context.indexes.get_index_info(name)
         else:
             raise NotImplementedError("Remote index info not implemented")
 
@@ -1310,7 +1209,7 @@ class CinchDB:
             db.add_column("users", Column(name="active", type="BOOLEAN", default="true"))
         """
         if self.is_local:
-            self._managers.columns.add_column(table, column)
+            self._context.columns.add_column(table, column)
         else:
             raise NotImplementedError("Remote column addition not implemented")
 
@@ -1326,7 +1225,7 @@ class CinchDB:
             db.drop_column("users", "old_field")
         """
         if self.is_local:
-            self._managers.columns.drop_column(table, column)
+            self._context.columns.drop_column(table, column)
         else:
             raise NotImplementedError("Remote column dropping not implemented")
 
@@ -1343,7 +1242,7 @@ class CinchDB:
             db.rename_column("users", "email_addr", "email")
         """
         if self.is_local:
-            self._managers.columns.rename_column(table, old_name, new_name)
+            self._context.columns.rename_column(table, old_name, new_name)
         else:
             raise NotImplementedError("Remote column renaming not implemented")
 
@@ -1364,9 +1263,47 @@ class CinchDB:
             db.alter_column_nullable("users", "active", False, fill_value="true")
         """
         if self.is_local:
-            self._managers.columns.alter_column_nullable(table, column, nullable, fill_value)
+            self._context.columns.alter_column_nullable(table, column, nullable, fill_value)
         else:
             raise NotImplementedError("Remote column altering not implemented")
+
+    def list_columns(self, table: str) -> List["Column"]:
+        """List all columns in a table.
+
+        Args:
+            table: Table name
+
+        Returns:
+            List of Column objects
+
+        Examples:
+            columns = db.list_columns("users")
+            for col in columns:
+                print(f"{col.name}: {col.type}")
+        """
+        if self.is_local:
+            return self._context.columns.list_columns(table)
+        else:
+            raise NotImplementedError("Remote column listing not implemented")
+
+    def get_column_info(self, table: str, column: str) -> "Column":
+        """Get information about a specific column.
+
+        Args:
+            table: Table name
+            column: Column name
+
+        Returns:
+            Column object with full details
+
+        Examples:
+            col = db.get_column_info("users", "email")
+            print(f"Type: {col.type}, Nullable: {col.nullable}")
+        """
+        if self.is_local:
+            return self._context.columns.get_column_info(table, column)
+        else:
+            raise NotImplementedError("Remote column info not implemented")
 
     # View convenience methods
 
@@ -1385,7 +1322,7 @@ class CinchDB:
             view = db.create_view("active_users", "SELECT * FROM users WHERE active = true")
         """
         if self.is_local:
-            return self._managers.views.create_view(name, sql)
+            return self._context.views.create_view(name, sql)
         else:
             raise NotImplementedError("Remote view creation not implemented")
 
@@ -1402,7 +1339,7 @@ class CinchDB:
                 print(f"View: {view.name}")
         """
         if self.is_local:
-            return self._managers.views.list_views()
+            return self._context.views.list_views()
         else:
             raise NotImplementedError("Remote view listing not implemented")
 
@@ -1425,7 +1362,7 @@ class CinchDB:
             view = db.update_view("recent_posts", "SELECT * FROM posts WHERE created_at > date('now', '-30 days')", "Posts from last 30 days")
         """
         if self.is_local:
-            return self._managers.views.update_view(name, sql, description)
+            return self._context.views.update_view(name, sql, description)
         else:
             raise NotImplementedError("Remote view updating not implemented")
 
@@ -1440,7 +1377,7 @@ class CinchDB:
             db.drop_view("old_view")
         """
         if self.is_local:
-            self._managers.views.delete_view(name)
+            self._context.views.delete_view(name)
         else:
             raise NotImplementedError("Remote view dropping not implemented")
 
@@ -1476,7 +1413,7 @@ class CinchDB:
             active_users = db.select(User, active=True, limit=10)
         """
         if self.is_local:
-            return self._managers.data.select(model_class, limit=limit, offset=offset, **filters)
+            return self._context.data.select(model_class, limit=limit, offset=offset, **filters)
         else:
             raise NotImplementedError("Remote model-based select not implemented")
 
@@ -1497,7 +1434,7 @@ class CinchDB:
                 print(f"Found: {user.name}")
         """
         if self.is_local:
-            return self._managers.data.find_by_id(model_class, record_id)
+            return self._context.data.find_by_id(model_class, record_id)
         else:
             raise NotImplementedError("Remote model-based find not implemented")
 
@@ -1518,7 +1455,7 @@ class CinchDB:
                 print("User deleted successfully")
         """
         if self.is_local:
-            return self._managers.data.delete_model_by_id(model_class, record_id)
+            return self._context.data.delete_model_by_id(model_class, record_id)
         else:
             raise NotImplementedError("Remote model-based delete not implemented")
 
@@ -1537,7 +1474,7 @@ class CinchDB:
                 print(f"{lang['name']}: {lang['description']}")
         """
         if self.is_local:
-            return self._managers.codegen.get_supported_languages()
+            return self._context.codegen.get_supported_languages()
         else:
             raise NotImplementedError("Remote code generation not implemented")
 
@@ -1565,7 +1502,7 @@ class CinchDB:
             if output_dir is None:
                 import tempfile
                 output_dir = Path(tempfile.mkdtemp()) / "generated_models"
-            return self._managers.codegen.generate_models(
+            return self._context.codegen.generate_models(
                 language, output_dir, include_tables, include_views
             )
         else:
@@ -1592,7 +1529,7 @@ class CinchDB:
             all_tables = db.list_tables(include_system=True)
         """
         if self.is_local:
-            return self._managers.tables.list_tables(include_system=include_system)
+            return self._context.tables.list_tables(include_system=include_system)
         else:
             raise NotImplementedError("Remote table listing not implemented")
 
@@ -1613,7 +1550,7 @@ class CinchDB:
                 print(f"  {col.name}: {col.type}")
         """
         if self.is_local:
-            return self._managers.tables.get_table(name)
+            return self._context.tables.get_table(name)
         else:
             raise NotImplementedError("Remote table details not implemented")
 
@@ -1628,7 +1565,7 @@ class CinchDB:
             db.drop_table("old_table")
         """
         if self.is_local:
-            self._managers.tables.delete_table(name)
+            self._context.tables.delete_table(name)
         else:
             raise NotImplementedError("Remote table dropping not implemented")
 
@@ -1648,7 +1585,7 @@ class CinchDB:
             db.copy_table("users", "users_template", copy_data=False)
         """
         if self.is_local:
-            self._managers.tables.copy_table(source, target, copy_data)
+            self._context.tables.copy_table(source, target, copy_data)
         else:
             raise NotImplementedError("Remote table copying not implemented")
 

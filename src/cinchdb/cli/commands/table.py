@@ -5,9 +5,7 @@ from typing import List, Optional
 from rich.console import Console
 from rich.table import Table as RichTable
 
-from cinchdb.managers.table import TableManager
-from cinchdb.managers.base import ConnectionContext
-from cinchdb.managers.change_applier import ChangeApplier
+from cinchdb.core.database import CinchDB
 from cinchdb.models import Column, ForeignKeyRef
 from cinchdb.cli.utils import get_config_with_data, validate_required_arg
 from cinchdb.utils.type_utils import normalize_type
@@ -31,8 +29,8 @@ def list_tables():
     db_name = config_data.active_database
     branch_name = config_data.active_branch
 
-    table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-    tables = table_mgr.list_tables()
+    db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+    tables = db.list_tables()
 
     if not tables:
         console.print("[yellow]No tables found[/yellow]")
@@ -164,13 +162,12 @@ def create(
         )
 
     try:
-        table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        table_mgr.create_table(name, parsed_columns)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        db.create_table(name, parsed_columns)
         console.print(
             f"[green]✅ Created table '{name}' with {len(parsed_columns)} columns[/green]"
         )
-
-        # Changes are automatically applied to all tenants by the manager
+        # Changes are automatically applied to all tenants by CinchDB
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -183,9 +180,6 @@ def delete(
     name: Optional[str] = typer.Argument(None, help="Name of the table to delete"),
     force: bool = typer.Option(
         False, "--force", "-f", help="Force deletion without confirmation"
-    ),
-    apply: bool = typer.Option(
-        True, "--apply/--no-apply", help="Apply changes to all tenants"
     ),
 ):
     """Delete a table."""
@@ -202,16 +196,10 @@ def delete(
             raise typer.Exit(0)
 
     try:
-        table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        table_mgr.delete_table(name)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        db.drop_table(name)
         console.print(f"[green]✅ Deleted table '{name}'[/green]")
-
-        if apply:
-            # Apply to all tenants
-            applier = ChangeApplier(config.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
-            if applied > 0:
-                console.print("[green]✅ Applied changes to all tenants[/green]")
+        # Changes are automatically applied to all tenants by CinchDB
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -226,9 +214,6 @@ def copy(
     data: bool = typer.Option(
         True, "--data/--no-data", help="Copy data along with structure"
     ),
-    apply: bool = typer.Option(
-        True, "--apply/--no-apply", help="Apply changes to all tenants"
-    ),
 ):
     """Copy a table to a new table."""
     source = validate_required_arg(source, "source", ctx)
@@ -238,16 +223,10 @@ def copy(
     branch_name = config_data.active_branch
 
     try:
-        table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        table_mgr.copy_table(source, target, copy_data=data)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        db.copy_table(source, target, copy_data=data)
         console.print(f"[green]✅ Copied table '{source}' to '{target}'[/green]")
-
-        if apply:
-            # Apply to all tenants
-            applier = ChangeApplier(config.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
-            if applied > 0:
-                console.print("[green]✅ Applied changes to all tenants[/green]")
+        # Changes are automatically applied to all tenants by CinchDB
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -265,8 +244,8 @@ def info(
     branch_name = config_data.active_branch
 
     try:
-        table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
-        table = table_mgr.get_table(name)
+        db = CinchDB(project_dir=config.project_dir, database=db_name, branch=branch_name)
+        table = db.get_table(name)
 
         # Display info
         console.print(f"\n[bold]Table: {table.name}[/bold]")

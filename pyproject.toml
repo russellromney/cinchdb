@@ -93,9 +93,14 @@ dev-dependencies = [
     "mkdocstrings[python]>=0.30.0",
     "pymdown-extensions>=10.16.1",
     "psutil>=7.0.0",
+    "pytest-xdist>=3.8.0",
 ]
 
 [tool.pytest.ini_options]
 timeout = 30
 timeout_method = "thread"
 addopts = "--timeout=30 --timeout-method=thread"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "stress: marks tests as stress tests that run concurrently"
+]

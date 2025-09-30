@@ -548,6 +548,7 @@ class TestKVStore:
         db.kv.delete("test")
         assert db.kv.exists("test") is False
 
+    @pytest.mark.xdist_group(name="kv_ttl")
     def test_ttl_basic(self, db):
         """Test TTL functionality."""
         # Set with 0.03 second TTL
@@ -665,6 +666,7 @@ class TestKVStore:
         with pytest.raises(ValueError, match="Keys not found"):
             db.kv.mget(["key1", "nonexistent", "key3"])
 
+    @pytest.mark.xdist_group(name="kv_ttl")
     def test_mset_with_ttl(self, db):
         """Test batch set with TTL."""
         items = {"temp1": "value1", "temp2": "value2"}

@@ -41,7 +41,7 @@ class ChangeApplier:
         self.branch = branch
 
         # Create context for manager instantiation
-        context = ConnectionContext(
+        self.context = ConnectionContext(
             project_root=project_root,
             database=database,
             branch=branch,
@@ -49,8 +49,6 @@ class ChangeApplier:
         )
 
         self.change_tracker = ChangeTracker(project_root, database, branch)
-        self.tenant_manager = TenantManager(context)
-        self.branch_manager = BranchManager(context)
 
     def _get_change_by_id(self, change_id: str) -> Change:
         """Get a change by its ID.
@@ -94,11 +92,11 @@ class ChangeApplier:
 
         # Ensure __empty__ tenant exists and is materialized
         # This is critical for schema changes as it's the template for lazy tenants
-        self.tenant_manager._ensure_empty_tenant()
+        self.context.tenants._ensure_empty_tenant()
 
         backup_dir = self._get_backup_dir(change.id)
         # Include system tenants (like __empty__) when applying schema changes
-        all_tenants = self.tenant_manager.list_tenants(include_system=True)
+        all_tenants = self.context.tenants.list_tenants(include_system=True)
         
         # Filter to only materialized tenants (those with actual .db files)
         # Schema changes can only be applied to materialized tenants
@@ -106,7 +104,7 @@ class ChangeApplier:
         materialized_tenants = []
         for tenant in all_tenants:
             # Always include __empty__ (schema template) or check if materialized
-            if tenant.name == "__empty__" or not self.tenant_manager.is_tenant_lazy(tenant.name):
+            if tenant.name == "__empty__" or not self.context.tenants.is_tenant_lazy(tenant.name):
                 materialized_tenants.append(tenant)
         
         if not materialized_tenants:

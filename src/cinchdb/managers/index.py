@@ -1,32 +1,26 @@
 """Index management for CinchDB."""
 
-from pathlib import Path
 from typing import List, Dict, Any, Optional
 import sqlite3
 from datetime import datetime, timezone
 import uuid
 
+from cinchdb.managers.base import BaseManager, ConnectionContext
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.models.change import Change, ChangeType
 
 
-class IndexManager:
+class IndexManager(BaseManager):
     """Manages database indexes for CinchDB tables at the branch level."""
 
-    def __init__(
-        self, project_dir: Path, database: str, branch: str
-    ):
+    def __init__(self, context: ConnectionContext):
         """Initialize IndexManager.
 
         Args:
-            project_dir: Path to the project directory
-            database: Database name
-            branch: Branch name
+            context: ConnectionContext with all connection parameters
         """
-        self.project_dir = Path(project_dir)
-        self.database = database
-        self.branch = branch
+        super().__init__(context)
 
     def create_index(
         self,
@@ -66,7 +60,7 @@ class IndexManager:
 
         # Get connection to main tenant database (indexes are branch-level)
         db_path = get_tenant_db_path(
-            self.project_dir, self.database, self.branch, "main"
+            self.project_root, self.database, self.branch, "main"
         )
         
         with DatabaseConnection(db_path) as conn:
@@ -126,7 +120,7 @@ class IndexManager:
         """
         # Get connection to main tenant database (indexes are branch-level)
         db_path = get_tenant_db_path(
-            self.project_dir, self.database, self.branch, "main"
+            self.project_root, self.database, self.branch, "main"
         )
         
         with DatabaseConnection(db_path) as conn:
@@ -162,9 +156,9 @@ class IndexManager:
         """
         # Get connection to main tenant database (indexes are branch-level)
         db_path = get_tenant_db_path(
-            self.project_dir, self.database, self.branch, "main"
+            self.project_root, self.database, self.branch, "main"
         )
-        
+
         indexes = []
         
         with DatabaseConnection(db_path) as conn:
@@ -225,11 +219,11 @@ class IndexManager:
         """
         # Get connection to main tenant database (indexes are branch-level)
         db_path = get_tenant_db_path(
-            self.project_dir, self.database, self.branch, "main"
+            self.project_root, self.database, self.branch, "main"
         )
-        
+
         with DatabaseConnection(db_path) as conn:
-            
+
             # Get index info
             result = conn.execute(
                 """
@@ -286,8 +280,8 @@ class IndexManager:
         """
         # Import here to avoid circular dependency
         from cinchdb.managers.change_tracker import ChangeTracker
-        
-        tracker = ChangeTracker(self.project_dir, self.database, self.branch)
+
+        tracker = ChangeTracker(self.project_root, self.database, self.branch)
         
         change = Change(
             id=str(uuid.uuid4()),

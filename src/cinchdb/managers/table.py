@@ -1,61 +1,25 @@
 """Table management for CinchDB."""
 
-from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 
-from cinchdb.models import Table, Column, Change, ChangeType
+from cinchdb.models import Table, Column, Change, ChangeType, SchemaSnapshot
+from cinchdb.managers.base import BaseManager, ConnectionContext
 
 if TYPE_CHECKING:
     from cinchdb.models import Index
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.core.maintenance_utils import check_maintenance_mode
-from cinchdb.managers.change_tracker import ChangeTracker
-from cinchdb.managers.tenant import TenantManager
 from cinchdb.utils.name_validator import validate_name
 
 
-class TableManager:
+class TableManager(BaseManager):
     """Manages tables within a database."""
 
     # Protected column names that users cannot use
     PROTECTED_COLUMNS = {"id", "created_at", "updated_at"}
-    
+
     # Protected table name prefixes that users cannot use
     PROTECTED_TABLE_PREFIXES = ("__", "sqlite_")
-
-    def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main",
-        encryption_manager=None
-    ):
-        """Initialize table manager.
-
-        Args:
-            project_root: Path to project root
-            database: Database name
-            branch: Branch name
-            tenant: Tenant name (default: main)
-            encryption_manager: EncryptionManager instance for encrypted connections
-        """
-        self.project_root = Path(project_root)
-        self.database = database
-        self.branch = branch
-        self.tenant = tenant
-        self.encryption_manager = encryption_manager
-        self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
-        self._change_tracker = None  # Lazy init - database might not exist yet
-        self.tenant_manager = TenantManager(project_root, database, branch, encryption_manager)
-
-    @property
-    def change_tracker(self):
-        """Lazy load change tracker only when needed for actual changes."""
-        if self._change_tracker is None:
-            try:
-                self._change_tracker = ChangeTracker(self.project_root, self.database, self.branch)
-            except ValueError:
-                # Database/branch doesn't exist yet - this is fine for read operations
-                return None
-        return self._change_tracker
 
     def list_tables(self, include_system: bool = False) -> List[Table]:
         """List all tables in the tenant.
@@ -168,9 +132,9 @@ class TableManager:
                     fk_constraint += f" ON UPDATE {fk.on_update}"
                 foreign_key_constraints.append(fk_constraint)
 
-        # Build automatic columns (id is always the primary key)
+        # Build automatic columns (id is always the primary key and unique)
         auto_columns = [
-            Column(name="id", type="TEXT", nullable=False),
+            Column(name="id", type="TEXT", nullable=False, unique=True),
             Column(name="created_at", type="TEXT", nullable=False),
             Column(name="updated_at", type="TEXT", nullable=True),
         ]
@@ -209,8 +173,20 @@ class TableManager:
             details={"columns": [col.model_dump() for col in all_columns]},
             sql=create_sql,
         )
+
+        # Build schema snapshot with this new table
+        schema_snapshot = None
         if self.change_tracker:
-            self.change_tracker.add_change(change)
+            snapshot = SchemaSnapshot()
+            # Get existing tables
+            existing_tables = self.list_tables(include_system=False)
+            for tbl in existing_tables:
+                snapshot.add_table(tbl.name, tbl.columns)
+            # Add the new table
+            snapshot.add_table(table_name, all_columns)
+            schema_snapshot = snapshot
+
+            self.change_tracker.add_change(change, schema_snapshot=schema_snapshot)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -221,7 +197,7 @@ class TableManager:
         # Create indexes if specified
         if indexes:
             from cinchdb.managers.index import IndexManager
-            index_manager = IndexManager(self.project_root, self.database, self.branch)
+            index_manager = IndexManager(self.context)
             
             for index in indexes:
                 index_manager.create_index(
@@ -255,62 +231,31 @@ class TableManager:
         if not self._table_exists(table_name):
             raise ValueError(f"Table '{table_name}' does not exist")
 
-        columns = []
-        foreign_keys = {}
+        # Get schema from snapshot - this should ALWAYS be available
+        if not self.change_tracker:
+            raise RuntimeError(
+                f"Cannot get table schema: change_tracker not initialized. "
+                f"This indicates a critical bug in the metadata system."
+            )
 
-        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
-            # Get foreign key information first
-            fk_cursor = conn.execute(f"PRAGMA foreign_key_list({table_name})")
-            for fk_row in fk_cursor.fetchall():
-                from_col = fk_row["from"]
-                to_table = fk_row["table"]
-                to_col = fk_row["to"]
-                on_update = fk_row["on_update"]
-                on_delete = fk_row["on_delete"]
+        schema_snapshot = self.change_tracker.metadata_db.get_latest_schema_snapshot(
+            self.change_tracker.branch_id
+        )
 
-                # Create ForeignKeyRef
-                from cinchdb.models import ForeignKeyRef
+        if not schema_snapshot:
+            raise RuntimeError(
+                f"No schema snapshot found for branch. "
+                f"This indicates a critical bug in the metadata/change tracking system."
+            )
 
-                foreign_keys[from_col] = ForeignKeyRef(
-                    table=to_table,
-                    column=to_col,
-                    on_update=on_update,
-                    on_delete=on_delete,
-                )
+        if not schema_snapshot.has_table(table_name):
+            raise RuntimeError(
+                f"Table '{table_name}' exists in database but not in schema snapshot. "
+                f"This indicates schema snapshot is out of sync - a critical bug."
+            )
 
-            # Get column information
-            cursor = conn.execute(f"PRAGMA table_info({table_name})")
-
-            for row in cursor.fetchall():
-                # Map SQLite types
-                sqlite_type = row["type"].upper()
-                if "INT" in sqlite_type:
-                    col_type = "INTEGER"
-                elif (
-                    "REAL" in sqlite_type
-                    or "FLOAT" in sqlite_type
-                    or "DOUBLE" in sqlite_type
-                ):
-                    col_type = "REAL"
-                elif "BLOB" in sqlite_type:
-                    col_type = "BLOB"
-                elif "NUMERIC" in sqlite_type:
-                    col_type = "NUMERIC"
-                else:
-                    col_type = "TEXT"
-
-                # Check if this column has a foreign key
-                foreign_key = foreign_keys.get(row["name"])
-
-                column = Column(
-                    name=row["name"],
-                    type=col_type,
-                    nullable=(row["notnull"] == 0),
-                    default=row["dflt_value"],
-                    # Note: primary_key info not needed - 'id' is always the primary key
-                    foreign_key=foreign_key,
-                )
-                columns.append(column)
+        # Build columns from snapshot (preserves BOOLEAN and other type info)
+        columns = schema_snapshot.get_table_schema(table_name)
 
         return Table(
             name=table_name, database=self.database, branch=self.branch, columns=columns
@@ -430,8 +375,20 @@ class TableManager:
             },
             sql=create_sql,
         )
+
+        # Build schema snapshot with the copied table
+        schema_snapshot = None
         if self.change_tracker:
-            self.change_tracker.add_change(change)
+            snapshot = SchemaSnapshot()
+            # Get existing tables
+            existing_tables = self.list_tables(include_system=False)
+            for tbl in existing_tables:
+                snapshot.add_table(tbl.name, tbl.columns)
+            # Add the new copied table
+            snapshot.add_table(target_table, source.columns)
+            schema_snapshot = snapshot
+
+            self.change_tracker.add_change(change, schema_snapshot=schema_snapshot)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -448,7 +405,7 @@ class TableManager:
         )
 
     def _table_exists(self, table_name: str) -> bool:
-        """Check if a table exists.
+        """Check if a table exists using schema snapshot.
 
         Args:
             table_name: Name of the table
@@ -456,9 +413,18 @@ class TableManager:
         Returns:
             True if table exists
         """
-        with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                (table_name,),
-            )
-            return cursor.fetchone() is not None
+        if not self.change_tracker:
+            # If no change tracker, we can't check the snapshot
+            # This should only happen during initialization
+            with DatabaseConnection(self.db_path, tenant_id=self.tenant, encryption_manager=self.encryption_manager) as conn:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (table_name,),
+                )
+                return cursor.fetchone() is not None
+
+        # Use schema snapshot for consistency
+        schema_snapshot = self.change_tracker.metadata_db.get_latest_schema_snapshot(
+            self.change_tracker.branch_id
+        )
+        return schema_snapshot is not None and schema_snapshot.has_table(table_name)

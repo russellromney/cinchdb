@@ -3,45 +3,37 @@
 import json
 import sqlite3
 import time
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from cinchdb.managers.base import BaseManager, ConnectionContext
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.path_utils import get_tenant_db_path
-from cinchdb.managers.tenant import TenantManager
 
 
-class KVManager:
+class KVManager(BaseManager):
     """Key-Value store manager for CinchDB.
 
     Provides fast unstructured data storage with TTL support and native type handling.
     Supports text, numbers, binary data, JSON objects, and null values.
     """
 
-    def __init__(
-        self,
-        project_root: Path,
-        database: str,
-        branch: str,
-        tenant: str = "main",
-        encryption_manager=None
-    ):
+    def __init__(self, context: ConnectionContext):
         """Initialize KV manager.
 
         Args:
-            project_root: Path to project root
-            database: Database name
-            branch: Branch name
-            tenant: Tenant name (default: main)
-            encryption_manager: EncryptionManager instance for encrypted connections
+            context: ConnectionContext with all connection parameters
         """
-        self.project_root = Path(project_root)
-        self.database = database
-        self.branch = branch
-        self.tenant = tenant
-        self.encryption_manager = encryption_manager
-        self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
-        self.tenant_manager = TenantManager(project_root, database, branch, encryption_manager)
+        super().__init__(context)
+
+        # Lazy-loaded tenant manager
+        self._tenant_manager = None
+
+    @property
+    def tenant_manager(self):
+        """Get tenant manager instance (lazy-loaded)."""
+        if self._tenant_manager is None:
+            from cinchdb.managers.tenant import TenantManager
+            self._tenant_manager = TenantManager(self.context)
+        return self._tenant_manager
 
     def _is_tenant_materialized(self) -> bool:
         """Check if the tenant is materialized (has actual database file)."""

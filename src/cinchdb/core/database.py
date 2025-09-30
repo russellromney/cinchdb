@@ -8,6 +8,7 @@ from cinchdb.models import Column, Change, Index
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.utils import validate_query_safe
 from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db
+from cinchdb.managers.base import ConnectionContext
 
 if TYPE_CHECKING:
     from cinchdb.managers.table import TableManager
@@ -39,9 +40,7 @@ class _Managers:
         """Table management operations."""
         if self._db._table_manager is None:
             from cinchdb.managers.table import TableManager
-            self._db._table_manager = TableManager(
-                self._db.project_dir, self._db.database, self._db.branch, self._db.tenant, self._db.encryption_manager
-            )
+            self._db._table_manager = TableManager(self._db._context)
         return self._db._table_manager
 
     @property
@@ -49,9 +48,7 @@ class _Managers:
         """Column management operations."""
         if self._db._column_manager is None:
             from cinchdb.managers.column import ColumnManager
-            self._db._column_manager = ColumnManager(
-                self._db.project_dir, self._db.database, self._db.branch, self._db.tenant, self._db.encryption_manager
-            )
+            self._db._column_manager = ColumnManager(self._db._context)
         return self._db._column_manager
 
     @property
@@ -59,9 +56,7 @@ class _Managers:
         """View management operations."""
         if self._db._view_manager is None:
             from cinchdb.managers.view import ViewModel
-            self._db._view_manager = ViewModel(
-                self._db.project_dir, self._db.database, self._db.branch, self._db.tenant
-            )
+            self._db._view_manager = ViewModel(self._db._context)
         return self._db._view_manager
 
     @property
@@ -69,7 +64,7 @@ class _Managers:
         """Branch management operations."""
         if self._db._branch_manager is None:
             from cinchdb.managers.branch import BranchManager
-            self._db._branch_manager = BranchManager(self._db.project_dir, self._db.database)
+            self._db._branch_manager = BranchManager(self._db._context)
         return self._db._branch_manager
 
     @property
@@ -77,9 +72,7 @@ class _Managers:
         """Tenant management operations."""
         if self._db._tenant_manager is None:
             from cinchdb.managers.tenant import TenantManager
-            self._db._tenant_manager = TenantManager(
-                self._db.project_dir, self._db.database, self._db.branch, self._db.encryption_manager
-            )
+            self._db._tenant_manager = TenantManager(self._db._context)
         return self._db._tenant_manager
 
     @property
@@ -87,9 +80,7 @@ class _Managers:
         """Data management operations."""
         if self._db._data_manager is None:
             from cinchdb.managers.data import DataManager
-            self._db._data_manager = DataManager(
-                self._db.project_dir, self._db.database, self._db.branch, self._db.tenant, self._db.encryption_manager
-            )
+            self._db._data_manager = DataManager(self._db._context)
         return self._db._data_manager
 
     @property
@@ -97,9 +88,7 @@ class _Managers:
         """Code generation operations."""
         if self._db._codegen_manager is None:
             from cinchdb.managers.codegen import CodegenManager
-            self._db._codegen_manager = CodegenManager(
-                self._db.project_dir, self._db.database, self._db.branch, self._db.tenant
-            )
+            self._db._codegen_manager = CodegenManager(self._db._context)
         return self._db._codegen_manager
 
     @property
@@ -107,7 +96,7 @@ class _Managers:
         """Merge operations."""
         if self._db._merge_manager is None:
             from cinchdb.managers.merge_manager import MergeManager
-            self._db._merge_manager = MergeManager(self._db.project_dir, self._db.database)
+            self._db._merge_manager = MergeManager(self._db._context)
         return self._db._merge_manager
 
     @property
@@ -115,9 +104,7 @@ class _Managers:
         """Index management operations."""
         if self._db._index_manager is None:
             from cinchdb.managers.index import IndexManager
-            self._db._index_manager = IndexManager(
-                self._db.project_dir, self._db.database, self._db.branch
-            )
+            self._db._index_manager = IndexManager(self._db._context)
         return self._db._index_manager
 
     @property
@@ -125,10 +112,7 @@ class _Managers:
         """Key-Value store operations."""
         if self._db._kv_manager is None:
             from cinchdb.managers.kv import KVManager
-            self._db._kv_manager = KVManager(
-                self._db.project_dir, self._db.database, self._db.branch, self._db.tenant,
-                self._db.encryption_manager
-            )
+            self._db._kv_manager = KVManager(self._db._context)
         return self._db._kv_manager
 
 
@@ -204,7 +188,16 @@ class CinchDB:
             self.api_url = None
             self.api_key = None
             self.is_local = True
-            
+
+            # Create shared ConnectionContext for all managers
+            self._context = ConnectionContext(
+                project_root=self.project_dir,
+                database=database,
+                branch=branch,
+                tenant=tenant,
+                encryption_manager=encryption_manager
+            )
+
             # Auto-materialize lazy database if needed
             self._materialize_database_if_lazy()
         elif api_url is not None and api_key is not None:
@@ -214,6 +207,7 @@ class CinchDB:
             self.api_key = api_key
             self.is_local = False
             self._session = None
+            self._context = None  # Remote doesn't use ConnectionContext yet
         else:
             raise ValueError(
                 "Must provide either project_dir for local connection "
@@ -424,10 +418,7 @@ class CinchDB:
         if self.is_local:
             if self._query_manager is None:
                 from cinchdb.managers.query import QueryManager
-
-                self._query_manager = QueryManager(
-                    self.project_dir, self.database, self.branch, self.tenant, self.encryption_manager
-                )
+                self._query_manager = QueryManager(self._context)
             # Execute SELECT query directly (replacing removed execute method)
             from cinchdb.utils.sql_validator import validate_query_safe
             from cinchdb.core.connection import DatabaseConnection
@@ -449,6 +440,45 @@ class CinchDB:
                 cursor = conn.execute(sql, params)
                 rows = cursor.fetchall()
                 results = [dict(row) for row in rows]
+
+                # Try to get table name from query to apply boolean conversion
+                # This is a simple extraction - works for basic SELECT FROM table queries
+                from_match = None
+                sql_upper = sql.upper()
+                if "FROM" in sql_upper:
+                    from_idx = sql_upper.index("FROM")
+                    after_from = sql[from_idx + 4:].strip()
+                    # Extract table name (stops at space, comma, or WHERE)
+                    import re
+                    table_match = re.match(r'(\w+)', after_from)
+                    if table_match:
+                        table_name = table_match.group(1)
+                        try:
+                            # Get column types for boolean conversion
+                            # IMPORTANT: For lazy tenants, we need to get schema from the db_path we're actually using (__empty__),
+                            # not from the tenant's path (which might not exist yet or be empty)
+                            # Create a temporary TableManager with the actual db_path to avoid creating empty tenant databases
+                            from cinchdb.managers.table import TableManager
+                            temp_table_mgr = TableManager.__new__(TableManager)
+                            temp_table_mgr.db_path = db_path  # Use the actual path from get_tenant_db_path_for_operation
+                            temp_table_mgr.project_root = self.project_dir
+                            temp_table_mgr.database = self.database
+                            temp_table_mgr.branch = self.branch
+                            temp_table_mgr.tenant = self.tenant
+                            temp_table_mgr.encryption_manager = self.encryption_manager
+
+                            table = temp_table_mgr.get_table(table_name)
+                            column_types = {col.name: col.type for col in table.columns}
+
+                            # Convert BOOLEAN values from storage
+                            from cinchdb.utils.type_utils import convert_value_from_storage
+                            for row in results:
+                                for col_name, value in row.items():
+                                    if col_name in column_types:
+                                        row[col_name] = convert_value_from_storage(column_types[col_name], value)
+                        except:
+                            # If we can't get table schema, proceed without conversion
+                            pass
 
                 # Apply column masking if requested
                 if mask_columns and results:

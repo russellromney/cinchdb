@@ -5,6 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.change_applier import ChangeApplier
@@ -37,7 +38,7 @@ class TestTableManager:
     @pytest.fixture
     def table_manager(self, temp_project):
         """Create a TableManager instance."""
-        return TableManager(temp_project, "main", "main", "main")
+        return TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
     def test_list_tables_empty(self, table_manager):
         """Test listing tables in empty database."""
@@ -106,6 +107,32 @@ class TestTableManager:
             table_manager.create_table("posts", columns)
         assert "already exists" in str(exc.value)
 
+    def test_create_table_empty_columns(self, table_manager, temp_project):
+        """Test creating table with empty columns list."""
+        # Create table with no user-defined columns
+        table = table_manager.create_table("empty_table", [])
+
+        # Should have exactly 3 system columns
+        assert table.name == "empty_table"
+        assert len(table.columns) == 3
+
+        # Verify the system columns
+        col_names = [col.name for col in table.columns]
+        assert col_names == ["id", "created_at", "updated_at"]
+
+        # Verify id column is marked as unique
+        id_col = table.columns[0]
+        assert id_col.name == "id"
+        assert id_col.unique == True
+        assert id_col.nullable == False
+
+        # Verify table exists in database
+        db_path = get_tenant_db_path(temp_project, "main", "main", "main")
+        with DatabaseConnection(db_path) as conn:
+            cursor = conn.execute("PRAGMA table_info(empty_table)")
+            db_columns = cursor.fetchall()
+            assert len(db_columns) == 3
+
     def test_create_table_protected_names(self, table_manager):
         """Test creating table with protected column names."""
         # Try to use protected column names
@@ -135,7 +162,7 @@ class TestTableManager:
 
         id_col = next(c for c in table.columns if c.name == "id")
         assert id_col.type == "TEXT"
-        # id is always the primary key (no primary_key field needed)
+        assert id_col.unique == True  # id is always unique (PRIMARY KEY)
 
     def test_get_table_not_exists(self, table_manager):
         """Test getting non-existent table."""
@@ -277,8 +304,8 @@ class TestTableManager:
         """Test that table changes are tracked and can be applied to all tenants."""
         from cinchdb.managers.tenant import TenantManager
 
-        # Create additional tenant first (non-lazy so it gets schema changes)
-        tenant_mgr = TenantManager(temp_project, "main", "main")
+        # Create additional tenant first (non-lazy)
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         tenant_mgr.create_tenant("tenant2", lazy=False)
 
         # Create table (this automatically applies to all tenants)

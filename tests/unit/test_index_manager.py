@@ -6,6 +6,7 @@ import tempfile
 import shutil
 
 from cinchdb.managers.index import IndexManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.table import TableManager
 from cinchdb.models import Column
 from cinchdb.core.initializer import ProjectInitializer
@@ -23,9 +24,8 @@ class TestIndexManager:
         # Initialize project
         initializer = ProjectInitializer(project_dir)
         initializer.init_project("testdb", "main")
-        
-        # Create a test table
-        table_manager = TableManager(project_dir, "testdb", "main", "main")
+
+        table_manager = TableManager(ConnectionContext(project_root=project_dir, database="testdb", branch="main", tenant="main"))
         table_manager.create_table(
             "users",
             [
@@ -42,8 +42,8 @@ class TestIndexManager:
         shutil.rmtree(temp_dir)
 
     def test_create_simple_index(self, temp_project):
-        """Test creating a simple index on a single column."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        """Test creating a simple index."""
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         # Create index
         index_name = manager.create_index("users", ["email"])
@@ -59,7 +59,7 @@ class TestIndexManager:
 
     def test_create_unique_index(self, temp_project):
         """Test creating a unique index."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         # Create unique index
         index_name = manager.create_index("users", ["username"], unique=True)
@@ -72,8 +72,8 @@ class TestIndexManager:
         assert indexes[0]["unique"] is True
 
     def test_create_compound_index(self, temp_project):
-        """Test creating a compound index on multiple columns."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        """Test creating a compound index."""
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         # Create compound index
         index_name = manager.create_index("users", ["username", "email"])
@@ -86,8 +86,8 @@ class TestIndexManager:
         assert indexes[0]["columns"] == ["username", "email"]
 
     def test_create_named_index(self, temp_project):
-        """Test creating an index with a custom name."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        """Test creating a named index."""
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         # Create named index
         custom_name = "idx_user_lookup"
@@ -102,7 +102,7 @@ class TestIndexManager:
 
     def test_drop_index(self, temp_project):
         """Test dropping an index."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         # Create and drop index
         index_name = manager.create_index("users", ["email"])
@@ -113,9 +113,9 @@ class TestIndexManager:
         assert len(indexes) == 0
 
     def test_list_all_indexes(self, temp_project):
-        """Test listing all indexes across tables."""
-        manager = IndexManager(temp_project, "testdb", "main")
-        table_manager = TableManager(temp_project, "testdb", "main", "main")
+        """Test listing all indexes."""
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
+        table_manager = TableManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         # Create another table
         table_manager.create_table(
@@ -143,8 +143,8 @@ class TestIndexManager:
         assert len(product_indexes) == 1
 
     def test_get_index_info(self, temp_project):
-        """Test getting detailed information about an index."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        """Test getting detailed index information."""
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         # Create index
         index_name = manager.create_index("users", ["email", "username"], unique=True)
@@ -161,21 +161,21 @@ class TestIndexManager:
 
     def test_create_index_nonexistent_table(self, temp_project):
         """Test creating an index on a non-existent table."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         with pytest.raises(ValueError, match="Table 'nonexistent' does not exist"):
             manager.create_index("nonexistent", ["column"])
 
     def test_create_index_nonexistent_column(self, temp_project):
         """Test creating an index on a non-existent column."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         with pytest.raises(ValueError, match="do not exist in table"):
             manager.create_index("users", ["nonexistent"])
 
     def test_drop_nonexistent_index(self, temp_project):
         """Test dropping a non-existent index."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         # With if_exists=True (default), should not raise
         manager.drop_index("nonexistent")
@@ -186,14 +186,14 @@ class TestIndexManager:
 
     def test_get_info_nonexistent_index(self, temp_project):
         """Test getting info for a non-existent index."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         with pytest.raises(ValueError, match="does not exist"):
             manager.get_index_info("nonexistent")
 
     def test_create_duplicate_index(self, temp_project):
         """Test creating a duplicate index."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         # Create index
         index_name = manager.create_index("users", ["email"], name="test_index")
@@ -207,8 +207,8 @@ class TestIndexManager:
             manager.create_index("users", ["email"], name="test_index", if_not_exists=False)
 
     def test_empty_column_list(self, temp_project):
-        """Test creating an index with no columns."""
-        manager = IndexManager(temp_project, "testdb", "main")
+        """Test creating an index with an empty column list."""
+        manager = IndexManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main", tenant="main"))
         
         with pytest.raises(ValueError, match="At least one column"):
             manager.create_index("users", [])

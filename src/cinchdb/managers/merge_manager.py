@@ -1,12 +1,12 @@
 """Branch merging functionality for CinchDB."""
 
-from pathlib import Path
 from typing import List, Dict, Any
+
+from cinchdb.managers.base import BaseManager, ConnectionContext
 from cinchdb.models import Change, ChangeType
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.managers.change_comparator import ChangeComparator
-from cinchdb.managers.branch import BranchManager
 from cinchdb.core.path_utils import list_tenants
 
 
@@ -16,20 +16,30 @@ class MergeError(Exception):
     pass
 
 
-class MergeManager:
+class MergeManager(BaseManager):
     """Manages merging operations between branches."""
 
-    def __init__(self, project_root: Path, database_name: str):
+    def __init__(self, context: ConnectionContext):
         """Initialize the merge manager.
 
         Args:
-            project_root: Path to the project root
-            database_name: Name of the database
+            context: ConnectionContext with all connection parameters
         """
-        self.project_root = Path(project_root)
-        self.database_name = database_name
-        self.comparator = ChangeComparator(project_root, database_name)
-        self.branch_manager = BranchManager(project_root, database_name)
+        super().__init__(context)
+
+        self.database_name = self.database
+        self.comparator = ChangeComparator(self.project_root, self.database)
+
+        # Lazy-loaded branch manager
+        self._branch_manager = None
+
+    @property
+    def branch_manager(self):
+        """Get branch manager instance (lazy-loaded)."""
+        if self._branch_manager is None:
+            from cinchdb.managers.branch import BranchManager
+            self._branch_manager = BranchManager(self.context)
+        return self._branch_manager
 
     def can_merge(self, source_branch: str, target_branch: str) -> Dict[str, Any]:
         """Check if source branch can be merged into target branch.

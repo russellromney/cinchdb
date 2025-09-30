@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
 from cinchdb.managers.tenant import TenantManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.core.initializer import init_project
 
 
@@ -31,8 +32,8 @@ class TestTenantEncryptionIntegration:
     
     @pytest.fixture
     def tenant_manager(self, temp_project):
-        """Create a tenant manager for testing."""
-        return TenantManager(temp_project, "testdb", "main")
+        """Create a TenantManager for testing."""
+        return TenantManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main"))
     
     def test_create_tenant_generates_key_with_plugged(self, tenant_manager):
         """Test that tenant creation generates encryption key when plugged is available."""

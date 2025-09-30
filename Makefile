@@ -2,6 +2,7 @@
         build-python build-ts build-docs update-docs \
         dev-docs \
         test-python test-ts test-integration test-unit test-python-integration \
+        test-docs test-docs-syntax \
         all
 
 # Default target
@@ -23,6 +24,8 @@ help:
 	@echo "  make test-unit        - Run Python unit tests (CinchDB + plugged plugin)"
 	@echo "  make test-integration - Run Python integration tests only"
 	@echo "  make test-ts          - Run TypeScript SDK tests"
+	@echo "  make test-docs        - Verify documented API signatures work"
+	@echo "  make test-docs-syntax - Check docs for syntax errors and API issues"
 	@echo "  make coverage         - Run tests with coverage report (both projects)"
 	@echo ""
 	@echo "Code Quality:"
@@ -70,6 +73,14 @@ test-unit:
 
 test-python-integration:
 	ulimit -n 4096 && uv run pytest -vv tests/integration/ -v
+
+test-docs:
+	@echo "Testing documented API signatures..."
+	ulimit -n 4096 && uv run pytest tests/test_docs_api_signatures.py -v
+
+test-docs-syntax:
+	@echo "Validating documentation code examples..."
+	uv run python scripts/test_docs_examples.py
 
 coverage:
 	ulimit -n 4096 && uv run pytest -vv --cov=cinchdb --cov-report=html --cov-report=term tests/

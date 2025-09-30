@@ -71,15 +71,17 @@ class ChangeTracker:
 
         return changes
 
-    def add_change(self, change: Change) -> Change:
+    def add_change(self, change: Change, schema_snapshot: "SchemaSnapshot" = None) -> Change:
         """Add a new change to the branch.
 
         Args:
             change: Change object to add
+            schema_snapshot: Optional SchemaSnapshot of full branch schema after this change
 
         Returns:
             The added Change object with ID and timestamp
         """
+        from cinchdb.models import SchemaSnapshot
         # Ensure change has required fields
         if not change.id:
             import uuid
@@ -91,6 +93,9 @@ class ChangeTracker:
         # Check if change already exists
         existing = self.metadata_db.get_change(change.id)
         if not existing:
+            # Convert SchemaSnapshot to dict for storage
+            snapshot_dict = schema_snapshot.to_dict() if schema_snapshot else None
+
             # Create new change - use the correct parameter names
             self.metadata_db.create_change(
                 change_id=change.id,
@@ -102,6 +107,7 @@ class ChangeTracker:
                 entity_name=change.entity_name,
                 details=change.details,
                 sql=change.sql,
+                schema_snapshot=snapshot_dict,
             )
 
         # Link change to branch if not already linked

@@ -1,46 +1,23 @@
 """View/Model management for CinchDB."""
 
-from pathlib import Path
 from typing import List
 
+from cinchdb.managers.base import BaseManager, ConnectionContext
 from cinchdb.models import View, Change, ChangeType
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.core.maintenance_utils import check_maintenance_mode
-from cinchdb.managers.change_tracker import ChangeTracker
 
 
-class ViewModel:
+class ViewModel(BaseManager):
     """Manages SQL views (models) in the database."""
 
-    def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main"
-    ):
+    def __init__(self, context: ConnectionContext):
         """Initialize view manager.
 
         Args:
-            project_root: Path to project root
-            database: Database name
-            branch: Branch name
-            tenant: Tenant name (default: main)
+            context: ConnectionContext with all connection parameters
         """
-        self.project_root = Path(project_root)
-        self.database = database
-        self.branch = branch
-        self.tenant = tenant
-        self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
-        self._change_tracker = None  # Lazy init - database might not exist yet
-
-    @property
-    def change_tracker(self):
-        """Lazy load change tracker only when needed for actual changes."""
-        if self._change_tracker is None:
-            try:
-                self._change_tracker = ChangeTracker(self.project_root, self.database, self.branch)
-            except ValueError:
-                # Database/branch doesn't exist yet - this is fine for read operations
-                return None
-        return self._change_tracker
+        super().__init__(context)
 
     def list_views(self) -> List[View]:
         """List all views in the database.

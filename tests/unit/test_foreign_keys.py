@@ -5,6 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.table import TableManager
 from cinchdb.models import Column, ForeignKeyRef
 from cinchdb.core.connection import DatabaseConnection
@@ -29,7 +30,7 @@ class TestForeignKeys:
     @pytest.fixture
     def table_manager(self, temp_project):
         """Create a TableManager instance."""
-        return TableManager(temp_project, "main", "main", "main")
+        return TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
     def test_create_table_with_foreign_key(self, table_manager, temp_project):
         """Test creating a table with a foreign key."""

@@ -5,6 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.column import ColumnManager
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.change_tracker import ChangeTracker
@@ -30,8 +31,8 @@ class TestColumnManager:
 
     @pytest.fixture
     def managers(self, temp_project):
-        """Create manager instances with a test table."""
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        """Create manager instances."""
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         # Create a test table
         columns = [
@@ -40,7 +41,7 @@ class TestColumnManager:
         ]
         table_mgr.create_table("users", columns)
 
-        column_mgr = ColumnManager(temp_project, "main", "main", "main")
+        column_mgr = ColumnManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         return {"table": table_mgr, "column": column_mgr}
 

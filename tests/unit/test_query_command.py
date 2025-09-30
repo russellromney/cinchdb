@@ -7,6 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.table import TableManager
 from cinchdb.models import Column
 from cinchdb.cli.main import app
@@ -37,7 +38,8 @@ class TestQueryCommand:
         init_project(project_path)
 
         # Create a test table with data
-        table_mgr = TableManager(project_path, "main", "main", "main")
+        context = ConnectionContext(project_root=project_path, database="main", branch="main", tenant="main")
+        table_mgr = TableManager(context)
         table_mgr.create_table(
             "users",
             [

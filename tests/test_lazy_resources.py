@@ -5,7 +5,8 @@ import tempfile
 from pathlib import Path
 from cinchdb.core.initializer import ProjectInitializer, init_project
 from cinchdb.managers.branch import BranchManager
-from cinchdb.managers.tenant import TenantManager
+from cinchdb.managers.base import ConnectionContext
+from cinchdb.core.database import CinchDB
 from cinchdb.infrastructure.metadata_db import MetadataDB
 from cinchdb.core.path_utils import list_databases, list_branches, get_context_root, get_tenant_db_path
 
@@ -95,7 +96,7 @@ class TestLazyBranches:
     
     def test_create_lazy_branch(self, test_project):
         """Test creating a branch (branches are no longer lazy)."""
-        branch_manager = BranchManager(test_project, "testdb")
+        branch_manager = BranchManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create branch (no lazy parameter anymore)
         branch = branch_manager.create_branch("main", "feature1")
@@ -113,7 +114,7 @@ class TestLazyBranches:
     
     def test_materialize_lazy_branch(self, test_project):
         """Test branch creation (branches are always materialized now)."""
-        branch_manager = BranchManager(test_project, "testdb")
+        branch_manager = BranchManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create branch (always materialized)
         branch_manager.create_branch("main", "feature2")
@@ -131,7 +132,7 @@ class TestLazyBranches:
     
     def test_delete_lazy_branch(self, test_project):
         """Test deleting a branch."""
-        branch_manager = BranchManager(test_project, "testdb")
+        branch_manager = BranchManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create and delete branch
         branch_manager.create_branch("main", "feature3")
@@ -143,7 +144,7 @@ class TestLazyBranches:
     
     def test_nested_lazy_branches(self, test_project):
         """Test creating nested branches."""
-        branch_manager = BranchManager(test_project, "testdb")
+        branch_manager = BranchManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create chain of branches
         branch_manager.create_branch("main", "dev")
@@ -229,15 +230,19 @@ class TestIntegration:
         initializer.init_database("lazy2", lazy=True)
         
         # Create branches (branches are always materialized)
-        branch_mgr_mat = BranchManager(test_project, "materialized1")
+        branch_mgr_mat = BranchManager(ConnectionContext(project_root=test_project, database="materialized1", branch="main"))
         branch_mgr_mat.create_branch("main", "dev")
         branch_mgr_mat.create_branch("main", "prod")
-        
-        # Create tenants in materialized database
-        tenant_mgr = TenantManager(test_project, "materialized1", "main")
-        tenant_mgr.create_tenant("lazy_tenant", lazy=True)
-        tenant_mgr.create_tenant("real_tenant", lazy=False)
-        
+
+        # Create tenants in materialized database using CinchDB
+        db_mat = CinchDB(database="materialized1", branch="main", project_dir=test_project)
+        db_mat.create_tenant("lazy_tenant", lazy=True)
+        db_mat.create_tenant("real_tenant", lazy=False)
+
+        # Keep TenantManager for internal state checks
+        from cinchdb.managers.tenant import TenantManager
+        tenant_mgr = TenantManager(ConnectionContext(project_root=test_project, database="materialized1", branch="main"))
+
         # Verify mixed state
         databases = list_databases(test_project)
         assert all(db in databases for db in ["testdb", "lazy1", "lazy2", "materialized1"])

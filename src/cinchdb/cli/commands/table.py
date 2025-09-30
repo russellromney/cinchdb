@@ -6,9 +6,11 @@ from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.managers.table import TableManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column, ForeignKeyRef
 from cinchdb.cli.utils import get_config_with_data, validate_required_arg
+from cinchdb.utils.type_utils import normalize_type
 
 app = typer.Typer(help="Table management commands", invoke_without_command=True)
 console = Console()
@@ -29,7 +31,7 @@ def list_tables():
     db_name = config_data.active_database
     branch_name = config_data.active_branch
 
-    table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
+    table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
     tables = table_mgr.list_tables()
 
     if not tables:
@@ -45,12 +47,9 @@ def list_tables():
     table.add_column("Created", style="yellow")
 
     for tbl in tables:
-        # Count user-defined columns (exclude automatic ones)
-        user_columns = len(
-            [c for c in tbl.columns if c.name not in ["id", "created_at", "updated_at"]]
-        )
-        tbl.columns[0].name  # Placeholder - we don't track table creation time
-        table.add_row(tbl.name, str(user_columns), "-")
+        # Show total column count (including system columns: id, created_at, updated_at)
+        total_columns = len(tbl.columns)
+        table.add_row(tbl.name, str(total_columns), "-")
 
     console.print(table)
 
@@ -61,7 +60,7 @@ def create(
     name: Optional[str] = typer.Argument(None, help="Name of the table"),
     columns: Optional[List[str]] = typer.Argument(
         None,
-        help="Column definitions (format: name:type[:nullable][:fk=table[.column][:action]])",
+        help="Column definitions (format: name:type[:not_null][:fk=table[.column][:action]])",
     ),
     apply: bool = typer.Option(
         True, "--apply/--no-apply", help="Apply changes to all tenants"
@@ -69,20 +68,24 @@ def create(
 ):
     """Create a new table.
 
-    Column format: name:type[:nullable][:fk=table[.column][:action]]
-    Types: TEXT, INTEGER, REAL, BLOB, NUMERIC
+    Column format: name:type[:not_null][:fk=table[.column][:action]]
+    Types: TEXT, INTEGER, REAL, BLOB, NUMERIC, BOOLEAN
+    Type aliases: int, bool, str, string, float, double, varchar, etc.
     FK Actions: CASCADE, SET NULL, RESTRICT, NO ACTION
+    Note: Columns are nullable by default. Use :not_null to make them required.
+    Note: Types are case-insensitive (text, TEXT, Text all work)
 
     Examples:
-        cinch table create users name:TEXT email:TEXT:nullable age:INTEGER:nullable
-        cinch table create posts title:TEXT content:TEXT author_id:TEXT:fk=users
+        cinch table create users name:text:not_null email:TEXT age:int
+        cinch table create posts title:str:not_null content:TEXT active:bool author_id:TEXT:fk=users
         cinch table create comments content:TEXT post_id:TEXT:fk=posts.id:cascade
+        cinch table create placeholder  # Creates table with only system columns
     """
     name = validate_required_arg(name, "name", ctx)
+    # Allow empty columns list - table will have id, created_at, updated_at
+    columns = columns or []
     if not columns:
-        console.print(ctx.get_help())
-        console.print("\n[red]❌ Error: Missing argument 'COLUMNS'.[/red]")
-        raise typer.Exit(1)
+        console.print("[yellow]Creating table with only system columns (id, created_at, updated_at)[/yellow]")
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
@@ -99,8 +102,12 @@ def create(
             raise typer.Exit(1)
 
         col_name = parts[0]
-        col_type = parts[1].upper()
-        nullable = False
+        try:
+            col_type = normalize_type(parts[1])
+        except ValueError as e:
+            console.print(f"[red]❌ {e}[/red]")
+            raise typer.Exit(1)
+        nullable = True  # Default to nullable (SQL standard)
         foreign_key = None
 
         # Parse additional parts
@@ -108,6 +115,8 @@ def create(
             part = parts[i]
             if part.lower() == "nullable":
                 nullable = True
+            elif part.lower() in ["not_null", "notnull", "not_nullable"]:
+                nullable = False
             elif part.startswith("fk="):
                 # Parse foreign key definition
                 fk_def = part[3:]  # Remove "fk=" prefix
@@ -147,13 +156,7 @@ def create(
                     on_update="RESTRICT",  # Default to RESTRICT for updates
                 )
 
-        if col_type not in ["TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC"]:
-            console.print(f"[red]❌ Invalid type: '{col_type}'[/red]")
-            console.print(
-                "[yellow]Valid types: TEXT, INTEGER, REAL, BLOB, NUMERIC[/yellow]"
-            )
-            raise typer.Exit(1)
-
+        # Type is already validated by normalize_type above
         parsed_columns.append(
             Column(
                 name=col_name, type=col_type, nullable=nullable, foreign_key=foreign_key
@@ -161,7 +164,7 @@ def create(
         )
 
     try:
-        table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
+        table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         table_mgr.create_table(name, parsed_columns)
         console.print(
             f"[green]✅ Created table '{name}' with {len(parsed_columns)} columns[/green]"
@@ -199,7 +202,7 @@ def delete(
             raise typer.Exit(0)
 
     try:
-        table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
+        table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         table_mgr.delete_table(name)
         console.print(f"[green]✅ Deleted table '{name}'[/green]")
 
@@ -235,7 +238,7 @@ def copy(
     branch_name = config_data.active_branch
 
     try:
-        table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
+        table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         table_mgr.copy_table(source, target, copy_data=data)
         console.print(f"[green]✅ Copied table '{source}' to '{target}'[/green]")
 
@@ -262,7 +265,7 @@ def info(
     branch_name = config_data.active_branch
 
     try:
-        table_mgr = TableManager(config.project_dir, db_name, branch_name, "main")
+        table_mgr = TableManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         table = table_mgr.get_table(name)
 
         # Display info

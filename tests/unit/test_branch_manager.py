@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import shutil
 from cinchdb.managers.branch import BranchManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.core.path_utils import get_context_root
 
 
@@ -28,7 +29,7 @@ class TestBranchManager:
     @pytest.fixture
     def branch_manager(self, temp_project):
         """Create a BranchManager instance."""
-        return BranchManager(temp_project, "main")
+        return BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
     def test_list_branches_initial(self, branch_manager):
         """Test listing branches in a new project."""
@@ -64,14 +65,14 @@ class TestBranchManager:
         """Test that creating a branch copies all tenant metadata."""
         # Create an additional materialized tenant in main branch using TenantManager
         from cinchdb.managers.tenant import TenantManager
-        main_tenant_mgr = TenantManager(temp_project, "main", "main")
+        main_tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         main_tenant_mgr.create_tenant("customer1", lazy=False)
 
         # Create branch
         branch_manager.create_branch("main", "feature")
 
-        # Check tenant metadata was copied (tenants will be lazy in new branch)
-        feature_tenant_mgr = TenantManager(temp_project, "main", "feature")
+        # Check tenant metadata was copied (tenants will be lazy)
+        feature_tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="feature"))
         feature_tenants = feature_tenant_mgr.list_tenants()
         tenant_names = [t.name for t in feature_tenants if not t.name.startswith("__")]
         

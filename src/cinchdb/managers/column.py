@@ -1,54 +1,38 @@
 """Column management for CinchDB."""
 
-from pathlib import Path
 from typing import List, Any, Optional
 
-from cinchdb.models import Column, Change, ChangeType
+from cinchdb.models import Column, Change, ChangeType, SchemaSnapshot
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.core.maintenance_utils import check_maintenance_mode
-from cinchdb.managers.change_tracker import ChangeTracker
-from cinchdb.managers.table import TableManager
+from cinchdb.managers.base import BaseManager, ConnectionContext
+from cinchdb.utils.type_utils import normalize_type
 
 
-class ColumnManager:
+class ColumnManager(BaseManager):
     """Manages columns within tables."""
 
     # Protected column names that cannot be modified
     PROTECTED_COLUMNS = {"id", "created_at", "updated_at"}
 
-    def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main",
-        encryption_manager=None
-    ):
+    def __init__(self, context: ConnectionContext):
         """Initialize column manager.
 
         Args:
-            project_root: Path to project root
-            database: Database name
-            branch: Branch name
-            tenant: Tenant name (default: main)
-            encryption_manager: EncryptionManager instance for encrypted connections
+            context: ConnectionContext with all connection parameters
         """
-        self.project_root = Path(project_root)
-        self.database = database
-        self.branch = branch
-        self.tenant = tenant
-        self.encryption_manager = encryption_manager
-        self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
-        self._change_tracker = None  # Lazy init - database might not exist yet
-        self.table_manager = TableManager(project_root, database, branch, tenant, encryption_manager)
+        super().__init__(context)
+
+        # Lazy-loaded table manager
+        self._table_manager = None
 
     @property
-    def change_tracker(self):
-        """Lazy load change tracker only when needed for actual changes."""
-        if self._change_tracker is None:
-            try:
-                self._change_tracker = ChangeTracker(self.project_root, self.database, self.branch)
-            except ValueError:
-                # Database/branch doesn't exist yet - this is fine for read operations
-                return None
-        return self._change_tracker
+    def table_manager(self):
+        """Lazy load table manager to avoid circular dependencies."""
+        if self._table_manager is None:
+            from cinchdb.managers.table import TableManager
+            self._table_manager = TableManager(self.context)
+        return self._table_manager
 
     def list_columns(self, table_name: str) -> List[Column]:
         """List all columns in a table.
@@ -96,26 +80,65 @@ class ColumnManager:
                 f"Column '{column.name}' already exists in table '{table_name}'"
             )
 
+        # Normalize column type
+        normalized_column = Column(
+            name=column.name,
+            type=normalize_type(column.type),
+            nullable=column.nullable,
+            default=column.default,
+            unique=column.unique,
+            foreign_key=column.foreign_key
+        )
+
         # Build ALTER TABLE SQL
-        col_def = f"{column.name} {column.type}"
-        if not column.nullable:
+        # Handle BOOLEAN type specially (store as INTEGER with CHECK constraint)
+        if normalized_column.type == "BOOLEAN":
+            col_def = f"{normalized_column.name} INTEGER CHECK ({normalized_column.name} IN (0, 1))"
+        else:
+            col_def = f"{normalized_column.name} {normalized_column.type}"
+
+        if not normalized_column.nullable:
             col_def += " NOT NULL"
-        if column.default is not None:
-            col_def += f" DEFAULT {column.default}"
+        if normalized_column.default is not None:
+            col_def += f" DEFAULT {normalized_column.default}"
 
         alter_sql = f"ALTER TABLE {table_name} ADD COLUMN {col_def}"
+
+        # Build schema snapshot: get current schema + add this column
+        schema_snapshot = None
+        if self.change_tracker:
+            # Get existing schema from latest snapshot
+            existing_snapshot = self.change_tracker.metadata_db.get_latest_schema_snapshot(
+                self.change_tracker.branch_id
+            )
+            if existing_snapshot:
+                snapshot = existing_snapshot.deep_copy()
+            else:
+                snapshot = SchemaSnapshot()
+
+            # Add this column to the table in the snapshot
+            if snapshot.has_table(table_name):
+                snapshot.add_column(table_name, normalized_column)
+            else:
+                # Table exists but not in snapshot yet (backwards compat)
+                # Get current table schema and add it
+                table = self.table_manager.get_table(table_name)
+                snapshot.add_table(table_name, table.columns)
+                snapshot.add_column(table_name, normalized_column)
+
+            schema_snapshot = snapshot
 
         # Track the change first (as unapplied)
         change = Change(
             type=ChangeType.ADD_COLUMN,
             entity_type="column",
-            entity_name=column.name,
+            entity_name=normalized_column.name,
             branch=self.branch,
-            details={"table": table_name, "column_def": column.model_dump()},
+            details={"table": table_name, "column_def": normalized_column.model_dump()},
             sql=alter_sql,
         )
         if self.change_tracker:
-            self.change_tracker.add_change(change)
+            self.change_tracker.add_change(change, schema_snapshot=schema_snapshot)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier
@@ -585,8 +608,38 @@ class ColumnManager:
             },
             sql=f"-- ALTER COLUMN {column_name} {'NULL' if nullable else 'NOT NULL'}",
         )
+
+        # Get updated schema snapshot after this change
+        schema_snapshot = None
         if self.change_tracker:
-            self.change_tracker.add_change(change)
+            # Build updated schema by getting all tables and updating the modified column
+            snapshot = SchemaSnapshot()
+            tables = self.table_manager.list_tables(include_system=False)
+            for tbl in tables:
+                if tbl.name == table_name:
+                    # Update the nullable value for the target column in the snapshot
+                    updated_columns = []
+                    for col in existing_columns:
+                        if col.name == column_name:
+                            # Create updated column with new nullable value
+                            updated_col = Column(
+                                name=col.name,
+                                type=col.type,
+                                nullable=nullable,
+                                default=col.default,
+                                unique=col.unique,
+                                foreign_key=col.foreign_key
+                            )
+                            updated_columns.append(updated_col)
+                        else:
+                            updated_columns.append(col)
+                    snapshot.add_table(table_name, updated_columns)
+                else:
+                    # Keep other tables as-is
+                    snapshot.add_table(tbl.name, tbl.columns)
+
+            schema_snapshot = snapshot
+            self.change_tracker.add_change(change, schema_snapshot=schema_snapshot)
 
         # Apply to all tenants in the branch
         from cinchdb.managers.change_applier import ChangeApplier

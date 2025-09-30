@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.codegen import CodegenManager
 from cinchdb.models import Column
@@ -36,7 +37,7 @@ class TestCodegenEnhanced:
         tenant = "main"
 
         # Create table manager and test table
-        table_manager = TableManager(project_root, database, branch, tenant)
+        table_manager = TableManager(ConnectionContext(project_root=project_root, database=database, branch=branch, tenant=tenant))
 
         # Create users table
         columns = [
@@ -47,7 +48,7 @@ class TestCodegenEnhanced:
         table_manager.create_table("users", columns)
 
         # Create and return codegen manager
-        return CodegenManager(project_root, database, branch, tenant)
+        return CodegenManager(ConnectionContext(project_root=project_root, database=database, branch=branch, tenant=tenant))
 
     def test_enhanced_model_generation(self, temp_project, codegen_manager):
         """Test that enhanced models are generated with CRUD methods."""
@@ -218,8 +219,8 @@ class TestCodegenEnhanced:
 
     def test_init_file_generation(self, temp_project):
         """Test that __init__.py is generated correctly."""
-        # Create table manager directly for this test
-        table_manager = TableManager(temp_project, "main", "main", "main")
+        # Create table manager
+        table_manager = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         # Create another table for testing
         columns = [
@@ -228,8 +229,7 @@ class TestCodegenEnhanced:
         ]
         table_manager.create_table("posts", columns)
 
-        # Create codegen manager
-        codegen_manager = CodegenManager(temp_project, "main", "main", "main")
+        codegen_manager = CodegenManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         output_dir = temp_project / "generated_models"
 
@@ -255,8 +255,8 @@ class TestCodegenEnhanced:
 
     def test_field_generation_with_types(self, temp_project):
         """Test that fields are generated with correct types."""
-        # Create table manager and table with various column types
-        table_manager = TableManager(temp_project, "main", "main", "main")
+        # Create table manager and table
+        table_manager = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         columns = [
             Column(name="text_field", type="TEXT", nullable=True),
@@ -266,8 +266,7 @@ class TestCodegenEnhanced:
         ]
         table_manager.create_table("test_types", columns)
 
-        # Create codegen manager
-        codegen_manager = CodegenManager(temp_project, "main", "main", "main")
+        codegen_manager = CodegenManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         output_dir = temp_project / "generated_models"
 

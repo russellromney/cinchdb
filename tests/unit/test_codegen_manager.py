@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers import TableManager, ViewModel, CodegenManager
 from cinchdb.models import Column
 
@@ -30,8 +31,7 @@ class TestCodegenManager:
     @pytest.fixture
     def codegen_manager(self, temp_project):
         """Create CodegenManager with test data."""
-        # Create some test tables
-        table_manager = TableManager(temp_project, "main", "main", "main")
+        table_manager = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         # Create users table
         users_columns = [
@@ -50,13 +50,14 @@ class TestCodegenManager:
         table_manager.create_table("posts", posts_columns)
 
         # Create a view
-        view_manager = ViewModel(temp_project, "main", "main", "main")
+        context = ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main")
+        view_manager = ViewModel(context)
         view_manager.create_view(
             "user_posts",
             "SELECT u.name, u.email, p.title FROM users u JOIN posts p ON u.id = p.user_id",
         )
 
-        return CodegenManager(temp_project, "main", "main", "main")
+        return CodegenManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
     def test_get_supported_languages(self, codegen_manager):
         """Test getting supported languages."""

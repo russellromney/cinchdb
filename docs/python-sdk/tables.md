@@ -10,11 +10,11 @@ from cinchdb.models import Column
 
 db = cinchdb.connect("myapp")
 
-# Simple table
+# Simple table (columns are nullable by default)
 table = db.create_table("users", [
     Column(name="name", type="TEXT"),
     Column(name="email", type="TEXT", unique=True),
-    Column(name="age", type="INTEGER", nullable=True)
+    Column(name="age", type="INTEGER")  # nullable=True by default
 ])
 # Expected output: Table object with columns and metadata
 # Performance: ~5ms to create table structure
@@ -22,32 +22,70 @@ table = db.create_table("users", [
 
 print(f"Created table '{table.name}' with {len(table.columns)} columns")
 # Console output: Created table 'users' with 6 columns (3 defined + 3 automatic)
+
+# Empty table with only system columns
+empty_table = db.create_table("placeholder", [])
+# Expected: Table with only id, created_at, updated_at columns
+print(f"Created table '{empty_table.name}' with {len(empty_table.columns)} columns")
+# Console output: Created table 'placeholder' with 3 columns
+# Use case: Placeholder tables, tables to be populated programmatically,
+#           or when schema will be added incrementally via migrations
 ```
 
 Every table automatically gets:
-- `id` - UUID primary key
-- `created_at` - Creation timestamp  
-- `updated_at` - Last modified timestamp
+- `id` - UUID primary key (unique, not nullable)
+- `created_at` - Creation timestamp (not nullable)
+- `updated_at` - Last modified timestamp (nullable)
 
 ### Column Types
 ```python
-# Common column types
+# Common column types (case-insensitive with aliases)
 Column(name="name", type="TEXT")           # String - stores up to 2^31 characters
 Column(name="price", type="REAL")          # Decimal - 8-byte floating point
 Column(name="quantity", type="INTEGER")    # Whole number - 64-bit signed integer
-Column(name="active", type="BOOLEAN")      # True/false - stored as 0/1
-Column(name="data", type="BLOB")          # Binary data - up to 2^31 bytes
+Column(name="active", type="BOOLEAN")      # True/false - returns Python bool values
+Column(name="data", type="BLOB")           # Binary data - up to 2^31 bytes
+
+# Types are case-insensitive and support common aliases
+Column(name="field1", type="text")         # Same as TEXT
+Column(name="field2", type="int")          # Alias for INTEGER
+Column(name="field3", type="bool")         # Alias for BOOLEAN
+Column(name="field4", type="float")        # Alias for REAL
+Column(name="field5", type="str")          # Alias for TEXT
+Column(name="field6", type="varchar")      # Alias for TEXT
 
 # Column properties
 Column(name="email", type="TEXT", nullable=False, unique=True)
 # Creates unique index automatically, query performance: <1ms with index
 
-Column(name="bio", type="TEXT", nullable=True)  # Can be NULL
-# Default nullable=False for data integrity
+Column(name="bio", type="TEXT")  # nullable=True by default
+# Default nullable=True for flexibility
+
+Column(name="required_field", type="TEXT", nullable=False)  # Must provide value
 
 # Common errors:
-# ValueError: Invalid column type 'STRING' - Use 'TEXT' instead
+# ValueError: Invalid column type 'STRING' - Use 'TEXT' or 'str' instead
 # sqlite3.IntegrityError: NOT NULL constraint failed - Required field missing
+```
+
+### BOOLEAN Type
+```python
+# BOOLEAN columns return Python bool values
+db.create_table("settings", [
+    Column(name="enabled", type="BOOLEAN"),      # Can use BOOLEAN
+    Column(name="visible", type="bool"),         # Or bool alias
+    Column(name="active", type="Boolean")        # Case-insensitive
+])
+
+# Insert boolean values
+db.insert("settings", {"enabled": True, "visible": False, "active": True})
+# Internally stored as 1/0 for SQLite compatibility
+
+# Query returns Python bool
+result = db.query("SELECT * FROM settings WHERE enabled = ?", [True])
+print(result[0]["enabled"])  # Outputs: True (not 1)
+# Expected: True/False values, not integers
+# Performance: No conversion overhead, handled at storage layer
 ```
 
 ### Tables with Indexes
@@ -61,15 +99,15 @@ table = db.create_table("products", [
 # Performance: ~5ms for table creation
 
 # Add indexes after creation
-idx1 = db.create_index("idx_products_name", "products", ["name"])
+idx1 = db.create_index("products", ["name"], name="idx_products_name")
 # Expected: Index created in ~5ms
 # Query performance improvement: 10-100x faster on WHERE name = ?
 
-idx2 = db.create_index("idx_products_email", "products", ["email"], unique=True)
+idx2 = db.create_index("products", ["email"], name="idx_products_email", unique=True)
 # Expected: Unique index created, prevents duplicate emails
 # Performance: <1ms lookups, automatic constraint enforcement
 
-idx3 = db.create_index("idx_products_category_price", "products", ["category", "price"])
+idx3 = db.create_index("products", ["category", "price"], name="idx_products_category_price")
 # Expected: Compound index for multi-column queries
 # Performance: Optimal for WHERE category = ? ORDER BY price queries
 # Note: Column order matters - category queries fast, price-only queries won't use this index
@@ -194,7 +232,7 @@ order_summary = db.query("""
 ### Update Records
 ```python
 # Update single record
-updated_user = db.update("users", user_id, {"last_login": "2024-01-15T10:30:00Z"})
+updated_user = db.update("users", {"id": user_id, "last_login": "2024-01-15T10:30:00Z"})
 # Expected output: {"id": "uuid-123", ..., "last_login": "2024-01-15T10:30:00Z", "updated_at": "2025-01-15T11:00:00Z"}
 # Performance: ~1ms per update
 # Note: updated_at field automatically set to current timestamp
@@ -225,7 +263,7 @@ db.query("DELETE FROM orders WHERE status = ? AND created_at < ?", ["cancelled",
 # Common errors:
 # sqlite3.IntegrityError: FOREIGN KEY constraint failed - Delete child records first
 # Tip: Consider soft deletes for audit trails:
-# db.update("orders", order_id, {"deleted_at": "datetime('now')"})
+# db.update("orders", {"id": order_id, "deleted_at": "datetime('now')"})
 ```
 
 ## Multi-Tenant Tables
@@ -297,7 +335,7 @@ db.create_index("orders", ["status", "created_at"])    # Status + date queries
 ```python
 # Use appropriate types
 Column(name="price", type="REAL")           # Not TEXT
-Column(name="quantity", type="INTEGER")     # Not REAL  
+Column(name="quantity", type="INTEGER")     # Not REAL
 Column(name="active", type="BOOLEAN")       # Not INTEGER
 
 # Make appropriate columns nullable
@@ -309,26 +347,141 @@ Column(name="email", type="TEXT", unique=True)
 Column(name="username", type="TEXT", unique=True)
 ```
 
+## Flexible Data Storage Options
+
+CinchDB emphasizes structured schemas with proper columns. This enables fast queries, indexes, type safety, and easier maintenance. However, different use cases call for different storage approaches:
+
+### When to Use Structured Columns (Recommended)
+
+Define explicit columns for data that needs to be queried, filtered, or indexed:
+
+```python
+# Good: Structured schema
+db.create_table("users", [
+    Column(name="name", type="TEXT"),
+    Column(name="email", type="TEXT", unique=True),
+    Column(name="theme", type="TEXT"),
+    Column(name="language", type="TEXT"),
+    Column(name="notifications_enabled", type="BOOLEAN")
+])
+
+# Benefits:
+# - Fast queries: WHERE theme = 'dark'
+# - Indexes work efficiently
+# - Type safety and constraints
+# - Easy to evolve schema (add columns as needed)
+```
+
+### When to Use Key-Value Store
+
+For simple, unstructured data that doesn't need complex queries, use the KV store:
+
+```python
+# Good: Simple key-value pairs
+db.kv.set("user:123:settings", {"theme": "dark", "lang": "en", "notifications": True})
+settings = db.kv.get("user:123:settings")
+
+# Good for:
+# - Session data (with TTL)
+# - Cache values
+# - Simple configuration that's looked up by key only
+# - Temporary data
+
+# Not good for:
+# - Data you need to query across multiple records
+# - Data that needs indexes
+# - Data with complex relationships
+```
+
+### Advanced: JSON in TEXT Columns
+
+SQLite supports JSON functions for advanced users who need semi-structured data. Store JSON strings in TEXT columns:
+
+```python
+import json
+
+# Store JSON in TEXT column
+db.create_table("events", [
+    Column(name="event_type", type="TEXT"),
+    Column(name="metadata", type="TEXT")  # Will contain JSON
+])
+
+db.insert("events", {
+    "event_type": "page_view",
+    "metadata": json.dumps({"page": "/home", "duration": 3.5, "referrer": "google"})
+})
+
+# Query JSON fields using SQLite's json_extract()
+results = db.query("""
+    SELECT event_type, json_extract(metadata, '$.page') as page
+    FROM events
+    WHERE json_extract(metadata, '$.duration') > 3
+""")
+```
+
+**When to use JSON columns:**
+- Storing API responses or external data with varying structure
+- Flexible metadata that changes per record
+- Advanced users comfortable with JSON path syntax
+
+**Important notes:**
+- `db.query()` only allows SELECT statements - no json_set() or json_patch()
+- To update JSON values, you must replace the entire field
+- If you find yourself frequently querying JSON fields, normalize to proper columns instead
+- JSON columns are harder to index and query efficiently
+
+**Recommended approach:** Start with structured columns. Add specific columns as you identify common query patterns. Use KV store for simple lookups. Reserve JSON for truly flexible data that doesn't need complex queries.
+
 ## Troubleshooting
 
-**"Table already exists"**
-- **Cause**: Table was created previously
-- **Solution**: Use different name or delete existing table
-- **Check**: `db.list_tables()` to see existing tables
+### Error: "Table already exists"
+```python
+db.create_table("users", [Column(name="email", type="TEXT")])
+# Raises: ValueError: Table 'users' already exists
+```
+**Cause**: Table was created previously
+**Solutions**:
+1. Check existing tables: `tables = db.list_tables()`
+2. Get table info: `table = db.get_table("users")`
+3. Use different name: `db.create_table("user_profiles", ...)`
+4. Delete and recreate: `db.drop_table("users")` then create
 
-**"No such table: users"**
-- **Cause**: Table doesn't exist on current branch/database
-- **Solution**: Create table first or switch to correct branch
-- **Debug**: `db.list_tables()` and `db.current_branch`
+### Error: "No such table: users"
+```python
+result = db.query("SELECT * FROM users")
+# Raises: sqlite3.OperationalError: no such table: users
+```
+**Cause**: Table doesn't exist on current branch/database
+**Solutions**:
+1. Check available tables: `db.list_tables()`
+2. Verify current branch: `db.current_branch`
+3. Create table first:
+   ```python
+   db.create_table("users", [
+       Column(name="email", type="TEXT")
+   ])
+   ```
 
-**"UNIQUE constraint failed: users.email"**
-- **Cause**: Inserting duplicate value in unique column
-- **Solution**: Check for existing record before insert
-- **Example**: `db.query("SELECT id FROM users WHERE email = ?", [email])`
+### Error: "UNIQUE constraint failed: users.email"
+```python
+db.insert("users", {"email": "john@example.com"})
+db.insert("users", {"email": "john@example.com"})  # Fails
+# Raises: sqlite3.IntegrityError: UNIQUE constraint failed: users.email
+```
+**Cause**: Inserting duplicate value in unique column
+**Solutions**:
+1. Check before insert:
+   ```python
+   existing = db.query("SELECT id FROM users WHERE email = ?", ["john@example.com"])
+   if not existing:
+       db.insert("users", {"email": "john@example.com"})
+   ```
+2. Use upsert pattern (update if exists)
+3. Remove unique constraint if duplicates are allowed
 
 **"Slow queries" (>100ms)**
 - **Cause**: Missing indexes on WHERE/JOIN columns
-- **Solution**: Add indexes: `db.create_index("idx_name", "table", ["column"])`
+- **Solution**: Add indexes: `db.create_index("table", ["column"], name="idx_name")`
 - **Analyze**: `db.query("EXPLAIN QUERY PLAN SELECT ...")` to check index usage
 - **Performance expectation**:
   - Indexed queries: <5ms

@@ -60,9 +60,17 @@ class TestCinchDB:
         # Access a manager through private interface
         with patch("cinchdb.managers.table.TableManager") as mock_table_manager:
             _ = db._managers.tables
-            mock_table_manager.assert_called_once_with(
-                tmp_path, "test_db", "main", "main", None
-            )
+            # Now TableManager is called with ConnectionContext
+            from cinchdb.managers.base import ConnectionContext
+            mock_table_manager.assert_called_once()
+            call_args = mock_table_manager.call_args[0]
+            assert len(call_args) == 1
+            assert isinstance(call_args[0], ConnectionContext)
+            assert call_args[0].project_root == tmp_path
+            assert call_args[0].database == "test_db"
+            assert call_args[0].branch == "main"
+            assert call_args[0].tenant == "main"
+            assert call_args[0].encryption_manager is None
 
         # Should be cached
         with patch("cinchdb.managers.table.TableManager") as mock_table_manager:
@@ -332,10 +340,18 @@ class TestCinchDB:
             mock_data_manager.return_value = mock_instance
             
             result = db.insert("users", {"name": "Test User", "email": "test@example.com"})
-            
-            mock_data_manager.assert_called_once_with(
-                tmp_path, "test_db", "main", "main", None
-            )
+
+            # Now DataManager is called with ConnectionContext
+            from cinchdb.managers.base import ConnectionContext
+            mock_data_manager.assert_called_once()
+            call_args = mock_data_manager.call_args[0]
+            assert len(call_args) == 1
+            assert isinstance(call_args[0], ConnectionContext)
+            assert call_args[0].project_root == tmp_path
+            assert call_args[0].database == "test_db"
+            assert call_args[0].branch == "main"
+            assert call_args[0].tenant == "main"
+            assert call_args[0].encryption_manager is None
             mock_instance.create_from_dict.assert_called_once_with(
                 "users", {"name": "Test User", "email": "test@example.com"}
             )

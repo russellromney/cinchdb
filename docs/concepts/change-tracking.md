@@ -46,7 +46,7 @@ CinchDB tracks these schema modifications:
 Changes are stored in `changes.json` within each branch:
 
 ```
-.cinchdb/databases/myapp/branches/feature/
+.cinchdb/databases/myapp/branches/feature.add-users/
 ├── metadata.json
 ├── changes.json    # All changes for this branch
 └── tenants/

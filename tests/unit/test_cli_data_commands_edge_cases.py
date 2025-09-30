@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 from unittest.mock import patch, MagicMock
 
 from cinchdb.cli.commands.data import app
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.core.initializer import init_project
 from cinchdb.managers.table import TableManager
 from cinchdb.models.table import Column
@@ -30,10 +31,10 @@ class TestDataCommandsEdgeCases:
         
         # Initialize project
         init_project(project_dir)
-        
-        # Create test tables with various column types
-        table_mgr = TableManager(project_dir, "main", "main")
-        
+
+        # Create test table
+        table_mgr = TableManager(ConnectionContext(project_root=project_dir, database="main", branch="main"))
+
         # Users table with all column types
         table_mgr.create_table(
             "users",

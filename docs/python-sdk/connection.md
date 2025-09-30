@@ -179,8 +179,8 @@ db = cinchdb.connect("myapp")
 
 # Use direct methods on CinchDB instance
 results = db.query("SELECT * FROM users")
-user_id = db.insert("users", {"name": "John", "email": "john@example.com"})
-db.update("users", user_id, {"name": "John Smith"})
+user = db.insert("users", {"name": "John", "email": "john@example.com"})
+db.update("users", {"id": user["id"], "name": "John Smith"})
 ```
 
 ## Error Handling

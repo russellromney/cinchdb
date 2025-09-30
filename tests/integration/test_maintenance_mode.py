@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from threading import Thread
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.tenant import TenantManager
@@ -32,8 +33,7 @@ class TestMaintenanceMode:
 
     def test_maintenance_mode_during_apply_all(self, temp_project):
         """Test that apply_all sets and clears maintenance mode."""
-        # Create a table change
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
         table_mgr.create_table(
             "users",
             [Column(name="user_id", type="TEXT", nullable=False)]
@@ -75,8 +75,8 @@ class TestMaintenanceMode:
         metadata_db = get_metadata_db(temp_project)
         metadata_db.set_branch_maintenance("main", "main", True, "Testing")
 
-        # Try to create a table - should fail
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        # Try to create table while in maintenance mode
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
         with pytest.raises(MaintenanceError) as exc_info:
             table_mgr.create_table(
                 "blocked_table",
@@ -97,10 +97,9 @@ class TestMaintenanceMode:
     def test_maintenance_mode_during_merge(self, temp_project):
         """Test that merge operations use maintenance mode."""
         # Create a feature branch with changes
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
-
-        table_mgr = TableManager(temp_project, "main", "feature", "main")
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature", tenant="main"))
         table_mgr.create_table(
             "products",
             [Column(name="name", type="TEXT", nullable=False)]
@@ -124,7 +123,7 @@ class TestMaintenanceMode:
         monitor_thread.start()
 
         # Perform merge
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.merge_into_main("feature")
         assert result["success"]
 
@@ -136,8 +135,7 @@ class TestMaintenanceMode:
 
     def test_concurrent_write_blocked_during_maintenance(self, temp_project):
         """Test that concurrent writes are blocked during maintenance."""
-        # Create initial table
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
         table_mgr.create_table(
             "initial",
             [Column(name="item_id", type="INTEGER", nullable=False)]
@@ -153,8 +151,7 @@ class TestMaintenanceMode:
             time.sleep(0.05)  # Let maintenance mode get set
 
             try:
-                # This should be blocked
-                table_mgr2 = TableManager(temp_project, "main", "main", "main")
+                table_mgr2 = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
                 table_mgr2.create_table(
                     "concurrent_table",
                     [Column(name="data", type="TEXT", nullable=False)]
@@ -211,10 +208,9 @@ class TestMaintenanceMode:
     def test_nested_maintenance_mode(self, temp_project):
         """Test that nested operations don't interfere with maintenance mode."""
         # Create a branch with multiple changes
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
-
-        table_mgr = TableManager(temp_project, "main", "feature", "main")
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature", tenant="main"))
 
         # Create multiple tables
         for i in range(3):
@@ -250,8 +246,7 @@ class TestMaintenanceMode:
 
     def test_maintenance_mode_with_multiple_tenants(self, temp_project):
         """Test maintenance mode applies to all materialized tenants."""
-        # Create multiple tenants
-        tenant_mgr = TenantManager(temp_project, "main", "main")
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         tenant_mgr.create_tenant("tenant1")
         tenant_mgr.create_tenant("tenant2")
 
@@ -259,8 +254,8 @@ class TestMaintenanceMode:
         tenant_mgr.materialize_tenant("tenant1")
         tenant_mgr.materialize_tenant("tenant2")
 
-        # Create a table change
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        # Create table in main branch
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
         table_mgr.create_table(
             "shared_table",
             [Column(name="data", type="TEXT", nullable=False)]

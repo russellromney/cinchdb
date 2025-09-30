@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.managers.view import ViewModel
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.cli.utils import get_config_with_data, validate_required_arg
 
@@ -28,7 +29,7 @@ def list_views():
     db_name = config_data.active_database
     branch_name = config_data.active_branch
 
-    view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
+    view_mgr = ViewModel(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name, tenant="main"))
     views = view_mgr.list_views()
 
     if not views:
@@ -72,7 +73,7 @@ def create(
     branch_name = config_data.active_branch
 
     try:
-        view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
+        view_mgr = ViewModel(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name, tenant="main"))
         view_mgr.create_view(name, sql)
         console.print(f"[green]✅ Created view '{name}'[/green]")
 
@@ -105,7 +106,7 @@ def update(
     branch_name = config_data.active_branch
 
     try:
-        view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
+        view_mgr = ViewModel(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name, tenant="main"))
         view_mgr.update_view(name, sql)
         console.print(f"[green]✅ Updated view '{name}'[/green]")
 
@@ -146,7 +147,7 @@ def delete(
             raise typer.Exit(0)
 
     try:
-        view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
+        view_mgr = ViewModel(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name, tenant="main"))
         view_mgr.delete_view(name)
         console.print(f"[green]✅ Deleted view '{name}'[/green]")
 
@@ -173,7 +174,7 @@ def info(
     branch_name = config_data.active_branch
 
     try:
-        view_mgr = ViewModel(config.project_dir, db_name, branch_name, "main")
+        view_mgr = ViewModel(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name, tenant="main"))
         view = view_mgr.get_view(name)
 
         # Display info

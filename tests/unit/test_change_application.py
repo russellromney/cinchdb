@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.managers.change_tracker import ChangeTracker
@@ -33,8 +34,8 @@ class TestChangeApplier:
     @pytest.fixture
     def managers(self, temp_project):
         """Create manager instances."""
-        branch_mgr = BranchManager(temp_project, "main")
-        tenant_mgr = TenantManager(temp_project, "main", "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         change_tracker = ChangeTracker(temp_project, "main", "main")
         change_applier = ChangeApplier(temp_project, "main", "main")
 
@@ -362,8 +363,8 @@ class TestChangeApplierRollback:
     @pytest.fixture
     def setup_with_tenants(self, temp_project):
         """Set up project with multiple tenants and basic tables."""
-        branch_mgr = BranchManager(temp_project, "main")
-        tenant_mgr = TenantManager(temp_project, "main", "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         change_tracker = ChangeTracker(temp_project, "main", "main")
         change_applier = ChangeApplier(temp_project, "main", "main")
 

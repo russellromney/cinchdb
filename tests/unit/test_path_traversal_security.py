@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import shutil
 from cinchdb.utils.name_validator import validate_name, InvalidNameError
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.core.path_utils import get_tenant_db_path, ensure_tenant_db_path
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.core.initializer import init_project
@@ -75,8 +76,8 @@ class TestPathTraversalSecurity:
             ensure_tenant_db_path(temp_project, "main", "main", "../../etc/passwd")
     
     def test_tenant_manager_validates_names(self, temp_project):
-        """Test that TenantManager validates tenant names."""
-        tenant_mgr = TenantManager(temp_project, "main", "main")
+        """Test that TenantManager validates names."""
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         
         # Test create_tenant validates
         with pytest.raises(InvalidNameError):
@@ -107,8 +108,8 @@ class TestPathTraversalSecurity:
             tenant_mgr.materialize_tenant("../evil")
     
     def test_valid_names_still_work(self, temp_project):
-        """Test that valid names still work correctly."""
-        tenant_mgr = TenantManager(temp_project, "main", "main")
+        """Test that valid names still work."""
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         
         valid_names = [
             "tenant1",

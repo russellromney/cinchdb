@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 from cinchdb.core.initializer import init_project, init_database, ProjectInitializer
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.core.path_utils import get_database_path, get_tenant_db_path, get_context_root, get_tenant_db_path
 from cinchdb.infrastructure.metadata_db import MetadataDB
@@ -64,8 +65,8 @@ def test_tenant_default_is_lazy():
         # Initialize project with eager database so we can test tenants
         init_project(project_dir)
         init_database(project_dir, "test-db", lazy=False)
-        
-        tenant_manager = TenantManager(project_dir, "test-db", "main")
+
+        tenant_manager = TenantManager(ConnectionContext(project_root=project_dir, database="test-db", branch="main"))
         
         # Create tenant without specifying lazy parameter
         tenant_manager.create_tenant("test-tenant")
@@ -93,8 +94,8 @@ def test_tenant_explicit_eager():
         # Initialize project with eager database
         init_project(project_dir)
         init_database(project_dir, "test-db", lazy=False)
-        
-        tenant_manager = TenantManager(project_dir, "test-db", "main")
+
+        tenant_manager = TenantManager(ConnectionContext(project_root=project_dir, database="test-db", branch="main"))
         
         # Create tenant explicitly as eager
         tenant_manager.create_tenant("eager-tenant", lazy=False)

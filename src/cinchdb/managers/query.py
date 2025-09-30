@@ -1,40 +1,37 @@
 """Query execution manager for CinchDB - handles SQL queries with type-safe returns."""
 
-from pathlib import Path
 from typing import List, Optional, Type, TypeVar, Union
 
 from pydantic import BaseModel, ValidationError
 
+from cinchdb.managers.base import BaseManager, ConnectionContext
 from cinchdb.core.connection import DatabaseConnection
 from cinchdb.utils import validate_query_safe
-from cinchdb.managers.tenant import TenantManager
 
 T = TypeVar("T", bound=BaseModel)
 
 
-class QueryManager:
+class QueryManager(BaseManager):
     """Manages SQL query execution with support for typed returns."""
 
-    def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main",
-        encryption_manager=None
-    ):
+    def __init__(self, context: ConnectionContext):
         """Initialize query manager.
 
         Args:
-            project_root: Path to project root
-            database: Database name
-            branch: Branch name
-            tenant: Tenant name (default: main)
-            encryption_manager: EncryptionManager instance for encrypted connections
+            context: ConnectionContext with all connection parameters
         """
-        self.project_root = Path(project_root)
-        self.database = database
-        self.branch = branch
-        self.tenant = tenant
-        self.encryption_manager = encryption_manager
-        # Initialize tenant manager for lazy tenant handling
-        self.tenant_manager = TenantManager(project_root, database, branch, encryption_manager)
+        super().__init__(context)
+
+        # Lazy-loaded tenant manager
+        self._tenant_manager = None
+
+    @property
+    def tenant_manager(self):
+        """Get tenant manager instance (lazy-loaded)."""
+        if self._tenant_manager is None:
+            from cinchdb.managers.tenant import TenantManager
+            self._tenant_manager = TenantManager(self.context)
+        return self._tenant_manager
     
     def _is_write_query(self, sql: str) -> bool:
         """Check if a SQL query is a write operation.

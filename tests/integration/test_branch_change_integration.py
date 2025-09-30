@@ -5,6 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.change_tracker import ChangeTracker
@@ -25,8 +26,7 @@ class TestBranchChangeIntegration:
 
     def test_new_branch_inherits_changes(self, temp_project):
         """Test that a new branch inherits all changes from its parent."""
-        # Create a table in main branch
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
         table_mgr.create_table(
             "users",
             [
@@ -41,7 +41,7 @@ class TestBranchChangeIntegration:
         assert len(main_changes) > 0  # Should have CREATE TABLE change
 
         # Create feature branch
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Feature branch should have all main's changes
@@ -59,10 +59,9 @@ class TestBranchChangeIntegration:
     def test_branch_after_merge_has_all_changes(self, temp_project):
         """Test that branching after a merge includes merged changes."""
         # Create feature1 branch and add a table
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature1")
-
-        table_mgr1 = TableManager(temp_project, "main", "feature1", "main")
+        table_mgr1 = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature1", tenant="main"))
         table_mgr1.create_table(
             "products",
             [Column(name="name", type="TEXT", nullable=False)]
@@ -70,7 +69,7 @@ class TestBranchChangeIntegration:
 
         # Merge feature1 to main
         from cinchdb.managers.merge_manager import MergeManager
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.merge_into_main("feature1")
         assert result["success"]
 
@@ -88,20 +87,20 @@ class TestBranchChangeIntegration:
 
     def test_divergent_branches_track_correctly(self, temp_project):
         """Test that divergent branches correctly track their changes."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         # Create two feature branches from main
         branch_mgr.create_branch("main", "feature_a")
         branch_mgr.create_branch("main", "feature_b")
 
-        # Add different tables to each
-        table_mgr_a = TableManager(temp_project, "main", "feature_a", "main")
+        # Add different tables to each branch
+        table_mgr_a = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature_a", tenant="main"))
         table_mgr_a.create_table(
             "table_a",
             [Column(name="item_id", type="INTEGER", nullable=False)]
         )
 
-        table_mgr_b = TableManager(temp_project, "main", "feature_b", "main")
+        table_mgr_b = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature_b", tenant="main"))
         table_mgr_b.create_table(
             "table_b",
             [Column(name="item_id", type="INTEGER", nullable=False)]
@@ -128,8 +127,8 @@ class TestBranchChangeIntegration:
 
     def test_applied_status_preserved_on_copy(self, temp_project):
         """Test that applied status is preserved when copying changes."""
-        # Create and apply changes in main
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        # Create table in main branch
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
         table_mgr.create_table(
             "users",
             [Column(name="user_id", type="TEXT", nullable=False)]
@@ -146,7 +145,7 @@ class TestBranchChangeIntegration:
         assert all(c.applied for c in main_changes)
 
         # Create new branch
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Changes should still be marked as applied in new branch
@@ -156,8 +155,8 @@ class TestBranchChangeIntegration:
 
     def test_change_order_preserved_on_copy(self, temp_project):
         """Test that change order is preserved when creating branches."""
-        # Create multiple tables in specific order
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        # Create multiple tables in main branch
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
 
         tables = ["users", "products", "orders", "reviews"]
         for table_name in tables:
@@ -171,7 +170,7 @@ class TestBranchChangeIntegration:
         main_changes = main_tracker.get_changes()
 
         # Create new branch
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Get feature changes

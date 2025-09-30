@@ -19,35 +19,47 @@ Tables in main/main:
 ┏━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
 ┃ Name      ┃ Columns ┃ Created            ┃
 ┡━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
-│ users     │ 3       │ 2024-01-15 10:30:00│
-│ products  │ 5       │ 2024-01-15 11:00:00│
-│ orders    │ 4       │ 2024-01-15 11:30:00│
+│ users     │ 6       │ 2024-01-15 10:30:00│
+│ products  │ 8       │ 2024-01-15 11:00:00│
+│ orders    │ 7       │ 2024-01-15 11:30:00│
 └───────────┴─────────┴────────────────────┘
 ```
+
+**Note:** Column count includes all columns (user-defined + system columns: id, created_at, updated_at)
 
 ## create
 
 Create a new table with columns and optional foreign key constraints.
 
 ```bash
-cinch table create TABLE_NAME COLUMN:TYPE[:nullable][:fk=table[.column][:action]]...
+cinch table create TABLE_NAME [COLUMN:TYPE[:not_null][:fk=table[.column][:action]]...]
 ```
 
 ### Arguments
 - `TABLE_NAME` - Name of the table
-- `COLUMN:TYPE` - Column definitions with optional modifiers
+- `COLUMN:TYPE` - Column definitions with optional modifiers (optional - can create empty table)
 
 ### Column Format
 ```
-name:type[:nullable][:fk=table[.column][:action]]
+name:type[:not_null][:fk=table[.column][:action]]
 ```
 
+**Note:** Columns are nullable by default. Use `:not_null` to make them required.
+
 ### Column Types
+Primary types (case-insensitive):
 - `TEXT` - String data
 - `INTEGER` - Whole numbers
 - `REAL` - Decimal numbers
 - `BLOB` - Binary data
 - `NUMERIC` - Numeric values
+- `BOOLEAN` - True/false values
+
+Type aliases (all case-insensitive):
+- `int` → `INTEGER`
+- `bool` → `BOOLEAN`
+- `str`, `string`, `varchar` → `TEXT`
+- `float`, `double` → `REAL`
 
 ### Foreign Key Actions
 - `CASCADE` - Delete/update child rows when parent is deleted/updated
@@ -56,29 +68,78 @@ name:type[:nullable][:fk=table[.column][:action]]
 - `NO ACTION` - Similar to RESTRICT
 
 ### Examples
+
+#### Basic Table Creation
 ```bash
-# Simple table
+# Simple table (columns are nullable by default)
 cinch table create users name:TEXT email:TEXT
 ```
+**Expected output:**
 ```
-✓ Created table 'users' with 5 columns (id, name, email, created_at, updated_at)
+[yellow]Creating table with system columns (id, created_at, updated_at)[/yellow]
+[green]✅ Created table 'users' with 5 columns[/green]
 ```
+**Performance:** ~5ms for table creation
 
+#### Table with Required Fields
 ```bash
-# With nullable columns
-cinch table create posts title:TEXT content:TEXT:nullable author:TEXT:nullable
+# With required columns (not_null)
+cinch table create posts title:TEXT:not_null content:TEXT author:TEXT
 ```
+**Expected output:**
 ```
-✓ Created table 'posts' with 6 columns (id, title, content, author, created_at, updated_at)
+[green]✅ Created table 'posts' with 6 columns[/green]
 ```
+**Note:** title is required, content and author are nullable
+
+#### Empty Table (System Columns Only)
+```bash
+# Empty table (only system columns)
+cinch table create placeholder
+```
+**Expected output:**
+```
+[yellow]Creating table with only system columns (id, created_at, updated_at)[/yellow]
+[green]✅ Created table 'placeholder' with 3 columns[/green]
+```
+**Use case:** Useful for placeholder tables or tables that will be populated programmatically
+
+#### Using Case-Insensitive Types and Aliases
+```bash
+# All these are equivalent - types are case-insensitive
+cinch table create users1 name:text email:TEXT age:integer
+cinch table create users2 name:Text email:text age:Integer
+
+# Using type aliases
+cinch table create settings \
+  enabled:bool \
+  timeout:int \
+  description:str \
+  percentage:float
+
+# Mix and match styles
+cinch table create products \
+  name:varchar \
+  price:double \
+  active:BOOLEAN \
+  stock:INT
+```
+**Expected output:**
+```
+[green]✅ Created table with normalized types[/green]
+```
+**Note:** All variations produce identical table schemas
 
 ```bash
 # With foreign key (references id column by default)
 cinch table create posts title:TEXT content:TEXT author_id:TEXT:fk=users
 ```
+**Expected output:**
 ```
-✓ Created table 'posts' with foreign key constraint: author_id → users(id)
+[green]✅ Created table 'posts' with 6 columns[/green]
 ```
+**Foreign key:** author_id → users(id) with RESTRICT on delete/update
+**Performance:** ~7ms (includes foreign key validation)
 
 ```bash
 # With foreign key to specific column
@@ -103,9 +164,9 @@ cinch table create reviews \
 
 ### Automatic Columns
 Every table includes:
-- `id` - UUID primary key
-- `created_at` - Creation timestamp
-- `updated_at` - Last update timestamp
+- `id` - UUID primary key (unique, not nullable)
+- `created_at` - Creation timestamp (not nullable)
+- `updated_at` - Last update timestamp (nullable)
 
 ## delete
 
@@ -121,14 +182,27 @@ cinch table delete TABLE_NAME
 ### Options
 - `--force` - Skip confirmation
 
-### Example
+### Examples
 ```bash
 # With confirmation
 cinch table delete old_table
+```
+**Expected output:**
+```
+Are you sure you want to delete table 'old_table'? [y/N]: y
+[green]✅ Deleted table 'old_table'[/green]
+```
 
+```bash
 # Without confirmation
 cinch table delete old_table --force
 ```
+**Expected output:**
+```
+[green]✅ Deleted table 'old_table'[/green]
+```
+**Performance:** ~3ms for table deletion
+**Warning:** This permanently deletes all data in the table
 
 ## info
 
@@ -141,24 +215,30 @@ cinch table info TABLE_NAME
 ### Arguments
 - `TABLE_NAME` - Table to inspect
 
-### Example Output
+### Example
+```bash
+cinch table info users
 ```
-Table: users
-Created: 2024-01-15 10:30:00
-
-Columns:
-┏━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
-┃ Name        ┃ Type    ┃ Nullable ┃
-┡━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
-│ id          │ TEXT    │ No       │
-│ name        │ TEXT    │ Yes      │
-│ email       │ TEXT    │ Yes      │
-│ created_at  │ TEXT    │ No       │
-│ updated_at  │ TEXT    │ No       │
-└─────────────┴─────────┴──────────┘
-
-Row count: 42
+**Expected output:**
 ```
+[bold]Table: users[/bold]
+Database: main
+Branch: main
+Tenant: main
+
+[bold]Columns:[/bold]
+┏━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━┓
+┃ Name        ┃ Type    ┃ Nullable ┃ Unique ┃ Default ┃
+┡━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━┩
+│ id          │ TEXT    │ No       │ Yes    │ -       │
+│ name        │ TEXT    │ Yes      │ No     │ -       │
+│ email       │ TEXT    │ Yes      │ No     │ -       │
+│ created_at  │ TEXT    │ No       │ No     │ -       │
+│ updated_at  │ TEXT    │ Yes      │ No     │ -       │
+└─────────────┴─────────┴──────────┴────────┴─────────┘
+```
+**Note:** id column shows as Unique=Yes because it's the PRIMARY KEY
+**Performance:** ~2ms for metadata retrieval
 
 ## copy
 
@@ -179,10 +259,22 @@ cinch table copy SOURCE_TABLE NEW_TABLE
 ```bash
 # Copy schema only
 cinch table copy users users_backup
+```
+**Expected output:**
+```
+[green]✅ Copied table 'users' to 'users_backup'[/green]
+```
+**Performance:** ~5ms (schema only)
 
+```bash
 # Copy with data
 cinch table copy users users_backup --data
 ```
+**Expected output:**
+```
+[green]✅ Copied table 'users' to 'users_backup'[/green]
+```
+**Performance:** Depends on data size (~10ms per 1000 rows)
 
 ## Column Management
 
@@ -271,11 +363,11 @@ cinch table create post_tags \
 2. **Column Types**
    - Use TEXT for IDs (stores UUIDs)
    - Use REAL for money/prices
-   - Use INTEGER for boolean flags (0/1)
+   - Use BOOLEAN for true/false flags (returns Python bool values)
 
 3. **Nullable Columns**
-   - Make columns nullable with `:nullable` modifier
-   - Required data should not be nullable
+   - Columns are nullable by default - use `:nullable` to be explicit
+   - Use `:not_null` modifier for required fields
    - Foreign keys can be nullable for optional relationships
 
 4. **Foreign Keys**
@@ -287,17 +379,75 @@ cinch table create post_tags \
 
 ## Troubleshooting
 
-### "Table already exists"
-**Problem**: `cinch table create users` fails with "Table already exists"
-**Solution**: Use `cinch table list` to check, or `cinch table info users` for details
+### Error: "Table already exists"
+**Command**: `cinch table create users name:TEXT`
+**Error message**:
+```
+[red]❌ Table 'users' already exists[/red]
+```
+**Cause**: A table with this name already exists in the current database/branch
+**Solutions**:
+1. Check existing tables: `cinch table list`
+2. View table structure: `cinch table info users`
+3. Use a different name: `cinch table create user_profiles name:TEXT`
+4. Delete existing table first: `cinch table delete users --force`
 
-### "Foreign key constraint failed"
-**Problem**: Creating table with foreign key to non-existent table
-**Solution**: Create parent table first: `cinch table create users name:TEXT`, then child table
+### Error: "Foreign key reference to non-existent table"
+**Command**: `cinch table create posts author_id:TEXT:fk=users`
+**Error message**:
+```
+[red]❌ Foreign key reference to non-existent table: 'users'[/red]
+```
+**Cause**: Referenced table doesn't exist
+**Solutions**:
+1. Create parent table first:
+   ```bash
+   cinch table create users name:TEXT email:TEXT
+   cinch table create posts title:TEXT author_id:TEXT:fk=users
+   ```
+2. Check table name spelling: `cinch table list`
+3. Verify you're in the correct branch: `cinch branch current`
 
-### "Cannot create table: Invalid column syntax"
-**Problem**: Wrong column format in table creation
-**Solution**: Use format `name:TYPE[:nullable][:fk=table]`, e.g. `user_id:TEXT:fk=users`
+### Error: "Invalid column definition"
+**Command**: `cinch table create users name:STRING`
+**Error message**:
+```
+[red]❌ Invalid type: 'STRING'[/red]
+[yellow]Valid types: TEXT, INTEGER, REAL, BLOB, NUMERIC[/yellow]
+```
+**Cause**: Incorrect column type or syntax
+**Solutions**:
+1. Use valid SQLite types: TEXT, INTEGER, REAL, BLOB, NUMERIC
+2. Check column format: `name:TYPE[:not_null][:fk=table[.column][:action]]`
+3. Examples of correct syntax:
+   - `name:TEXT` - nullable text column
+   - `age:INTEGER:not_null` - required integer
+   - `user_id:TEXT:fk=users` - foreign key
+
+### Error: "Column name is protected"
+**Command**: `cinch table create posts id:TEXT title:TEXT`
+**Error message**:
+```
+[red]❌ Column name 'id' is protected and cannot be used[/red]
+```
+**Cause**: Using reserved column names (id, created_at, updated_at)
+**Solutions**:
+1. Use different column name: `post_id:TEXT` instead of `id:TEXT`
+2. System columns are added automatically - no need to define them
+3. For custom IDs, use names like `external_id`, `legacy_id`, etc.
+
+### Error: "Table does not exist"
+**Command**: `cinch table info nonexistent`
+**Error message**:
+```
+[red]❌ Table 'nonexistent' does not exist[/red]
+```
+**Cause**: Trying to access a table that doesn't exist
+**Solutions**:
+1. Check available tables: `cinch table list`
+2. Verify spelling and case sensitivity
+3. Ensure you're in the correct database: `cinch db current`
+4. Check if table exists in another branch: `cinch branch list`
 
 ## Protected Names
 

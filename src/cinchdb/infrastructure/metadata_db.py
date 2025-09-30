@@ -124,6 +124,15 @@ class MetadataDB:
                 ON tenants(shard)
             """)
 
+            # Add archived_at column if it doesn't exist (migration for existing databases)
+            try:
+                self.conn.execute("""
+                    ALTER TABLE branches ADD COLUMN archived_at TIMESTAMP DEFAULT NULL
+                """)
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+
             try:
                 self.conn.execute("""
                     ALTER TABLE branches ADD COLUMN cdc_enabled BOOLEAN DEFAULT FALSE
@@ -131,7 +140,7 @@ class MetadataDB:
             except sqlite3.OperationalError:
                 # Column already exists
                 pass
-            
+
             self.conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_branches_cdc_enabled
                 ON branches(cdc_enabled)
@@ -155,6 +164,7 @@ class MetadataDB:
                     entity_name TEXT NOT NULL,
                     details JSON,
                     sql TEXT,
+                    schema_snapshot TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (database_id) REFERENCES databases(id) ON DELETE CASCADE,
@@ -550,19 +560,21 @@ class MetadataDB:
                      origin_branch_id: Optional[str], origin_branch_name: Optional[str],
                      change_type: str, entity_type: str, entity_name: str,
                      details: Optional[Dict[str, Any]] = None,
-                     sql: Optional[str] = None) -> None:
+                     sql: Optional[str] = None,
+                     schema_snapshot: Optional[Dict[str, Any]] = None) -> None:
         """Create a change record."""
         with self.conn:
             self.conn.execute("""
                 INSERT INTO changes (
                     id, database_id, origin_branch_id, origin_branch_name, type,
-                    entity_type, entity_name, details, sql
+                    entity_type, entity_name, details, sql, schema_snapshot
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 change_id, database_id, origin_branch_id, origin_branch_name, change_type,
                 entity_type, entity_name,
-                json.dumps(details) if details else None, sql
+                json.dumps(details) if details else None, sql,
+                json.dumps(schema_snapshot) if schema_snapshot else None
             ))
 
     def get_change(self, change_id: str) -> Optional[Dict[str, Any]]:
@@ -643,6 +655,31 @@ class MetadataDB:
                     SET applied = ?
                     WHERE branch_name = ? AND change_id = ?
                 """, (applied, branch_name, change_id))
+
+    def get_latest_schema_snapshot(self, branch_id: str) -> Optional["SchemaSnapshot"]:
+        """Get the latest schema snapshot for a branch.
+
+        Args:
+            branch_id: Branch ID to get schema for
+
+        Returns:
+            SchemaSnapshot object, or None if no schema changes exist
+        """
+        from cinchdb.models import SchemaSnapshot
+
+        cursor = self.conn.execute("""
+            SELECT c.schema_snapshot
+            FROM branch_changes bc
+            JOIN changes c ON bc.change_id = c.id
+            WHERE bc.branch_id = ? AND c.schema_snapshot IS NOT NULL
+            ORDER BY bc.applied_order DESC
+            LIMIT 1
+        """, (branch_id,))
+        row = cursor.fetchone()
+        if row and row['schema_snapshot']:
+            data = json.loads(row['schema_snapshot'])
+            return SchemaSnapshot.from_dict(data)
+        return None
 
     def get_next_change_order(self, branch_name: str = None, branch_id: str = None) -> int:
         """Get the next available order number for a branch."""

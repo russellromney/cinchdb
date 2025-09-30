@@ -258,7 +258,7 @@ class TestCLIIntegration:
 
         # Create table
         self.run_in_project(
-            ["table", "create", "users", "name:TEXT:NOT NULL"], temp_project
+            ["table", "create", "users", "name:TEXT:not_null"], temp_project
         )
 
         # List columns
@@ -524,9 +524,9 @@ class TestCLIIntegration:
         )
         assert "already exists" in output
 
-        # Try to create table without columns
+        # Create table without columns (should succeed with system columns)
         result = self.run_in_project(["table", "create", "empty"], temp_project)
-        assert result.exit_code != 0
+        assert result.exit_code == 0
 
         # Try to operate on non-existent table
         result = self.run_in_project(

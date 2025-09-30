@@ -1,45 +1,49 @@
 """Data management for CinchDB - handles CRUD operations on table data."""
 
 import uuid
-from pathlib import Path
 from typing import List, Dict, Any, Optional, Type, TypeVar
 from datetime import datetime
 
 from pydantic import BaseModel
 
 from cinchdb.core.connection import DatabaseConnection
-from cinchdb.core.path_utils import get_tenant_db_path
 from cinchdb.core.maintenance_utils import check_maintenance_mode
-from cinchdb.managers.table import TableManager
-from cinchdb.managers.query import QueryManager
+from cinchdb.managers.base import BaseManager, ConnectionContext
+from cinchdb.utils.type_utils import prepare_value_for_storage, convert_value_from_storage
 
 T = TypeVar("T", bound=BaseModel)
 
 
-class DataManager:
+class DataManager(BaseManager):
     """Manages data operations within a database tenant."""
 
-    def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main",
-        encryption_manager=None
-    ):
+    def __init__(self, context: ConnectionContext):
         """Initialize data manager.
 
         Args:
-            project_root: Path to project root
-            database: Database name
-            branch: Branch name
-            tenant: Tenant name (default: main)
-            encryption_manager: EncryptionManager instance for encrypted connections
+            context: ConnectionContext with all connection parameters
         """
-        self.project_root = Path(project_root)
-        self.database = database
-        self.branch = branch
-        self.tenant = tenant
-        self.encryption_manager = encryption_manager
-        self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
-        self.table_manager = TableManager(project_root, database, branch, tenant, encryption_manager)
-        self.query_manager = QueryManager(project_root, database, branch, tenant, encryption_manager)
+        super().__init__(context)
+
+        # Lazy-loaded managers
+        self._table_manager = None
+        self._query_manager = None
+
+    @property
+    def table_manager(self):
+        """Lazy load table manager."""
+        if self._table_manager is None:
+            from cinchdb.managers.table import TableManager
+            self._table_manager = TableManager(self.context)
+        return self._table_manager
+
+    @property
+    def query_manager(self):
+        """Lazy load query manager."""
+        if self._query_manager is None:
+            from cinchdb.managers.query import QueryManager
+            self._query_manager = QueryManager(self.context)
+        return self._query_manager
 
     def select(
         self,
@@ -127,6 +131,19 @@ class DataManager:
         now = datetime.now()
         record_data["created_at"] = now
         record_data["updated_at"] = now
+
+        # Get table schema to know column types
+        try:
+            table = self.table_manager.get_table(table_name)
+            column_types = {col.name: col.type for col in table.columns}
+        except (ValueError, FileNotFoundError):
+            # If we can't get schema, proceed without conversion
+            column_types = {}
+
+        # Convert BOOLEAN values for storage
+        for col_name, value in record_data.items():
+            if col_name in column_types:
+                record_data[col_name] = prepare_value_for_storage(column_types[col_name], value)
 
         # Build INSERT query
         columns = list(record_data.keys())
@@ -753,7 +770,7 @@ class DataManager:
         if not self.db_path.exists():
             # Tenant is lazy - materialize it
             from cinchdb.managers.tenant import TenantManager
-            tenant_mgr = TenantManager(self.project_root, self.database, self.branch)
+            tenant_mgr = TenantManager(self.context)
             tenant_mgr.materialize_tenant(self.tenant)
 
     def _is_tenant_materialized(self) -> bool:

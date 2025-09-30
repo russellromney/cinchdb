@@ -637,6 +637,32 @@ make install-all
 make test
 ```
 
+### Testing
+
+CinchDB has comprehensive test coverage including automated documentation validation:
+
+```bash
+# Run all tests
+make test
+
+# Run unit tests only
+make test-unit
+
+# Run integration tests
+make test-integration
+
+# Test that documentation examples work
+make test-docs
+
+# Validate documentation syntax
+make test-docs-syntax
+
+# Run tests with coverage
+make coverage
+```
+
+**Documentation Testing:** All code examples in the documentation are automatically tested to ensure they work correctly. This prevents API drift and keeps docs accurate.
+
 ## Future
 
 CinchDB focuses on being a simple, reliable SQLite management layer. Future development will prioritize:

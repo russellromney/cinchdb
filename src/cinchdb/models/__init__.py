@@ -8,6 +8,7 @@ from .tenant import Tenant
 from .table import Table, Column, ColumnType, ForeignKeyRef, ForeignKeyAction, Index
 from .view import View
 from .change import Change, ChangeType
+from .schema_snapshot import SchemaSnapshot
 
 __all__ = [
     "CinchDBBaseModel",
@@ -25,4 +26,5 @@ __all__ = [
     "View",
     "Change",
     "ChangeType",
+    "SchemaSnapshot",
 ]

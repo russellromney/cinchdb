@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.config import Config
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.branch import BranchManager
 from cinchdb.cli.utils import (
@@ -42,8 +43,8 @@ def list_branches():
     """List all branches in the current database."""
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
-
-    branch_mgr = BranchManager(config.project_dir, db_name)
+    branch_name = config_data.active_branch
+    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
     branches = branch_mgr.list_branches()
 
     if not branches:
@@ -92,9 +93,9 @@ def create(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     source_branch = source or config_data.active_branch
+    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=source_branch))
 
     try:
-        branch_mgr = BranchManager(config.project_dir, db_name)
         branch_mgr.create_branch(source_branch, name)
         console.print(
             f"[green]✅ Created branch '{name}' from '{source_branch}'[/green]"
@@ -121,6 +122,7 @@ def delete(
     name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
+    branch_name = config_data.active_branch
 
     if name == "main":
         console.print("[red]❌ Cannot delete the main branch[/red]")
@@ -133,8 +135,9 @@ def delete(
             console.print("[yellow]Cancelled[/yellow]")
             raise typer.Exit(0)
 
+    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+
     try:
-        branch_mgr = BranchManager(config.project_dir, db_name)
         branch_mgr.delete_branch(name)
         console.print(f"[green]✅ Deleted branch '{name}'[/green]")
 
@@ -152,9 +155,15 @@ def switch(
     name = validate_required_arg(name, "name", ctx)
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
+    branch_name = config_data.active_branch
+    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
 
     try:
-        BranchManager(config.project_dir, db_name)
+        # Verify branch exists
+        branches = branch_mgr.list_branches()
+        if not any(b.name == name for b in branches):
+            raise ValueError(f"Branch '{name}' does not exist")
+
         set_active_branch(config, name)
         console.print(f"[green]✅ Switched to branch '{name}'[/green]")
 
@@ -171,51 +180,46 @@ def info(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = name or config_data.active_branch
+    branch_mgr = BranchManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
 
-    try:
-        branch_mgr = BranchManager(config.project_dir, db_name)
-        branches = branch_mgr.list_branches()
+    branches = branch_mgr.list_branches()
 
-        branch = next((b for b in branches if b.name == branch_name), None)
-        if not branch:
-            console.print(f"[red]❌ Branch '{branch_name}' does not exist[/red]")
-            raise typer.Exit(1)
-
-        # Display info
-        console.print(f"\n[bold]Branch: {branch.name}[/bold]")
-        console.print(f"Database: {db_name}")
-        console.print(f"Parent: {branch.parent_branch or 'None'}")
-        created_at = branch.metadata.get("created_at", "Unknown")
-        if created_at != "Unknown":
-            from datetime import datetime
-
-            try:
-                dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                created_at = dt.strftime("%Y-%m-%d %H:%M:%S")
-            except Exception:
-                pass
-        console.print(f"Created: {created_at}")
-        console.print(f"Protected: {'Yes' if branch.name == 'main' else 'No'}")
-
-        # Count tenants
-        from cinchdb.managers.tenant import TenantManager
-
-        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
-        tenants = tenant_mgr.list_tenants()
-        console.print(f"Tenants: {len(tenants)}")
-
-        # Count changes
-        from cinchdb.managers.change_tracker import ChangeTracker
-
-        tracker = ChangeTracker(config.project_dir, db_name, branch_name)
-        changes = tracker.get_changes()
-        unapplied = tracker.get_unapplied_changes()
-        console.print(f"Total Changes: {len(changes)}")
-        console.print(f"Unapplied Changes: {len(unapplied)}")
-
-    except ValueError as e:
-        console.print(f"[red]❌ {e}[/red]")
+    branch = next((b for b in branches if b.name == branch_name), None)
+    if not branch:
+        console.print(f"[red]❌ Branch '{branch_name}' does not exist[/red]")
         raise typer.Exit(1)
+
+    # Display info
+    console.print(f"\n[bold]Branch: {branch.name}[/bold]")
+    console.print(f"Database: {db_name}")
+    console.print(f"Parent: {branch.parent_branch or 'None'}")
+    created_at = branch.metadata.get("created_at", "Unknown")
+    if created_at != "Unknown":
+        from datetime import datetime
+
+        try:
+            dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            created_at = dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+    console.print(f"Created: {created_at}")
+    console.print(f"Protected: {'Yes' if branch.name == 'main' else 'No'}")
+
+    # Count tenants
+    from cinchdb.managers.tenant import TenantManager
+
+    tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+    tenants = tenant_mgr.list_tenants()
+    console.print(f"Tenants: {len(tenants)}")
+
+    # Count changes
+    from cinchdb.managers.change_tracker import ChangeTracker
+
+    tracker = ChangeTracker(config.project_dir, db_name, branch_name)
+    changes = tracker.get_changes()
+    unapplied = tracker.get_unapplied_changes()
+    console.print(f"Total Changes: {len(changes)}")
+    console.print(f"Unapplied Changes: {len(unapplied)}")
 
 
 @app.command()
@@ -243,11 +247,11 @@ def merge(
     db_name = config_data.active_database
     target_branch = target or config_data.active_branch
 
-    from cinchdb.managers.merge_manager import MergeManager, MergeError
+    from cinchdb.managers.merge_manager import MergeManager
+
+    merge_mgr = MergeManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=target_branch))
 
     try:
-        merge_mgr = MergeManager(config.project_dir, db_name)
-
         if preview:
             # Show merge preview
             preview_result = merge_mgr.get_merge_preview(source, target_branch)
@@ -421,11 +425,11 @@ def merge_into_main(
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
 
-    from cinchdb.managers.merge_manager import MergeManager, MergeError
+    from cinchdb.managers.merge_manager import MergeManager
+
+    merge_mgr = MergeManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch="main"))
 
     try:
-        merge_mgr = MergeManager(config.project_dir, db_name)
-
         if preview:
             # Show merge preview for main branch
             preview_result = merge_mgr.get_merge_preview(source, "main")

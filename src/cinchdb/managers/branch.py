@@ -3,10 +3,10 @@
 import json
 import shutil
 import uuid
-from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime, timezone
 
+from cinchdb.managers.base import BaseManager, ConnectionContext
 from cinchdb.models import Branch
 from cinchdb.core.path_utils import (
     get_database_path,
@@ -18,20 +18,19 @@ from cinchdb.infrastructure.metadata_db import MetadataDB
 from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db
 
 
-class BranchManager:
+class BranchManager(BaseManager):
     """Manages branches within a database."""
 
-    def __init__(self, project_root: Path, database: str):
+    def __init__(self, context: ConnectionContext):
         """Initialize branch manager.
 
         Args:
-            project_root: Path to project root
-            database: Database name
+            context: ConnectionContext with all connection parameters
         """
-        self.project_root = Path(project_root)
-        self.database = database
-        self.db_path = get_database_path(self.project_root, database)
-        
+        super().__init__(context)
+
+        self.db_path = get_database_path(self.project_root, self.database)
+
         # Lazy-initialized pooled connection
         self._metadata_db = None
         self.database_id = None

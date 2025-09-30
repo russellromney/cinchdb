@@ -3,6 +3,7 @@
 import pytest
 from typer.testing import CliRunner
 from cinchdb.cli.main import app
+from cinchdb.managers.base import ConnectionContext
 import tempfile
 import shutil
 from pathlib import Path
@@ -173,8 +174,8 @@ class TestCLIForeignKeys:
         )
         assert result.exit_code == 0
 
-        # Verify column is nullable and has FK
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        # Verify
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         posts = table_mgr.get_table("posts")
         author_col = next(col for col in posts.columns if col.name == "author_id")
         assert author_col.nullable is True

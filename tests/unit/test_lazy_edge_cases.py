@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from cinchdb.core.initializer import init_project, init_database, ProjectInitializer
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.core.path_utils import list_databases, list_tenants, get_context_root, get_tenant_db_path
 from cinchdb.core.database import CinchDB
@@ -25,7 +26,7 @@ def test_lazy_database_with_lazy_tenants():
         
         # Try to create tenant in lazy database (should auto-materialize)
         CinchDB(database="lazy-db", project_dir=project_dir)
-        tenant_manager = TenantManager(project_dir, "lazy-db", "main")
+        tenant_manager = TenantManager(ConnectionContext(project_root=project_dir, database="lazy-db", branch="main"))
         
         # Create lazy tenant
         tenant = tenant_manager.create_tenant("lazy-tenant", lazy=True)
@@ -229,9 +230,9 @@ def test_lazy_tenant_in_lazy_database_lifecycle():
         
         # Connect to database (auto-materializes)
         CinchDB(database="lazy-db", project_dir=project_dir)
-        
+
         # Create lazy tenant
-        tenant_manager = TenantManager(project_dir, "lazy-db", "main")
+        tenant_manager = TenantManager(ConnectionContext(project_root=project_dir, database="lazy-db", branch="main"))
         tenant_manager.create_tenant("tenant1", lazy=True)
         tenant_manager.create_tenant("tenant2", lazy=True)
         

@@ -109,22 +109,22 @@ CinchDB merges are **atomic across all tenants**:
 
 ### Branch Naming
 ```bash
-# Feature branches
-cinch branch create feature/add-payments
-cinch branch create feature/user-authentication  
+# Feature branches (use dots for namespacing)
+cinch branch create feature.add-payments
+cinch branch create feature.user-authentication
 
 # Bug fixes
-cinch branch create fix/login-validation
-cinch branch create hotfix/critical-bug-123
+cinch branch create fix.login-validation
+cinch branch create hotfix.critical-bug-123
 
-# Experiments  
-cinch branch create experiment/new-schema
+# Experiments
+cinch branch create experiment.new-schema
 ```
 
 ### Development Workflow
 ```bash
 # 1. Start feature
-cinch branch create feature/orders --switch
+cinch branch create feature.orders --switch
 
 # 2. Develop iteratively
 cinch table create orders user_id:TEXT total:REAL
@@ -140,7 +140,7 @@ cinch query "SELECT o.*, COUNT(oi.id) FROM orders o LEFT JOIN order_items oi ON 
 
 # 5. Merge when confident
 cinch branch switch main
-cinch branch merge-into-main feature/orders
+cinch branch merge-into-main feature.orders
 ```
 
 ### Multi-Developer Teams

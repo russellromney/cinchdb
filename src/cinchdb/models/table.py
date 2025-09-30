@@ -1,12 +1,12 @@
 """Table and Column models for CinchDB."""
 
 from typing import List, Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from .base import CinchDBBaseModel
 
 
 # SQLite column types
-ColumnType = Literal["TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC"]
+ColumnType = Literal["TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC", "BOOLEAN"]
 
 # Foreign key actions
 ForeignKeyAction = Literal["CASCADE", "SET NULL", "RESTRICT", "NO ACTION"]
@@ -54,6 +54,15 @@ class Column(BaseModel):
     foreign_key: Optional[ForeignKeyRef] = Field(
         default=None, description="Foreign key constraint specification"
     )
+
+    @field_validator('type', mode='before')
+    @classmethod
+    def normalize_type(cls, v):
+        """Normalize type string before validation."""
+        if isinstance(v, str):
+            from cinchdb.utils.type_utils import normalize_type
+            return normalize_type(v)
+        return v
 
 
 class Table(CinchDBBaseModel):

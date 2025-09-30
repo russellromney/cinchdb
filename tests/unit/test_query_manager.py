@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from cinchdb.core.initializer import init_project
 from cinchdb.core.database import CinchDB
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.query import QueryManager
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.data import DataManager
@@ -58,7 +59,8 @@ class TestQueryManager:
         tenant = "main"
 
         # Create table manager and test table
-        table_manager = TableManager(project_root, database, branch, tenant)
+        context = ConnectionContext(project_root=project_root, database=database, branch=branch, tenant=tenant)
+        table_manager = TableManager(context)
 
         # Create users table
         columns = [
@@ -70,7 +72,7 @@ class TestQueryManager:
         table_manager.create_table("users", columns)
 
         # Create data manager and add test data
-        data_manager = DataManager(project_root, database, branch, tenant)
+        data_manager = DataManager(context)
 
         # Insert test users
         users = [
@@ -92,7 +94,7 @@ class TestQueryManager:
             data_manager.create(user)
 
         # Create and return query manager
-        return QueryManager(project_root, database, branch, tenant)
+        return QueryManager(context)
 
     def test_query_typed_basic(self, query_manager):
         """Test executing a typed SELECT query returning model instances."""

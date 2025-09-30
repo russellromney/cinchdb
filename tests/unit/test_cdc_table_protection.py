@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from cinchdb.managers.table import TableManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.models import Column
 from cinchdb.core.initializer import init_project
 
@@ -32,8 +33,8 @@ class TestCDCTableProtection:
     
     @pytest.fixture
     def table_manager(self, temp_project):
-        """Create a table manager for testing."""
-        return TableManager(temp_project, "main", "main", "main")
+        """Create a TableManager instance."""
+        return TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
     
     def test_list_tables_excludes_cdc_tables(self, table_manager):
         """Test that list_tables() excludes CDC and system tables."""

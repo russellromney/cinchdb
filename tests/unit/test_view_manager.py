@@ -5,6 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.view import ViewModel
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.change_tracker import ChangeTracker
@@ -31,8 +32,8 @@ class TestViewModel:
 
     @pytest.fixture
     def managers(self, temp_project):
-        """Create manager instances with test data."""
-        table_mgr = TableManager(temp_project, "main", "main", "main")
+        """Create managers for testing."""
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
 
         # Create test tables
         table_mgr.create_table(
@@ -53,7 +54,7 @@ class TestViewModel:
             ],
         )
 
-        view_mgr = ViewModel(temp_project, "main", "main", "main")
+        view_mgr = ViewModel(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
 
         return {"table": table_mgr, "view": view_mgr}
 
@@ -137,7 +138,7 @@ class TestViewModel:
         assert row["post_count"] == 2
 
     def test_update_view(self, managers, temp_project):
-        """Test updating a view's SQL."""
+        """Test updating a view SQL."""
         # Create initial view
         managers["view"].create_view(
             "published_posts", "SELECT * FROM posts WHERE published = 1"
@@ -253,8 +254,8 @@ class TestViewModel:
         from cinchdb.managers.tenant import TenantManager
         from cinchdb.managers.change_applier import ChangeApplier
 
-        # Create additional tenant (non-lazy so it gets schema changes)
-        tenant_mgr = TenantManager(temp_project, "main", "main")
+        # Create additional tenant (non-lazy)
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         tenant_mgr.create_tenant("tenant2", lazy=False)
 
         # Create view (this automatically applies to all tenants)

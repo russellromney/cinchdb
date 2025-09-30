@@ -33,16 +33,24 @@ class ChangeApplier:
             database: Database name
             branch: Branch name
         """
+        from cinchdb.managers.base import ConnectionContext
+        from cinchdb.managers.branch import BranchManager
+
         self.project_root = Path(project_root)
         self.database = database
         self.branch = branch
+
+        # Create context for manager instantiation
+        context = ConnectionContext(
+            project_root=project_root,
+            database=database,
+            branch=branch,
+            tenant="main"  # Change applier typically works at branch level
+        )
+
         self.change_tracker = ChangeTracker(project_root, database, branch)
-        self.tenant_manager = TenantManager(project_root, database, branch)
-
-        # Import here to avoid circular imports
-        from cinchdb.managers.branch import BranchManager
-
-        self.branch_manager = BranchManager(project_root, database)
+        self.tenant_manager = TenantManager(context)
+        self.branch_manager = BranchManager(context)
 
     def _get_change_by_id(self, change_id: str) -> Change:
         """Get a change by its ID.

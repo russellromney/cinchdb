@@ -45,27 +45,12 @@ Check that CinchDB is installed correctly:
 cinch version
 ```
 
-Expected output: `CinchDB version 0.1.15`
+Expected output: `CinchDB version 0.1.22`
 
 ## Current Version
 
-- **Latest Release**: 0.1.15
-- **PyPI**: 0.1.15 ✅
-
-You can check the installed version with:
-```bash
-cinch version
-# or
-python -c "import cinchdb; print(cinchdb.__version__)"
-```
-
-
-Expected output: `CinchDB version 0.1.15`
-
-## Current Version
-
-- **Latest Release**: 0.1.15
-- **PyPI**: 0.1.15 ✅
+- **Latest Release**: 0.1.22
+- **PyPI**: 0.1.22 ✅
 
 You can check the installed version with:
 ```bash

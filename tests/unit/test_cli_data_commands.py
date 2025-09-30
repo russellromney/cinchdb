@@ -10,8 +10,8 @@ from unittest.mock import patch, MagicMock
 
 from cinchdb.cli.commands.data import app
 from cinchdb.core.initializer import init_project
-from cinchdb.managers.table import TableManager
-from cinchdb.models.table import Column
+from cinchdb.core.database import CinchDB
+from cinchdb.models import Column
 
 
 class TestCLIDataCommands:
@@ -27,22 +27,22 @@ class TestCLIDataCommands:
         """Create a temporary project with config."""
         temp = tempfile.mkdtemp()
         project_dir = Path(temp)
-        
+
         # Initialize project
         init_project(project_dir)
-        
-        # Create a test table
-        table_mgr = TableManager(project_dir, "main", "main")
-        table_mgr.create_table(
+
+        # Create a test table using CinchDB
+        db = CinchDB(database="main", branch="main", project_dir=project_dir)
+        db.create_table(
             "users",
             [
                 Column(name="name", type="TEXT"),
                 Column(name="email", type="TEXT"),
                 Column(name="age", type="INTEGER"),
-                Column(name="active", type="INTEGER"),  # SQLite uses INTEGER for boolean
+                Column(name="active", type="BOOLEAN"),
             ],
         )
-        
+
         yield project_dir
         shutil.rmtree(temp)
 
@@ -134,10 +134,9 @@ class TestCLIDataCommands:
 
     def test_bulk_insert_with_tenant(self, runner, temp_project):
         """Test bulk-inserting data for a specific tenant."""
-        # Create the tenant first (should auto-materialize on first use)
-        from cinchdb.managers.tenant import TenantManager
-        tenant_mgr = TenantManager(temp_project, "main", "main")
-        tenant_mgr.create_tenant("customer_a")
+        # Create the tenant first using CinchDB
+        db = CinchDB(database="main", branch="main", project_dir=temp_project)
+        db.create_tenant("customer_a")
         
         with patch("cinchdb.cli.commands.data.get_config_with_data") as mock_config:
             mock_config.return_value = (
@@ -196,7 +195,6 @@ class TestCLIDataCommands:
             )
             
             # First insert some data
-            from cinchdb.core.database import CinchDB
             db = CinchDB("main", project_dir=temp_project)
             db.insert("users", {"name": "Test", "email": "test@example.com", "age": 40})
             
@@ -218,7 +216,6 @@ class TestCLIDataCommands:
             )
             
             # First insert some data
-            from cinchdb.core.database import CinchDB
             db = CinchDB("main", project_dir=temp_project)
             db.insert("users", {"name": "UpdateMe", "email": "update@example.com", "age": 25, "active": False})
             
@@ -240,7 +237,6 @@ class TestCLIDataCommands:
             )
             
             # First insert some data
-            from cinchdb.core.database import CinchDB
             db = CinchDB("main", project_dir=temp_project)
             result1 = db.insert("users", {"name": "User1", "email": "user1@example.com", "age": 20})
             result2 = db.insert("users", {"name": "User2", "email": "user2@example.com", "age": 30})
@@ -268,7 +264,6 @@ class TestCLIDataCommands:
             )
             
             # First insert some data
-            from cinchdb.core.database import CinchDB
             db = CinchDB("main", project_dir=temp_project)
             result1 = db.insert("users", {"name": "Delete1", "email": "del1@example.com", "age": 20})
             result2 = db.insert("users", {"name": "Delete2", "email": "del2@example.com", "age": 30})

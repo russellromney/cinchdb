@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from cinchdb.core.initializer import init_project, init_database
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.utils.name_validator import InvalidNameError, validate_name
 from cinchdb.managers.table import TableManager
 from cinchdb.managers.branch import BranchManager
@@ -178,8 +179,8 @@ class TestComprehensiveValidation:
 
     def test_table_name_validation(self, temp_project):
         """Test table name validation edge cases."""
-        table_mgr = TableManager(temp_project, "testdb", "main")
-        
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main"))
+
         # Valid table names (no hyphens allowed)
         valid_names = [
             "users",
@@ -222,8 +223,8 @@ class TestComprehensiveValidation:
 
     def test_column_name_validation(self, temp_project):
         """Test column name validation edge cases."""
-        table_mgr = TableManager(temp_project, "testdb", "main")
-        
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main"))
+
         # Valid column names (no hyphens, no 'id' as it's protected)
         valid_columns = [
             "user_id",
@@ -267,7 +268,7 @@ class TestComprehensiveValidation:
 
     def test_branch_name_validation(self, temp_project):
         """Test branch name validation edge cases."""
-        branch_mgr = BranchManager(temp_project, "testdb")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main"))
         
         # Valid branch names
         valid_names = [
@@ -304,8 +305,8 @@ class TestComprehensiveValidation:
 
     def test_tenant_name_validation(self, temp_project):
         """Test tenant name validation edge cases."""
-        tenant_mgr = TenantManager(temp_project, "testdb", "main")
-        
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main"))
+
         # Valid tenant names
         valid_names = [
             "tenant",
@@ -359,19 +360,19 @@ class TestComprehensiveValidation:
             # Database names
             with pytest.raises(InvalidNameError):
                 init_database(temp_project, attempt, lazy=True)
-            
+
             # Table names
-            table_mgr = TableManager(temp_project, "testdb", "main")
+            table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main"))
             with pytest.raises((InvalidNameError, ValueError)):
                 table_mgr.create_table(attempt, [Column(name="test_col", type="INTEGER")])
-            
+
             # Branch names
-            branch_mgr = BranchManager(temp_project, "testdb")
+            branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main"))
             with pytest.raises((InvalidNameError, ValueError)):
                 branch_mgr.create_branch("main", attempt)
-            
+
             # Tenant names
-            tenant_mgr = TenantManager(temp_project, "testdb", "main")
+            tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="testdb", branch="main"))
             with pytest.raises((InvalidNameError, ValueError)):
                 tenant_mgr.create_tenant(attempt, lazy=True)
 

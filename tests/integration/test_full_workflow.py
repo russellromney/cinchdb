@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.branch import BranchManager
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.managers.table import TableManager
@@ -35,11 +36,11 @@ class TestFullWorkflow:
     def test_complete_database_workflow(self, temp_project):
         """Test a complete database workflow from creation to merge."""
         # Step 1: Create a feature branch
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Step 2: Create tables in feature branch
-        table_mgr = TableManager(temp_project, "main", "feature", "main")
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature", tenant="main"))
 
         # Create users table
         users_table = table_mgr.create_table(
@@ -63,8 +64,8 @@ class TestFullWorkflow:
         )
         assert posts_table.name == "posts"
 
-        # Step 3: Add columns to existing table
-        column_mgr = ColumnManager(temp_project, "main", "feature", "main")
+        # Step 3: Add columns
+        column_mgr = ColumnManager(ConnectionContext(project_root=temp_project, database="main", branch="feature"))
         column_mgr.add_column("users", Column(name="age", type="INTEGER"))
 
         # Verify column was added
@@ -73,7 +74,7 @@ class TestFullWorkflow:
         assert "age" in column_names
 
         # Step 4: Create views
-        view_mgr = ViewModel(temp_project, "main", "feature", "main")
+        view_mgr = ViewModel(ConnectionContext(project_root=temp_project, database="main", branch="feature", tenant="main"))
         view_mgr.create_view(
             "user_posts",
             """
@@ -87,8 +88,8 @@ class TestFullWorkflow:
         assert len(views) == 1
         assert views[0].name == "user_posts"
 
-        # Step 5: Create additional eager tenant (need schema copied)
-        tenant_mgr = TenantManager(temp_project, "main", "feature")
+        # Step 5: Create additional eager tenant
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="feature"))
         tenant_mgr.create_tenant("test-tenant", lazy=False)
 
         tenants = tenant_mgr.list_tenants()
@@ -97,14 +98,14 @@ class TestFullWorkflow:
         assert "test-tenant" in tenant_names
 
         # Step 6: Verify schema was copied to new tenant
-        test_table_mgr = TableManager(temp_project, "main", "feature", "test-tenant")
+        test_table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature", tenant="test-tenant"))
         test_tables = test_table_mgr.list_tables()
         table_names = [t.name for t in test_tables]
         assert "users" in table_names
         assert "posts" in table_names
 
         # Step 7: Merge feature branch into main
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         # Check merge preview first
         preview = merge_mgr.get_merge_preview("feature", "main")
@@ -116,32 +117,32 @@ class TestFullWorkflow:
         assert result["success"]
         assert result["changes_merged"] > 0
 
-        # Step 8: Verify changes are now in main branch
-        main_table_mgr = TableManager(temp_project, "main", "main", "main")
+        # Step 8: Verify changes are in main branch
+        main_table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
         main_tables = main_table_mgr.list_tables()
         main_table_names = [t.name for t in main_tables]
         assert "users" in main_table_names
         assert "posts" in main_table_names
 
-        main_column_mgr = ColumnManager(temp_project, "main", "main", "main")
+        main_column_mgr = ColumnManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         main_columns = main_column_mgr.list_columns("users")
         main_column_names = [col.name for col in main_columns]
         assert "age" in main_column_names
 
-        main_view_mgr = ViewModel(temp_project, "main", "main", "main")
+        main_view_mgr = ViewModel(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
         main_views = main_view_mgr.list_views()
         assert len(main_views) == 1
         assert main_views[0].name == "user_posts"
 
     def test_multi_branch_development(self, temp_project):
         """Test development across multiple feature branches."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         # Create first feature branch
         branch_mgr.create_branch("main", "feature_users")
 
-        # Develop users feature
-        users_table_mgr = TableManager(temp_project, "main", "feature_users", "main")
+        # Create users table in feature branch
+        users_table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature_users", tenant="main"))
         users_table_mgr.create_table(
             "users",
             [
@@ -151,7 +152,7 @@ class TestFullWorkflow:
         )
 
         # Merge users feature first
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         users_result = merge_mgr.merge_into_main("feature_users")
         assert users_result["success"]
 
@@ -160,7 +161,7 @@ class TestFullWorkflow:
 
         # Develop products feature
         products_table_mgr = TableManager(
-            temp_project, "main", "feature_products", "main"
+            ConnectionContext(project_root=temp_project, database="main", branch="feature_products", tenant="main")
         )
         products_table_mgr.create_table(
             "products",
@@ -175,7 +176,7 @@ class TestFullWorkflow:
         assert products_result["success"]
 
         # Verify both features are in main
-        main_table_mgr = TableManager(temp_project, "main", "main", "main")
+        main_table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant="main"))
         main_tables = main_table_mgr.list_tables()
         main_table_names = [t.name for t in main_tables]
         assert "users" in main_table_names
@@ -184,54 +185,54 @@ class TestFullWorkflow:
     def test_tenant_isolation(self, temp_project):
         """Test that tenants are properly isolated."""
         # Create feature branch
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Create table in feature branch
-        table_mgr = TableManager(temp_project, "main", "feature", "main")
+        table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature", tenant="main"))
         table_mgr.create_table(
             "items", [Column(name="name", type="TEXT", nullable=False)]
         )
 
-        # Create additional eager tenants (need schema copied)
-        tenant_mgr = TenantManager(temp_project, "main", "feature")
+        # Create additional eager tenants
+        tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="feature"))
         tenant_mgr.create_tenant("tenant-a", lazy=False)
         tenant_mgr.create_tenant("tenant-b", lazy=False)
 
         # Verify all tenants have the table structure
         for tenant in ["main", "tenant-a", "tenant-b"]:
-            tenant_table_mgr = TableManager(temp_project, "main", "feature", tenant)
+            tenant_table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="feature", tenant=tenant))
             tables = tenant_table_mgr.list_tables()
             table_names = [t.name for t in tables]
             assert "items" in table_names
 
-        # Add column - should apply to all tenants automatically
-        column_mgr = ColumnManager(temp_project, "main", "feature", "main")
+        # Add column - should apply to all tenants
+        column_mgr = ColumnManager(ConnectionContext(project_root=temp_project, database="main", branch="feature"))
         column_mgr.add_column("items", Column(name="description", type="TEXT"))
 
         # Verify column exists in all tenants
         for tenant in ["main", "tenant-a", "tenant-b"]:
-            tenant_column_mgr = ColumnManager(temp_project, "main", "feature", tenant)
+            tenant_column_mgr = ColumnManager(ConnectionContext(project_root=temp_project, database="main", branch="feature", tenant=tenant))
             columns = tenant_column_mgr.list_columns("items")
             column_names = [col.name for col in columns]
             assert "description" in column_names
 
         # Merge to main
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.merge_into_main("feature")
         assert result["success"]
 
-        # Verify structure exists in main branch tenants
-        main_tenant_mgr = TenantManager(temp_project, "main", "main")
+        # Verify structure exists in all tenants in main
+        main_tenant_mgr = TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         main_tenants = main_tenant_mgr.list_tenants()
 
         for tenant in main_tenants:
-            tenant_table_mgr = TableManager(temp_project, "main", "main", tenant.name)
+            tenant_table_mgr = TableManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant=tenant.name))
             tables = tenant_table_mgr.list_tables()
             table_names = [t.name for t in tables]
             assert "items" in table_names
 
-            tenant_column_mgr = ColumnManager(temp_project, "main", "main", tenant.name)
+            tenant_column_mgr = ColumnManager(ConnectionContext(project_root=temp_project, database="main", branch="main", tenant=tenant.name))
             columns = tenant_column_mgr.list_columns("items")
             column_names = [col.name for col in columns]
             assert "description" in column_names

@@ -11,6 +11,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from cinchdb.models import Tenant
+from cinchdb.managers.base import BaseManager, ConnectionContext
 from cinchdb.core.path_utils import (
     get_branch_path,
     get_tenant_db_path,
@@ -32,31 +33,25 @@ from cinchdb.infrastructure.metadata_connection_pool import get_metadata_db
 logger = logging.getLogger(__name__)
 
 
-class TenantManager:
+class TenantManager(BaseManager):
     """Manages tenants within a branch."""
 
-    def __init__(self, project_root: Path, database: str, branch: str, encryption_manager=None):
+    def __init__(self, context: ConnectionContext):
         """Initialize tenant manager.
 
         Args:
-            project_root: Path to project root
-            database: Database name
-            branch: Branch name
-            encryption_manager: EncryptionManager instance for encrypted connections
+            context: ConnectionContext with all connection parameters
         """
-        self.project_root = Path(project_root)
-        self.database = database
-        self.branch = branch
-        self.encryption_manager = encryption_manager
-        
+        super().__init__(context)
+
         # New tenant-first approach: use context root
-        self.context_root = get_context_root(self.project_root, database, branch)
-        
+        self.context_root = get_context_root(self.project_root, self.database, self.branch)
+
         # Legacy support: keep branch_path for backward compatibility
-        self.branch_path = get_branch_path(self.project_root, database, branch)
-        
+        self.branch_path = get_branch_path(self.project_root, self.database, self.branch)
+
         self._empty_tenant_name = "__empty__"  # Reserved name for lazy tenant template
-        
+
         # Lazy-initialized pooled connection
         self._metadata_db = None
         self.database_id = None

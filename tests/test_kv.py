@@ -7,7 +7,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from cinchdb.managers.kv import KVManager
 from cinchdb.core.database import CinchDB
 from cinchdb.core.initializer import ProjectInitializer
 

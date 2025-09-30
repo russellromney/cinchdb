@@ -31,7 +31,7 @@ user = db.insert("users", {"name": "Alice", "email": "alice@example.com"})
 users = db.query("SELECT * FROM users WHERE name = ?", ["Alice"])
 
 # Update/delete
-db.update("users", user["id"], {"name": "Alice Smith"})
+db.update("users", {"id": user["id"], "name": "Alice Smith"})
 db.delete("users", user["id"])
 
 # Key-Value Store (Redis-like)
@@ -90,8 +90,8 @@ except Exception as e:
 | Connect | `cinchdb.connect("db", branch="main", tenant="main")` |
 | Create table | `db.create_table(name, columns)` |
 | Insert | `db.insert(table, data1, data2, ...)` |
-| Update | `db.update(table, id, data)` |
-| Delete | `db.delete(table, id)` |
+| Update | `db.update(table, {"id": id, ...})` |
+| Delete | `db.delete(table, id1, id2, ...)` |
 | Query | `db.query(sql, params)` |
 | Index | `db.create_index(table, columns, unique=False)` |
 | KV Set | `db.kv.set(key, value, ttl=None)` |
@@ -117,4 +117,6 @@ Every table automatically includes:
 - [Table Operations](tables.md)
 - [Query Examples](queries.md)
 - [Key-Value Store](kv-store.md)
+- [Tenants](tenants.md)
+- [Branches](branches.md)
 - [Complete API](api-reference.md)

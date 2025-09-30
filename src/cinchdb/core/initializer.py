@@ -120,7 +120,14 @@ class ProjectInitializer:
         
         # Create physical __empty__ tenant with schema from main
         from cinchdb.managers.tenant import TenantManager
-        tenant_mgr = TenantManager(self.project_dir, database_name, branch_name)
+        from cinchdb.managers.base import ConnectionContext
+        context = ConnectionContext(
+            project_root=self.project_dir,
+            database=database_name,
+            branch=branch_name,
+            tenant="main"
+        )
+        tenant_mgr = TenantManager(context)
         tenant_mgr._ensure_empty_tenant()
 
         return config

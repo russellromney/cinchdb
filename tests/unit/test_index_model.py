@@ -6,6 +6,7 @@ import tempfile
 import shutil
 
 from cinchdb.models import Column, Index
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.table import TableManager
 from cinchdb.core.database import CinchDB
 
@@ -57,8 +58,8 @@ class TestTableCreationWithIndexes:
     @pytest.fixture
     def table_manager(self, temp_project):
         """Create a TableManager for testing."""
-        return TableManager(temp_project, "test_db", "main", "main")
-    
+        return TableManager(ConnectionContext(project_root=temp_project, database="test_db", branch="main", tenant="main"))
+
     def test_create_table_with_single_index(self, table_manager):
         """Test creating a table with a single index."""
         columns = [
@@ -74,7 +75,7 @@ class TestTableCreationWithIndexes:
         
         # Verify index was created
         from cinchdb.managers.index import IndexManager
-        index_manager = IndexManager(table_manager.project_root, "test_db", "main")
+        index_manager = IndexManager(ConnectionContext(project_root=table_manager.project_root, database="test_db", branch="main"))
         created_indexes = index_manager.list_indexes("users")
         
         assert len(created_indexes) == 1
@@ -100,7 +101,7 @@ class TestTableCreationWithIndexes:
         
         # Verify all indexes were created
         from cinchdb.managers.index import IndexManager
-        index_manager = IndexManager(table_manager.project_root, "test_db", "main")
+        index_manager = IndexManager(ConnectionContext(project_root=table_manager.project_root, database="test_db", branch="main"))
         created_indexes = index_manager.list_indexes("users")
         
         assert len(created_indexes) == 3
@@ -133,7 +134,7 @@ class TestTableCreationWithIndexes:
         
         # Verify no indexes were created (beyond any SQLite auto-creates)
         from cinchdb.managers.index import IndexManager
-        index_manager = IndexManager(table_manager.project_root, "test_db", "main")
+        index_manager = IndexManager(ConnectionContext(project_root=table_manager.project_root, database="test_db", branch="main"))
         created_indexes = index_manager.list_indexes("simple")
         
         # Should only have SQLite's automatic rowid index, if any
@@ -150,7 +151,7 @@ class TestTableCreationWithIndexes:
         
         # Should behave same as not passing indexes parameter
         from cinchdb.managers.index import IndexManager
-        index_manager = IndexManager(table_manager.project_root, "test_db", "main")
+        index_manager = IndexManager(ConnectionContext(project_root=table_manager.project_root, database="test_db", branch="main"))
         created_indexes = index_manager.list_indexes("simple")
         
         user_indexes = [idx for idx in created_indexes if not idx["name"].startswith("sqlite_")]
@@ -263,8 +264,8 @@ class TestIndexModelValidation:
     @pytest.fixture
     def table_manager(self, temp_project):
         """Create a TableManager for testing."""
-        return TableManager(temp_project, "test_db", "main", "main")
-    
+        return TableManager(ConnectionContext(project_root=temp_project, database="test_db", branch="main", tenant="main"))
+
     def test_index_validation_through_table_creation(self, table_manager):
         """Test that Index model validation works through table creation."""
         columns = [Column(name="name", type="TEXT")]

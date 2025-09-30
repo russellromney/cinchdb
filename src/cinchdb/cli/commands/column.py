@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.managers.column import ColumnManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.change_applier import ChangeApplier
 from cinchdb.models import Column
 from cinchdb.cli.utils import get_config_with_data, validate_required_arg
@@ -33,7 +34,7 @@ def list_columns(
     branch_name = config_data.active_branch
 
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
+        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         columns = column_mgr.list_columns(table)
 
         # Create a table
@@ -93,7 +94,7 @@ def add(
         raise typer.Exit(1)
 
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
+        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         column = Column(name=name, type=type, nullable=nullable, default=default)
         column_mgr.add_column(table, column)
 
@@ -140,7 +141,7 @@ def drop(
             raise typer.Exit(0)
 
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
+        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         column_mgr.drop_column(table, name)
 
         console.print(f"[green]✅ Dropped column '{name}' from table '{table}'[/green]")
@@ -176,7 +177,7 @@ def rename(
     branch_name = config_data.active_branch
 
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
+        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         column_mgr.rename_column(table, old_name, new_name)
 
         console.print(
@@ -209,7 +210,7 @@ def info(
     branch_name = config_data.active_branch
 
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
+        column_mgr = ColumnManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         column = column_mgr.get_column_info(table, name)
 
         # Display info
@@ -260,33 +261,15 @@ def alter_nullable(
     branch_name = config_data.active_branch
 
     try:
-        column_mgr = ColumnManager(config.project_dir, db_name, branch_name, "main")
+        from cinchdb.core.database import CinchDB
 
-        # Check if column has NULLs when making NOT NULL
-        if not nullable and fill_value is None:
-            # Get column info to check current state
-            col_info = column_mgr.get_column_info(table, column)
-            if col_info.nullable:
-                # Check for NULL values
-                from cinchdb.core.connection import DatabaseConnection
-                from cinchdb.core.path_utils import get_tenant_db_path
+        db = CinchDB(
+            project_dir=config.project_dir,
+            database=db_name,
+            branch=branch_name
+        )
 
-                db_path = get_tenant_db_path(
-                    config.project_dir, db_name, branch_name, "main"
-                )
-                with DatabaseConnection(db_path) as conn:
-                    cursor = conn.execute(
-                        f"SELECT COUNT(*) FROM {table} WHERE {column} IS NULL"
-                    )
-                    null_count = cursor.fetchone()[0]
-
-                    if null_count > 0:
-                        console.print(
-                            f"[yellow]Column '{column}' has {null_count} NULL values.[/yellow]"
-                        )
-                        fill_value = typer.prompt("Provide a fill value")
-
-        # Convert fill_value to appropriate type
+        # Convert fill_value to appropriate type if provided
         if fill_value is not None:
             # Try to interpret the value
             if fill_value.lower() == "null":
@@ -297,7 +280,7 @@ def alter_nullable(
                 fill_value = float(fill_value)
             # Otherwise keep as string
 
-        column_mgr.alter_column_nullable(table, column, nullable, fill_value)
+        db.alter_column_nullable(table, column, nullable, fill_value)
 
         if nullable:
             console.print(
@@ -307,13 +290,6 @@ def alter_nullable(
             console.print(
                 f"[green]✅ Made column '{column}' NOT NULL in table '{table}'[/green]"
             )
-
-        if apply:
-            # Apply to all tenants
-            applier = ChangeApplier(config.project_dir, db_name, branch_name)
-            applied = applier.apply_all_unapplied()
-            if applied > 0:
-                console.print("[green]✅ Applied changes to all tenants[/green]")
 
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")

@@ -2,41 +2,47 @@
 
 from pathlib import Path
 from typing import List, Dict, Any, Literal
-from ..core.connection import DatabaseConnection
-from ..core.path_utils import get_tenant_db_path
-from ..models import Table, Column, View
-from ..managers.table import TableManager
-from ..managers.view import ViewModel
+
+from cinchdb.managers.base import BaseManager, ConnectionContext
+from cinchdb.core.connection import DatabaseConnection
+from cinchdb.models import Table, Column, View
 
 
 LanguageType = Literal["python", "typescript"]
 
 
-class CodegenManager:
+class CodegenManager(BaseManager):
     """Manages code generation for database schemas."""
 
     SUPPORTED_LANGUAGES = ["python", "typescript"]
 
-    def __init__(
-        self, project_root: Path, database: str, branch: str, tenant: str = "main"
-    ):
+    def __init__(self, context: ConnectionContext):
         """Initialize codegen manager.
 
         Args:
-            project_root: Path to project root
-            database: Database name
-            branch: Branch name
-            tenant: Tenant name (defaults to main)
+            context: ConnectionContext with all connection parameters
         """
-        self.project_root = Path(project_root)
-        self.database = database
-        self.branch = branch
-        self.tenant = tenant
-        self.db_path = get_tenant_db_path(project_root, database, branch, tenant)
+        super().__init__(context)
 
-        # Initialize managers for data access
-        self.table_manager = TableManager(project_root, database, branch, tenant)
-        self.view_manager = ViewModel(project_root, database, branch, tenant)
+        # Lazy-loaded managers
+        self._table_manager = None
+        self._view_manager = None
+
+    @property
+    def table_manager(self):
+        """Get table manager instance (lazy-loaded)."""
+        if self._table_manager is None:
+            from cinchdb.managers.table import TableManager
+            self._table_manager = TableManager(self.context)
+        return self._table_manager
+
+    @property
+    def view_manager(self):
+        """Get view manager instance (lazy-loaded)."""
+        if self._view_manager is None:
+            from cinchdb.managers.view import ViewModel
+            self._view_manager = ViewModel(self.context)
+        return self._view_manager
 
     def get_supported_languages(self) -> List[str]:
         """Get list of supported code generation languages.

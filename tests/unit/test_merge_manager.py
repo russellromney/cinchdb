@@ -9,6 +9,7 @@ from cinchdb.core.initializer import init_project
 from cinchdb.managers.merge_manager import MergeManager, MergeError
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.branch import BranchManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.models import Change, ChangeType
 
 
@@ -31,7 +32,7 @@ class TestMergeManager:
 
     def test_can_merge_nonexistent_source(self, temp_project):
         """Test merge check with nonexistent source branch."""
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         result = merge_mgr.can_merge("nonexistent", "main")
 
@@ -40,7 +41,7 @@ class TestMergeManager:
 
     def test_can_merge_nonexistent_target(self, temp_project):
         """Test merge check with nonexistent target branch."""
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         result = merge_mgr.can_merge("main", "nonexistent")
 
@@ -49,10 +50,10 @@ class TestMergeManager:
 
     def test_can_merge_no_changes(self, temp_project):
         """Test merge check when source has no changes to merge."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.can_merge("feature", "main")
 
         assert not result["can_merge"]
@@ -60,7 +61,7 @@ class TestMergeManager:
 
     def test_can_merge_with_changes(self, temp_project):
         """Test merge check when merge is possible."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Add change to feature branch
@@ -74,7 +75,7 @@ class TestMergeManager:
         )
         tracker.add_change(change)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.can_merge("feature", "main")
 
         assert result["can_merge"]
@@ -84,7 +85,7 @@ class TestMergeManager:
 
     def test_can_merge_with_conflicts(self, temp_project):
         """Test merge check when conflicts exist."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature1")
         branch_mgr.create_branch("main", "feature2")
 
@@ -109,7 +110,7 @@ class TestMergeManager:
         )
         tracker2.add_change(change2)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.can_merge("feature1", "feature2")
 
         assert not result["can_merge"]
@@ -118,7 +119,7 @@ class TestMergeManager:
 
     def test_merge_branches_success(self, temp_project):
         """Test successful branch merge."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
         branch_mgr.create_branch("main", "target")
 
@@ -133,7 +134,7 @@ class TestMergeManager:
         )
         tracker.add_change(change)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.merge_branches("feature", "target")
 
         assert result["success"]
@@ -148,7 +149,7 @@ class TestMergeManager:
 
     def test_merge_branches_into_main_blocked(self, temp_project):
         """Test that merging into main branch is blocked."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Add change to feature
@@ -162,7 +163,7 @@ class TestMergeManager:
         )
         tracker.add_change(change)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         with pytest.raises(MergeError) as exc_info:
             merge_mgr.merge_branches("feature", "main")
@@ -171,7 +172,7 @@ class TestMergeManager:
 
     def test_merge_branches_with_conflicts_fails(self, temp_project):
         """Test merge fails when conflicts exist."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature1")
         branch_mgr.create_branch("main", "feature2")
 
@@ -196,7 +197,7 @@ class TestMergeManager:
         )
         tracker2.add_change(change2)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         with pytest.raises(MergeError) as exc_info:
             merge_mgr.merge_branches("feature1", "feature2")
@@ -205,7 +206,7 @@ class TestMergeManager:
 
     def test_merge_into_main_success(self, temp_project):
         """Test successful merge into main branch."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Add change to feature
@@ -219,7 +220,7 @@ class TestMergeManager:
         )
         tracker.add_change(change)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.merge_into_main("feature")
 
         assert result["success"]
@@ -233,7 +234,7 @@ class TestMergeManager:
 
     def test_merge_into_main_self_fails(self, temp_project):
         """Test merging main into itself fails."""
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         with pytest.raises(MergeError) as exc_info:
             merge_mgr.merge_into_main("main")
@@ -242,7 +243,7 @@ class TestMergeManager:
 
     def test_merge_into_main_not_up_to_date(self, temp_project):
         """Test merge into main fails when source is not up to date."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         # Add change to main first
         main_tracker = ChangeTracker(temp_project, "main", "main")
@@ -268,7 +269,7 @@ class TestMergeManager:
         )
         main_tracker.add_change(new_main_change)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         with pytest.raises(MergeError) as exc_info:
             merge_mgr.merge_into_main("feature")
@@ -277,7 +278,7 @@ class TestMergeManager:
 
     def test_get_merge_preview(self, temp_project):
         """Test getting merge preview."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Add changes to feature
@@ -300,7 +301,7 @@ class TestMergeManager:
         )
         tracker.add_change(change2)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         preview = merge_mgr.get_merge_preview("feature", "main")
 
         assert preview["can_merge"]
@@ -316,11 +317,11 @@ class TestMergeManager:
 
     def test_get_merge_preview_cannot_merge(self, temp_project):
         """Test merge preview when merge is not possible."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # No changes in feature branch
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         preview = merge_mgr.get_merge_preview("feature", "main")
 
         assert not preview["can_merge"]
@@ -328,7 +329,7 @@ class TestMergeManager:
 
     def test_merge_branches_dry_run(self, temp_project):
         """Test dry-run merge returns SQL statements without applying."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
         branch_mgr.create_branch("main", "target")
 
@@ -356,7 +357,7 @@ class TestMergeManager:
         )
         tracker.add_change(change2)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.merge_branches("feature", "target", dry_run=True)
 
         assert result["success"]
@@ -386,7 +387,7 @@ class TestMergeManager:
 
     def test_merge_into_main_dry_run(self, temp_project):
         """Test dry-run merge into main returns SQL statements without applying."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Add a view change to feature
@@ -400,7 +401,7 @@ class TestMergeManager:
         )
         tracker.add_change(change)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.merge_into_main("feature", dry_run=True)
 
         assert result["success"]
@@ -428,7 +429,7 @@ class TestMergeManager:
 
     def test_merge_branches_dry_run_complex_changes(self, temp_project):
         """Test dry-run with complex changes including table copy."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
         branch_mgr.create_branch("main", "target")
 
@@ -444,7 +445,7 @@ class TestMergeManager:
         )
         tracker.add_change(change)
 
-        merge_mgr = MergeManager(temp_project, "main")
+        merge_mgr = MergeManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         result = merge_mgr.merge_branches("feature", "target", dry_run=True)
 
         assert result["success"]

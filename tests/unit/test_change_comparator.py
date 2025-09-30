@@ -9,6 +9,7 @@ from cinchdb.core.initializer import init_project
 from cinchdb.managers.change_comparator import ChangeComparator
 from cinchdb.managers.change_tracker import ChangeTracker
 from cinchdb.managers.branch import BranchManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.models import Change, ChangeType
 
 
@@ -56,7 +57,7 @@ class TestChangeComparator:
     def test_find_common_ancestor_no_common(self, temp_project):
         """Test finding common ancestor when branches have no common changes."""
         # Create two branches with different changes
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature1")
         branch_mgr.create_branch("main", "feature2")
 
@@ -87,7 +88,7 @@ class TestChangeComparator:
 
     def test_find_common_ancestor_with_common(self, temp_project):
         """Test finding common ancestor when branches have common changes."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
         # Add common change to both branches
         main_tracker = ChangeTracker(temp_project, "main", "main")
@@ -123,7 +124,7 @@ class TestChangeComparator:
 
     def test_get_divergent_changes(self, temp_project):
         """Test getting divergent changes between branches."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Add common change to both branches
@@ -172,7 +173,7 @@ class TestChangeComparator:
 
     def test_can_fast_forward_merge(self, temp_project):
         """Test fast-forward merge detection."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         # Add change only to feature branch (fast-forward scenario)
@@ -196,7 +197,7 @@ class TestChangeComparator:
 
     def test_detect_conflicts(self, temp_project):
         """Test conflict detection between branches."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature1")
         branch_mgr.create_branch("main", "feature2")
 
@@ -229,7 +230,7 @@ class TestChangeComparator:
 
     def test_get_merge_order(self, temp_project):
         """Test getting changes in correct merge order."""
-        branch_mgr = BranchManager(temp_project, "main")
+        branch_mgr = BranchManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
         branch_mgr.create_branch("main", "feature")
 
         tracker = ChangeTracker(temp_project, "main", "feature")

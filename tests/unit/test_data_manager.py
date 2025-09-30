@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pydantic import BaseModel, Field, ConfigDict
 
 from cinchdb.core.initializer import init_project
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.managers.data import DataManager
 from cinchdb.managers.table import TableManager
 from cinchdb.models import Column
@@ -59,7 +60,8 @@ class TestDataManager:
         tenant = "main"
 
         # Create table manager and test table
-        table_manager = TableManager(project_root, database, branch, tenant)
+        context = ConnectionContext(project_root=project_root, database=database, branch=branch, tenant=tenant)
+        table_manager = TableManager(context)
 
         # Create users table
         columns = [
@@ -70,7 +72,7 @@ class TestDataManager:
         table_manager.create_table("users", columns)
 
         # Create and return data manager
-        return DataManager(project_root, database, branch, tenant)
+        return DataManager(context)
 
     def test_create_record(self, data_manager):
         """Test creating a new record."""

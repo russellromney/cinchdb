@@ -5,6 +5,7 @@ import tempfile
 import uuid
 from pathlib import Path
 from cinchdb.managers.tenant import TenantManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.infrastructure.metadata_db import MetadataDB
 from cinchdb.core.connection import DatabaseConnection
 
@@ -68,7 +69,7 @@ class TestTenantManagerWithMetadata:
     
     def test_create_lazy_tenant(self, test_project):
         """Test creating a lazy tenant."""
-        manager = TenantManager(test_project, "testdb", "main")
+        manager = TenantManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create lazy tenant
         tenant = manager.create_tenant("tenant1", "Test tenant", lazy=True)
@@ -89,7 +90,7 @@ class TestTenantManagerWithMetadata:
     
     def test_create_materialized_tenant(self, test_project):
         """Test creating a materialized tenant."""
-        manager = TenantManager(test_project, "testdb", "main")
+        manager = TenantManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create materialized tenant
         tenant = manager.create_tenant("tenant2", "Test tenant", lazy=False)
@@ -114,7 +115,7 @@ class TestTenantManagerWithMetadata:
     
     def test_materialize_lazy_tenant(self, test_project):
         """Test materializing a lazy tenant."""
-        manager = TenantManager(test_project, "testdb", "main")
+        manager = TenantManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create lazy tenant
         manager.create_tenant("tenant3", lazy=True)
@@ -131,7 +132,7 @@ class TestTenantManagerWithMetadata:
     
     def test_auto_materialize_on_write(self, test_project):
         """Test that lazy tenants auto-materialize on write operations."""
-        manager = TenantManager(test_project, "testdb", "main")
+        manager = TenantManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create lazy tenant
         manager.create_tenant("tenant4", lazy=True)
@@ -144,7 +145,7 @@ class TestTenantManagerWithMetadata:
     
     def test_read_lazy_tenant_uses_empty(self, test_project):
         """Test that reading from lazy tenant uses __empty__ tenant."""
-        manager = TenantManager(test_project, "testdb", "main")
+        manager = TenantManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create lazy tenant
         manager.create_tenant("tenant5", lazy=True)
@@ -160,7 +161,7 @@ class TestTenantManagerWithMetadata:
     
     def test_delete_lazy_tenant(self, test_project):
         """Test deleting a lazy tenant."""
-        manager = TenantManager(test_project, "testdb", "main")
+        manager = TenantManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create and delete lazy tenant
         manager.create_tenant("tenant6", lazy=True)
@@ -172,7 +173,7 @@ class TestTenantManagerWithMetadata:
     
     def test_delete_materialized_tenant(self, test_project):
         """Test deleting a materialized tenant."""
-        manager = TenantManager(test_project, "testdb", "main")
+        manager = TenantManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create materialized tenant
         manager.create_tenant("tenant7", lazy=False)
@@ -191,7 +192,7 @@ class TestTenantManagerWithMetadata:
     def test_performance_with_many_lazy_tenants(self, test_project):
         """Test performance with many lazy tenants."""
         import time
-        manager = TenantManager(test_project, "testdb", "main")
+        manager = TenantManager(ConnectionContext(project_root=test_project, database="testdb", branch="main"))
         
         # Create many lazy tenants
         n_tenants = 1000

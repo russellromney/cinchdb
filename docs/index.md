@@ -6,13 +6,17 @@
 
 Branch database schemas like code. Make changes, test them, merge safely.
 
+Generate type-safe SDKs in Python/Typescript from your database schema and use in your codebase
+instead of using an ORM schema as a source of truth and running migrations. 
+
 ## Core Features
 
+- **Multi-Tenancy** - Shared schema, isolated data
 - **Schema Branching** - Branch schemas like Git repos
-- **Multi-Tenancy** - Shared schema, isolated data  
 - **Change Tracking** - Every modification tracked
-- **Safe Merges** - Atomic operations, no rollback risk
+- **Safe Merges** - Atomic operations, no rollback risk (seriously)
 - **Type-Safe Python SDK** - Full type safety with code generation
+- **Key-Value Store** - Redis-like API built-in
 
 ## Quick Start
 
@@ -33,6 +37,10 @@ cinch branch merge-into-main add-users
 
 # Generate type-safe SDK
 cinch codegen generate python models/
+
+# Use Key-Value store (Redis-like)
+cinch kv set "session:123" '{"user_id": 42}'
+cinch kv get "session:123"
 ```
 
 ## Why CinchDB?
@@ -69,3 +77,4 @@ pip install cinchdb
 - **Why not just SQLite?** → [Constraints](concepts/constraints.md)
 - **Need commands?** → [CLI Reference](cli/index.md)
 - **Want to code?** → [Python SDK](python-sdk/index.md)
+- **Key-Value Store?** → [KV CLI](cli/kv.md) | [KV Python](python-sdk/kv-store.md)

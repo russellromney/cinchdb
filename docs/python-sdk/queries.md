@@ -13,8 +13,13 @@ Execute SQL queries with the Python SDK.
 |-----------|--------|---------|
 | SELECT | `db.query()` | `db.query("SELECT * FROM users")` |
 | INSERT | `db.insert()` | `db.insert("users", {"name": "Alice"})` |
-| UPDATE | `db.update()` | `db.update("users", user_id, {"name": "Bob"})` |
+| UPDATE | `db.update()` | `db.update("users", {"id": user_id, "name": "Bob"})` |
 | DELETE | `db.delete()` | `db.delete("users", user_id)` |
+| Batch Insert | `db.insert()` | `db.insert("users", data1, data2, ...)` |
+| Batch Update | `db.update()` | `db.update("users", {"id": id1, ...}, {"id": id2, ...})` |
+| Batch Delete | `db.delete()` | `db.delete("users", id1, id2, ...)` |
+| Update Where | `db.update_where()` | `db.update_where("users", {"active": False}, age__gt=65)` |
+| Delete Where | `db.delete_where()` | `db.delete_where("users", status="inactive")` |
 
 ## Safe Parameterized Queries
 
@@ -97,7 +102,7 @@ inserted_users = db.insert("users", *users_data)
 
 ```python
 # Update by ID
-updated = db.update("users", user_id, {"name": "Alice Smith", "active": False})
+updated = db.update("users", {"id": user_id, "name": "Alice Smith", "active": False})
 # Expected output: {"id": "123", "name": "Alice Smith", "active": False, "updated_at": "2025-01-15T11:00:00Z"}
 # Performance: ~1ms per update
 print(f"Updated at: {updated['updated_at']}")
@@ -107,7 +112,7 @@ print(f"Updated at: {updated['updated_at']}")
 users_to_deactivate = db.query("SELECT id FROM users WHERE last_login < ?", ["2024-01-01"])
 # Expected: [{"id": "123"}, {"id": "124"}, ...]
 for user in users_to_deactivate:
-    db.update("users", user["id"], {"active": False})
+    db.update("users", {"id": user["id"], "active": False})
     # Each update: ~1ms
 # Total performance: ~1ms per user (consider batch operations for large datasets)
 
@@ -115,7 +120,7 @@ for user in users_to_deactivate:
 products = db.query("SELECT id, price FROM products WHERE category = ?", ["electronics"])
 for product in products:
     new_price = product["price"] * 1.1  # 10% increase
-    db.update("products", product["id"], {"price": new_price})
+    db.update("products", {"id": product["id"], "price": new_price})
     # Performance tip: For >100 items, consider raw SQL UPDATE for better performance
 
 # Common errors:
@@ -148,10 +153,69 @@ for user in inactive_users:
 
 # Common patterns:
 # Soft delete (recommended for audit trails):
-db.update("users", user_id, {"deleted_at": "datetime('now')", "active": False})
+db.update("users", {"id": user_id, "deleted_at": "datetime('now')", "active": False})
 
 # Common errors:
 # sqlite3.IntegrityError: FOREIGN KEY constraint failed - Delete related records first
+```
+
+## Batch Operations
+
+CinchDB supports efficient batch operations for inserting, updating, and deleting multiple records:
+
+```python
+# Batch insert - more efficient than individual inserts
+users = db.insert("users",
+    {"name": "Alice", "email": "alice@example.com"},
+    {"name": "Bob", "email": "bob@example.com"},
+    {"name": "Carol", "email": "carol@example.com"}
+)
+# Expected output: [{"id": "123", "name": "Alice", ...}, {"id": "124", "name": "Bob", ...}, ...]
+# Performance: ~0.3ms per record (3x faster than individual inserts)
+
+# Or with a list using star expansion
+user_data = [
+    {"name": "Dave", "email": "dave@example.com"},
+    {"name": "Eve", "email": "eve@example.com"}
+]
+users = db.insert("users", *user_data)
+
+# Batch update - each dict must contain 'id' field
+updates = db.update("users",
+    {"id": "123", "status": "active"},
+    {"id": "124", "status": "inactive"},
+    {"id": "125", "name": "Updated Name"}
+)
+# Expected output: [{"id": "123", "status": "active", ...}, {"id": "124", "status": "inactive", ...}, ...]
+# Performance: ~0.5ms per update
+
+# Batch delete - accepts multiple IDs
+deleted_count = db.delete("users", "123", "124", "125")
+# Expected output: 3 (number of records deleted)
+# Performance: ~0.5ms per delete
+
+# With a list of IDs
+user_ids = ["abc", "def", "ghi"]
+deleted_count = db.delete("users", *user_ids)
+```
+
+### Conditional Batch Operations
+
+For bulk updates/deletes based on criteria, use `update_where()` and `delete_where()`:
+
+```python
+# Update all records matching criteria
+count = db.update_where("users", {"status": "inactive"}, last_login__lt="2024-01-01")
+# Expected output: 15 (number of records updated)
+# Updates all users with last_login before 2024-01-01
+
+# Delete all records matching criteria
+count = db.delete_where("users", status="deleted", created_at__lt="2023-01-01")
+# Expected output: 8 (number of records deleted)
+
+# Supported operators: __gt, __lt, __gte, __lte, __in, __like, __not
+# Combine with operator="OR" for OR conditions
+count = db.update_where("products", {"active": False}, operator="OR", stock__lt=1, discontinued=True)
 ```
 
 ## Advanced Queries
@@ -212,6 +276,37 @@ user_age = db.query("SELECT name, julianday('now') - julianday(created_at) as da
 monthly_signups = db.query("SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as signups FROM users GROUP BY month")
 ```
 
+## Column Masking (Security)
+
+Protect sensitive data by masking specific columns in query results:
+
+```python
+# Mask sensitive columns (PII, credentials, etc.)
+users = db.query(
+    "SELECT * FROM users",
+    mask_columns=["email", "phone", "ssn"]
+)
+# Expected output: [{"id": "123", "name": "Alice", "email": "***MASKED***", "phone": "***MASKED***", ...}]
+# Use case: Logging, debugging, or displaying data without exposing PII
+
+# Mask password hashes in audit logs
+admins = db.query(
+    "SELECT id, username, password_hash, role FROM admin_users",
+    mask_columns=["password_hash"]
+)
+# Expected: [{"id": "1", "username": "admin", "password_hash": "***MASKED***", "role": "superuser"}]
+
+# Multiple masked columns
+payment_info = db.query(
+    "SELECT user_id, card_number, cvv, billing_address FROM payments",
+    mask_columns=["card_number", "cvv"]
+)
+# Use for: Compliance with data protection regulations (GDPR, PCI-DSS)
+
+# Note: Masking is applied to results after query execution
+# The actual database data remains unchanged
+```
+
 ## Transactions
 
 **Individual operations** (insert, update, delete) are automatically wrapped in transactions.
@@ -224,7 +319,7 @@ try:
     
     # Update counters
     stats = db.query("SELECT * FROM stats WHERE id = 1")[0]
-    db.update("stats", stats["id"], {"user_count": stats["user_count"] + 1})
+    db.update("stats", {"id": stats["id"], "user_count": stats["user_count"] + 1})
 except Exception as e:
     print(f"Operation failed: {e}")
     raise

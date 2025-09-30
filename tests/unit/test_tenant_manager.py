@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import shutil
 from cinchdb.managers.tenant import TenantManager
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.core.initializer import init_project
 from cinchdb.core.connection import DatabaseConnection
 
@@ -26,8 +27,8 @@ class TestTenantManager:
 
     @pytest.fixture
     def tenant_manager(self, temp_project):
-        """Create a TenantManager instance."""
-        return TenantManager(temp_project, "main", "main")
+        """Create a TenantManager for testing."""
+        return TenantManager(ConnectionContext(project_root=temp_project, database="main", branch="main"))
 
     def test_list_tenants_initial(self, tenant_manager):
         """Test listing tenants in a new project."""
@@ -67,12 +68,14 @@ class TestTenantManager:
         # Create a table using TableManager which will track the change
         from cinchdb.managers.table import TableManager
         from cinchdb.models import Column
-        
+
         table_mgr = TableManager(
-            tenant_manager.project_root, 
-            tenant_manager.database, 
-            tenant_manager.branch,
-            "main"
+            ConnectionContext(
+                project_root=tenant_manager.project_root,
+                database=tenant_manager.database,
+                branch=tenant_manager.branch,
+                tenant="main"
+            )
         )
         
         # Create a table which will be added to __empty__ template

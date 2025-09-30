@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table as RichTable
 
 from cinchdb.config import Config
+from cinchdb.managers.base import ConnectionContext
 from cinchdb.core.path_utils import get_project_root
 from cinchdb.managers.tenant import TenantManager
 from cinchdb.cli.utils import get_config_with_data, validate_required_arg
@@ -40,7 +41,7 @@ def list_tenants():
     db_name = config_data.active_database
     branch_name = config_data.active_branch
 
-    tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+    tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
     tenants = tenant_mgr.list_tenants()
 
     if not tenants:
@@ -99,7 +100,7 @@ def create(
     branch_name = config_data.active_branch
 
     try:
-        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         tenant_mgr.create_tenant(name, description, encrypt=encrypt, encryption_key=key)
         
         if encrypt:
@@ -140,7 +141,7 @@ def delete(
             raise typer.Exit(0)
 
     try:
-        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         tenant_mgr.delete_tenant(name)
         console.print(f"[green]✅ Deleted tenant '{name}'[/green]")
 
@@ -166,7 +167,7 @@ def copy(
     branch_name = config_data.active_branch
 
     try:
-        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         tenant_mgr.copy_tenant(source, target, description)
         console.print(f"[green]✅ Copied tenant '{source}' to '{target}'[/green]")
 
@@ -201,7 +202,7 @@ def rename(
         raise typer.Exit(1)
 
     try:
-        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
+        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
         tenant_mgr.rename_tenant(old_name, new_name)
         console.print(f"[green]✅ Renamed tenant '{old_name}' to '{new_name}'[/green]")
 
@@ -229,8 +230,8 @@ def vacuum(
     branch_name = config_data.active_branch
 
     try:
-        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
-        
+        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+
         console.print(f"[yellow]🔧 Starting VACUUM operation on tenant '{tenant_name}'...[/yellow]")
         
         result = tenant_mgr.vacuum_tenant(tenant_name)
@@ -263,14 +264,14 @@ def rotate_key(
 ):
     """Rotate encryption key for a tenant (requires plugged extension)."""
     validate_required_arg(tenant_name, "tenant name")
-    
+
     config, config_data = get_config_with_data()
     db_name = config_data.active_database
     branch_name = config_data.active_branch
 
     try:
-        tenant_mgr = TenantManager(config.project_dir, db_name, branch_name)
-        
+        tenant_mgr = TenantManager(ConnectionContext(project_root=config.project_dir, database=db_name, branch=branch_name))
+
         console.print(f"[yellow]🔐 Rotating encryption key for tenant '{tenant_name}'...[/yellow]")
         
         new_key = tenant_mgr.rotate_tenant_key(tenant_name)
